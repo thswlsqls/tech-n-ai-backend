@@ -33,7 +33,7 @@ public class AdminController {
     public ResponseEntity<ApiResponse<AdminResponse>> createAdmin(
             @Valid @RequestBody AdminCreateRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
-        return ResponseEntity.ok(ApiResponse.success(adminFacade.createAdmin(request)));
+        return ResponseEntity.ok(ApiResponse.success(adminFacade.createAdmin(request, principal.userId())));
     }
 
     @GetMapping("/accounts")
@@ -54,7 +54,7 @@ public class AdminController {
             @PathVariable Long adminId,
             @Valid @RequestBody AdminUpdateRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
-        return ResponseEntity.ok(ApiResponse.success(adminFacade.updateAdmin(adminId, request)));
+        return ResponseEntity.ok(ApiResponse.success(adminFacade.updateAdmin(adminId, request, principal.userId())));
     }
 
     @DeleteMapping("/accounts/{adminId}")

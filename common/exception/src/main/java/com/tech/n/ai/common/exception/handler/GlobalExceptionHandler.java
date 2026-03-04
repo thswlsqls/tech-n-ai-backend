@@ -25,6 +25,7 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
@@ -343,6 +344,32 @@ public class GlobalExceptionHandler {
         ApiResponse<Void> response = ApiResponse.error(
             ErrorCodeConstants.BAD_REQUEST,
             messageCode
+        );
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    /**
+     * 데이터 무결성 위반 예외 처리 (unique constraint 등)
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Map<String, String>>> handleDataIntegrityViolationException(
+        DataIntegrityViolationException e, HttpServletRequest request) {
+        log.warn("Data integrity violation: {}", e.getMostSpecificCause().getMessage());
+        logException(e, request, "WRITE");
+
+        Map<String, String> errors = new HashMap<>();
+        errors.put("field", "데이터 무결성 제약 조건을 위반했습니다.");
+
+        MessageCode messageCode = new MessageCode(
+            ErrorCodeConstants.MESSAGE_CODE_VALIDATION_ERROR,
+            "유효성 검증에 실패했습니다."
+        );
+        ApiResponse<Map<String, String>> response = new ApiResponse<>(
+            ErrorCodeConstants.VALIDATION_ERROR,
+            messageCode,
+            null,
+            errors
         );
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);

@@ -34,7 +34,7 @@ public class AdminService {
     private final TokenService tokenService;
 
     @Transactional
-    public AdminResponse createAdmin(AdminCreateRequest request) {
+    public AdminResponse createAdmin(AdminCreateRequest request, Long currentAdminId) {
         adminReaderRepository.findByEmail(request.email())
             .ifPresent(a -> { throw new ConflictException("email", "이미 등록된 이메일입니다."); });
 
@@ -47,6 +47,7 @@ public class AdminService {
         admin.setPassword(passwordEncoder.encode(request.password()));
         admin.setRole(ADMIN_ROLE);
         admin.setIsActive(true);
+        admin.setCreatedBy(currentAdminId);
 
         adminWriterRepository.save(admin);
         log.info("Admin created: email={}", request.email());
@@ -55,7 +56,7 @@ public class AdminService {
 
     @Transactional(readOnly = true)
     public List<AdminResponse> listAdmins() {
-        return adminReaderRepository.findByIsActiveTrue().stream()
+        return adminReaderRepository.findByIsActiveTrueAndIsDeletedFalse().stream()
             .map(AdminResponse::from)
             .toList();
     }
@@ -67,7 +68,7 @@ public class AdminService {
     }
 
     @Transactional
-    public AdminResponse updateAdmin(Long adminId, AdminUpdateRequest request) {
+    public AdminResponse updateAdmin(Long adminId, AdminUpdateRequest request, Long currentAdminId) {
         AdminEntity admin = findActiveAdmin(adminId);
 
         if (request.username() != null && !request.username().isBlank()
@@ -81,6 +82,7 @@ public class AdminService {
             admin.setPassword(passwordEncoder.encode(request.password()));
         }
 
+        admin.setUpdatedBy(currentAdminId);
         adminWriterRepository.save(admin);
         log.info("Admin updated: adminId={}", adminId);
         return AdminResponse.from(admin);
@@ -93,6 +95,7 @@ public class AdminService {
         }
 
         AdminEntity admin = findActiveAdmin(adminId);
+        admin.setIsActive(false);
         admin.setDeletedBy(currentAdminId);
         adminWriterRepository.delete(admin);
 
@@ -101,7 +104,7 @@ public class AdminService {
 
     @Transactional
     public TokenResponse login(LoginRequest request) {
-        AdminEntity admin = adminReaderRepository.findByEmailAndIsActiveTrue(request.email())
+        AdminEntity admin = adminReaderRepository.findByEmailAndIsActiveTrueAndIsDeletedFalse(request.email())
             .orElseThrow(() -> new UnauthorizedException("이메일 또는 비밀번호가 올바르지 않습니다."));
 
         if (!passwordEncoder.matches(request.password(), admin.getPassword())) {
@@ -118,7 +121,7 @@ public class AdminService {
         AdminEntity admin = adminReaderRepository.findById(adminId)
             .orElseThrow(() -> new ResourceNotFoundException("관리자를 찾을 수 없습니다."));
 
-        if (Boolean.TRUE.equals(admin.getIsDeleted())) {
+        if (Boolean.TRUE.equals(admin.getIsDeleted()) || !Boolean.TRUE.equals(admin.getIsActive())) {
             throw new ResourceNotFoundException("관리자를 찾을 수 없습니다.");
         }
 

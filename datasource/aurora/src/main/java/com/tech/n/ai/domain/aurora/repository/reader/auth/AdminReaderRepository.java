@@ -17,7 +17,7 @@ public interface AdminReaderRepository extends JpaRepository<AdminEntity, Long> 
 
     Optional<AdminEntity> findByUsername(String username);
 
-    List<AdminEntity> findByIsActiveTrue();
+    List<AdminEntity> findByIsActiveTrueAndIsDeletedFalse();
 
-    Optional<AdminEntity> findByEmailAndIsActiveTrue(String email);
+    Optional<AdminEntity> findByEmailAndIsActiveTrueAndIsDeletedFalse(String email);
 }

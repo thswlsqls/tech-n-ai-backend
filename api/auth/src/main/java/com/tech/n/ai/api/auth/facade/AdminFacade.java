@@ -17,8 +17,8 @@ public class AdminFacade {
 
     private final AdminService adminService;
 
-    public AdminResponse createAdmin(AdminCreateRequest request) {
-        return adminService.createAdmin(request);
+    public AdminResponse createAdmin(AdminCreateRequest request, Long currentAdminId) {
+        return adminService.createAdmin(request, currentAdminId);
     }
 
     public List<AdminResponse> listAdmins() {
@@ -29,8 +29,8 @@ public class AdminFacade {
         return adminService.getAdmin(adminId);
     }
 
-    public AdminResponse updateAdmin(Long adminId, AdminUpdateRequest request) {
-        return adminService.updateAdmin(adminId, request);
+    public AdminResponse updateAdmin(Long adminId, AdminUpdateRequest request, Long currentAdminId) {
+        return adminService.updateAdmin(adminId, request, currentAdminId);
     }
 
     public void deleteAdmin(Long adminId, Long currentAdminId) {

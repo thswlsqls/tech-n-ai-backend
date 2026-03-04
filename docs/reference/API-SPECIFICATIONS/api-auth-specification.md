@@ -21,7 +21,7 @@
 |---------|----------|
 | 공개 API | 불필요 |
 | 사용자 API | Bearer Token (JWT) |
-| 관리자 API | Bearer Token (ADMIN 이상) |
+| 관리자 API | Bearer Token (ADMIN) |
 
 ### 토큰 만료 시간
 
@@ -164,8 +164,8 @@
 | accessToken | String | O | JWT 액세스 토큰 |
 | refreshToken | String | O | 리프레시 토큰 |
 | tokenType | String | O | 토큰 타입 (항상 "Bearer") |
-| expiresIn | Integer | O | 액세스 토큰 만료 시간 (초) |
-| refreshTokenExpiresIn | Integer | O | 리프레시 토큰 만료 시간 (초) |
+| expiresIn | Long | O | 액세스 토큰 만료 시간 (초) |
+| refreshTokenExpiresIn | Long | O | 리프레시 토큰 만료 시간 (초) |
 
 **Errors**
 - `401` - 이메일 또는 비밀번호 불일치, 이메일 미인증
@@ -473,8 +473,7 @@ LoginRequest 형식 (일반 로그인과 동일)
 TokenResponse 형식 (로그인 응답과 동일)
 
 **Errors**
-- `401` - 이메일 또는 비밀번호 불일치
-- `403` - 관리자 권한 없음
+- `401` - 이메일 또는 비밀번호 불일치, 비활성화 또는 삭제된 관리자 계정
 
 ---
 
@@ -482,7 +481,7 @@ TokenResponse 형식 (로그인 응답과 동일)
 
 **POST** `/api/v1/auth/admin/accounts`
 
-**인증**: 필요 (SUPER_ADMIN)
+**인증**: 필요 (ADMIN)
 
 새 관리자 계정을 생성합니다.
 
@@ -490,7 +489,7 @@ TokenResponse 형식 (로그인 응답과 동일)
 
 | 헤더 | 타입 | 필수 | 설명 |
 |------|------|------|------|
-| Authorization | String | O | `Bearer {accessToken}` (SUPER_ADMIN) |
+| Authorization | String | O | `Bearer {accessToken}` (ADMIN) |
 
 **Request Body**
 
@@ -536,15 +535,17 @@ TokenResponse 형식 (로그인 응답과 동일)
 | id | Long | O | 관리자 ID |
 | email | String | O | 이메일 |
 | username | String | O | 관리자명 |
-| role | String | O | 권한 (`ADMIN`, `SUPER_ADMIN`) |
+| role | String | O | 권한 (`ADMIN`) |
 | isActive | Boolean | O | 활성화 여부 |
 | createdAt | String (ISO 8601) | O | 생성일시 |
 | lastLoginAt | String (ISO 8601) | X | 마지막 로그인 일시 |
 
 **Errors**
-- `400` - 유효성 검증 실패
+- `400` - 유효성 검증 실패, 이메일 중복, 사용자명 중복
+- `401` - 인증 실패
 - `403` - 권한 없음
-- `409` - 이메일 중복
+
+> **참고**: 이메일/사용자명 중복은 유효성 검증 에러 형식(코드: `4006`, `VALIDATION_ERROR`)으로 반환됩니다.
 
 ---
 
@@ -552,15 +553,15 @@ TokenResponse 형식 (로그인 응답과 동일)
 
 **GET** `/api/v1/auth/admin/accounts`
 
-**인증**: 필요 (ADMIN 이상)
+**인증**: 필요 (ADMIN)
 
-관리자 계정 목록을 조회합니다.
+활성 상태(`isActive=true`)이고 삭제되지 않은(`isDeleted=false`) 관리자 계정 목록을 조회합니다.
 
 **Request Headers**
 
 | 헤더 | 타입 | 필수 | 설명 |
 |------|------|------|------|
-| Authorization | String | O | `Bearer {accessToken}` (ADMIN 이상) |
+| Authorization | String | O | `Bearer {accessToken}` (ADMIN) |
 
 **Response** (200 OK) `ApiResponse<List<AdminResponse>>`
 
@@ -593,7 +594,7 @@ TokenResponse 형식 (로그인 응답과 동일)
 
 **GET** `/api/v1/auth/admin/accounts/{adminId}`
 
-**인증**: 필요 (ADMIN 이상)
+**인증**: 필요 (ADMIN)
 
 특정 관리자 계정을 조회합니다.
 
@@ -601,7 +602,7 @@ TokenResponse 형식 (로그인 응답과 동일)
 
 | 헤더 | 타입 | 필수 | 설명 |
 |------|------|------|------|
-| Authorization | String | O | `Bearer {accessToken}` (ADMIN 이상) |
+| Authorization | String | O | `Bearer {accessToken}` (ADMIN) |
 
 **Path Parameters**
 
@@ -624,7 +625,7 @@ AdminResponse 형식
 
 **PUT** `/api/v1/auth/admin/accounts/{adminId}`
 
-**인증**: 필요 (SUPER_ADMIN)
+**인증**: 필요 (ADMIN)
 
 관리자 계정 정보를 수정합니다.
 
@@ -632,7 +633,7 @@ AdminResponse 형식
 
 | 헤더 | 타입 | 필수 | 설명 |
 |------|------|------|------|
-| Authorization | String | O | `Bearer {accessToken}` (SUPER_ADMIN) |
+| Authorization | String | O | `Bearer {accessToken}` (ADMIN) |
 
 **Path Parameters**
 
@@ -661,7 +662,8 @@ AdminResponse 형식
 AdminResponse 형식
 
 **Errors**
-- `400` - 유효성 검증 실패
+- `400` - 유효성 검증 실패, 사용자명 중복
+- `401` - 인증 실패
 - `403` - 권한 없음
 - `404` - 관리자 없음
 
@@ -671,15 +673,15 @@ AdminResponse 형식
 
 **DELETE** `/api/v1/auth/admin/accounts/{adminId}`
 
-**인증**: 필요 (SUPER_ADMIN)
+**인증**: 필요 (ADMIN)
 
-관리자 계정을 삭제합니다. 자기 자신은 삭제 불가.
+관리자 계정을 삭제합니다 (Soft delete). 자기 자신은 삭제 불가.
 
 **Request Headers**
 
 | 헤더 | 타입 | 필수 | 설명 |
 |------|------|------|------|
-| Authorization | String | O | `Bearer {accessToken}` (SUPER_ADMIN) |
+| Authorization | String | O | `Bearer {accessToken}` (ADMIN) |
 
 **Path Parameters**
 
@@ -698,35 +700,39 @@ AdminResponse 형식
 ```
 
 **Errors**
-- `400` - 자기 자신 삭제 시도
-- `403` - 권한 없음
+- `401` - 인증 실패
+- `403` - 권한 없음, 자기 자신 삭제 시도
 - `404` - 관리자 없음
 
 ---
 
 ## 6. 에러 코드
 
-| HTTP 상태 | 에러 코드 | 설명 |
-|----------|---------|------|
-| 400 | 4000 | 잘못된 요청 (Validation Error) |
-| 401 | 4010 | 인증 실패 (Unauthorized) |
-| 403 | 4030 | 권한 없음 (Forbidden) |
-| 404 | 4040 | 리소스 없음 (Not Found) |
-| 409 | 4090 | 충돌 (Conflict - 이메일 중복 등) |
-| 500 | 5000 | 서버 에러 (Internal Server Error) |
+| HTTP 상태 | 에러 코드 | 메시지 코드 | 설명 |
+|----------|---------|-----------|------|
+| 400 | 4000 | BAD_REQUEST | 잘못된 요청 |
+| 400 | 4006 | VALIDATION_ERROR | 유효성 검증 실패 (이메일/사용자명 중복 포함) |
+| 401 | 4001 | AUTH_FAILED | 인증 실패 |
+| 401 | 4002 | AUTH_REQUIRED | 인증 필요 |
+| 403 | 4003 | FORBIDDEN | 권한 없음 |
+| 404 | 4004 | NOT_FOUND | 리소스 없음 |
+| 409 | 4005 | CONFLICT | 충돌 |
+| 429 | 4029 | RATE_LIMIT_EXCEEDED | 요청 한도 초과 |
+| 500 | 5000 | INTERNAL_SERVER_ERROR | 서버 에러 |
 
-### 인증 관련 에러 메시지
+> **참고**: `ConflictException`(이메일/사용자명 중복)은 유효성 검증 에러 형식으로 처리되어 HTTP `400`, 코드 `4006`으로 반환됩니다.
 
-| 에러 코드 | 메시지 |
-|---------|--------|
+### 에러 메시지 코드
+
+| 메시지 코드 | 기본 메시지 |
+|-----------|-----------|
 | AUTH_FAILED | 인증에 실패했습니다. |
-| INVALID_TOKEN | 유효하지 않은 토큰입니다. |
-| TOKEN_EXPIRED | 토큰이 만료되었습니다. |
-| EMAIL_NOT_VERIFIED | 이메일 인증이 필요합니다. |
-| EMAIL_ALREADY_EXISTS | 이미 존재하는 이메일입니다. |
-| USERNAME_ALREADY_EXISTS | 이미 존재하는 사용자명입니다. |
-| PASSWORD_POLICY_VIOLATION | 비밀번호 정책을 충족하지 않습니다. |
-| INVALID_CREDENTIALS | 이메일 또는 비밀번호가 일치하지 않습니다. |
+| AUTH_REQUIRED | 인증이 필요합니다. |
+| FORBIDDEN | 권한이 없습니다. |
+| NOT_FOUND | 리소스를 찾을 수 없습니다. |
+| CONFLICT | 충돌이 발생했습니다. |
+| VALIDATION_ERROR | 유효성 검증에 실패했습니다. |
+| BAD_REQUEST | 잘못된 요청입니다. |
 
 ---
 
@@ -752,13 +758,13 @@ AdminResponse 형식
 | GET | `/api/v1/auth/oauth2/{provider}` | X | OAuth 로그인 시작 |
 | GET | `/api/v1/auth/oauth2/{provider}/callback` | X | OAuth 콜백 |
 | POST | `/api/v1/auth/admin/login` | X | 관리자 로그인 |
-| POST | `/api/v1/auth/admin/accounts` | O (SUPER_ADMIN) | 관리자 계정 생성 |
-| GET | `/api/v1/auth/admin/accounts` | O (ADMIN+) | 관리자 목록 조회 |
-| GET | `/api/v1/auth/admin/accounts/{adminId}` | O (ADMIN+) | 관리자 상세 조회 |
-| PUT | `/api/v1/auth/admin/accounts/{adminId}` | O (SUPER_ADMIN) | 관리자 정보 수정 |
-| DELETE | `/api/v1/auth/admin/accounts/{adminId}` | O (SUPER_ADMIN) | 관리자 계정 삭제 |
+| POST | `/api/v1/auth/admin/accounts` | O (ADMIN) | 관리자 계정 생성 |
+| GET | `/api/v1/auth/admin/accounts` | O (ADMIN) | 관리자 목록 조회 |
+| GET | `/api/v1/auth/admin/accounts/{adminId}` | O (ADMIN) | 관리자 상세 조회 |
+| PUT | `/api/v1/auth/admin/accounts/{adminId}` | O (ADMIN) | 관리자 정보 수정 |
+| DELETE | `/api/v1/auth/admin/accounts/{adminId}` | O (ADMIN) | 관리자 계정 삭제 |
 
 ---
 
-**문서 버전**: 1.1
-**최종 업데이트**: 2026-02-12
+**문서 버전**: 1.2
+**최종 업데이트**: 2026-03-04
