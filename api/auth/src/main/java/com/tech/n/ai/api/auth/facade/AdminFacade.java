@@ -1,6 +1,7 @@
 package com.tech.n.ai.api.auth.facade;
 
 import com.tech.n.ai.api.auth.dto.LoginRequest;
+import com.tech.n.ai.api.auth.dto.RefreshTokenRequest;
 import com.tech.n.ai.api.auth.dto.TokenResponse;
 import com.tech.n.ai.api.auth.dto.admin.AdminCreateRequest;
 import com.tech.n.ai.api.auth.dto.admin.AdminResponse;
@@ -39,5 +40,13 @@ public class AdminFacade {
 
     public TokenResponse login(LoginRequest request) {
         return adminService.login(request);
+    }
+
+    public void logout(Long adminId, String refreshToken) {
+        adminService.logout(adminId, refreshToken);
+    }
+
+    public TokenResponse refreshToken(RefreshTokenRequest request) {
+        return adminService.refreshToken(request);
     }
 }

@@ -2,7 +2,7 @@
 
 **작성일**: 2026-02-06
 **대상 모듈**: api-auth
-**버전**: v1
+**버전**: v2
 
 ---
 
@@ -13,7 +13,7 @@
 | 모듈 | api-auth |
 | Base URL | `/api/v1/auth` |
 | 포트 | 8083 (via Gateway: 8081) |
-| 설명 | 사용자 인증 및 OAuth 로그인 API |
+| 설명 | 사용자 인증 및 OAuth 로그인, 관리자 인증 및 계정 관리 API |
 
 ### 인증 방식
 
@@ -25,10 +25,10 @@
 
 ### 토큰 만료 시간
 
-| 토큰 유형 | 만료 시간 |
-|----------|---------|
-| Access Token | 3600초 (1시간) |
-| Refresh Token | 604800초 (7일) |
+| 토큰 유형 | 사용자 | 관리자 |
+|----------|--------|--------|
+| Access Token | 3600초 (1시간) | 900초 (15분) |
+| Refresh Token | 604800초 (7일) | 86400초 (1일) |
 
 ---
 
@@ -462,7 +462,7 @@ TokenResponse 형식 (로그인 응답과 동일)
 
 **인증**: 불필요
 
-관리자 계정으로 로그인합니다.
+관리자 계정으로 로그인합니다. 로그인 실패 시 계정 잠금 정책이 적용됩니다.
 
 **Request Body**
 
@@ -470,20 +470,103 @@ LoginRequest 형식 (일반 로그인과 동일)
 
 **Response** (200 OK) `ApiResponse<TokenResponse>`
 
-TokenResponse 형식 (로그인 응답과 동일)
+TokenResponse 형식 (관리자 토큰: Access 900초, Refresh 86400초)
+
+**계정 잠금 정책**
+
+| 연속 실패 횟수 | 잠금 시간 |
+|--------------|----------|
+| 5회 이상 | 15분 |
+| 10회 이상 | 1시간 |
+
+> 로그인 성공 시 실패 횟수가 초기화됩니다.
 
 **Errors**
-- `401` - 이메일 또는 비밀번호 불일치, 비활성화 또는 삭제된 관리자 계정
+- `401` - 이메일 또는 비밀번호 불일치, 비활성화 또는 삭제된 관리자 계정, 계정 잠금 상태
 
 ---
 
-### 5.2 관리자 계정 생성
+### 5.2 관리자 로그아웃
+
+**POST** `/api/v1/auth/admin/logout`
+
+**인증**: 필요 (ADMIN)
+
+관리자 세션을 로그아웃합니다. 해당 리프레시 토큰이 무효화됩니다.
+
+**Request Headers**
+
+| 헤더 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| Authorization | String | O | `Bearer {accessToken}` (ADMIN) |
+
+**Request Body**
+
+```json
+{
+  "refreshToken": "dGhpcyBpcyBhIHJlZnJlc2ggdG9rZW4..."
+}
+```
+
+**LogoutRequest 필드**
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| refreshToken | String | O | 리프레시 토큰 |
+
+**Response** (200 OK) `ApiResponse<Void>`
+
+```json
+{
+  "code": "2000",
+  "messageCode": { "code": "SUCCESS", "text": "성공" },
+  "message": "success"
+}
+```
+
+**Errors**
+- `401` - 인증 실패, Refresh Token 불일치, 관리자 ID 불일치
+
+---
+
+### 5.3 관리자 토큰 갱신
+
+**POST** `/api/v1/auth/admin/refresh`
+
+**인증**: 불필요
+
+관리자 리프레시 토큰으로 새 액세스 토큰을 발급받습니다. 사용자(USER) 역할의 토큰은 사용할 수 없습니다.
+
+**Request Body**
+
+```json
+{
+  "refreshToken": "dGhpcyBpcyBhIHJlZnJlc2ggdG9rZW4..."
+}
+```
+
+**RefreshTokenRequest 필드**
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| refreshToken | String | O | 관리자 리프레시 토큰 |
+
+**Response** (200 OK) `ApiResponse<TokenResponse>`
+
+TokenResponse 형식 (관리자 토큰: Access 900초, Refresh 86400초)
+
+**Errors**
+- `401` - Refresh Token 만료 또는 무효, 사용자 토큰 사용 시도, 비활성화된 관리자 계정, 관리자 ID 불일치
+
+---
+
+### 5.4 관리자 계정 생성
 
 **POST** `/api/v1/auth/admin/accounts`
 
 **인증**: 필요 (ADMIN)
 
-새 관리자 계정을 생성합니다.
+새 관리자 계정을 생성합니다. 생성자 정보가 감사 추적됩니다.
 
 **Request Headers**
 
@@ -549,7 +632,7 @@ TokenResponse 형식 (로그인 응답과 동일)
 
 ---
 
-### 5.3 관리자 목록 조회
+### 5.5 관리자 목록 조회
 
 **GET** `/api/v1/auth/admin/accounts`
 
@@ -590,7 +673,7 @@ TokenResponse 형식 (로그인 응답과 동일)
 
 ---
 
-### 5.4 관리자 상세 조회
+### 5.6 관리자 상세 조회
 
 **GET** `/api/v1/auth/admin/accounts/{adminId}`
 
@@ -621,13 +704,13 @@ AdminResponse 형식
 
 ---
 
-### 5.5 관리자 정보 수정
+### 5.7 관리자 정보 수정
 
 **PUT** `/api/v1/auth/admin/accounts/{adminId}`
 
 **인증**: 필요 (ADMIN)
 
-관리자 계정 정보를 수정합니다.
+관리자 계정 정보를 수정합니다. 수정자 정보가 감사 추적됩니다.
 
 **Request Headers**
 
@@ -669,13 +752,13 @@ AdminResponse 형식
 
 ---
 
-### 5.6 관리자 계정 삭제
+### 5.8 관리자 계정 삭제
 
 **DELETE** `/api/v1/auth/admin/accounts/{adminId}`
 
 **인증**: 필요 (ADMIN)
 
-관리자 계정을 삭제합니다 (Soft delete). 자기 자신은 삭제 불가.
+관리자 계정을 삭제합니다 (Soft delete). 자기 자신은 삭제 불가. 삭제 시 해당 관리자의 모든 리프레시 토큰이 무효화되며, 삭제자 정보가 감사 추적됩니다.
 
 **Request Headers**
 
@@ -706,7 +789,35 @@ AdminResponse 형식
 
 ---
 
-## 6. 에러 코드
+## 6. 관리자 보안 정책
+
+### 6.1 계정 잠금
+
+| 정책 | 내용 |
+|------|------|
+| 1차 잠금 | 연속 5회 로그인 실패 시 15분 잠금 |
+| 2차 잠금 | 연속 10회 로그인 실패 시 1시간 잠금 |
+| 잠금 해제 | 로그인 성공 시 실패 횟수 초기화 |
+
+### 6.2 감사 추적 (Audit Trail)
+
+관리자 계정의 생성/수정/삭제 시 수행한 관리자의 ID가 기록됩니다.
+
+| 필드 | 설명 |
+|------|------|
+| createdBy | 계정을 생성한 관리자 ID |
+| updatedBy | 계정을 수정한 관리자 ID |
+| deletedBy | 계정을 삭제한 관리자 ID |
+
+### 6.3 관리자 토큰 분리
+
+관리자 토큰과 사용자 토큰은 분리되어 관리됩니다.
+- 관리자 토큰 갱신 경로(`/admin/refresh`)에서 사용자(USER) 역할의 토큰 사용 불가
+- 사용자 토큰 갱신 경로(`/refresh`)에서 관리자(ADMIN) 역할의 토큰 사용 불가
+
+---
+
+## 7. 에러 코드
 
 | HTTP 상태 | 에러 코드 | 메시지 코드 | 설명 |
 |----------|---------|-----------|------|
@@ -736,14 +847,14 @@ AdminResponse 형식
 
 ---
 
-## 7. 비밀번호 정책
+## 8. 비밀번호 정책
 
 - **최소 길이**: 8자
 - **필수 포함**: 대소문자/숫자/특수문자 중 2가지 이상
 
 ---
 
-## 8. 엔드포인트 요약
+## 9. 엔드포인트 요약
 
 | Method | Endpoint | 인증 | 설명 |
 |--------|----------|------|------|
@@ -758,6 +869,8 @@ AdminResponse 형식
 | GET | `/api/v1/auth/oauth2/{provider}` | X | OAuth 로그인 시작 |
 | GET | `/api/v1/auth/oauth2/{provider}/callback` | X | OAuth 콜백 |
 | POST | `/api/v1/auth/admin/login` | X | 관리자 로그인 |
+| POST | `/api/v1/auth/admin/logout` | O (ADMIN) | 관리자 로그아웃 |
+| POST | `/api/v1/auth/admin/refresh` | X | 관리자 토큰 갱신 |
 | POST | `/api/v1/auth/admin/accounts` | O (ADMIN) | 관리자 계정 생성 |
 | GET | `/api/v1/auth/admin/accounts` | O (ADMIN) | 관리자 목록 조회 |
 | GET | `/api/v1/auth/admin/accounts/{adminId}` | O (ADMIN) | 관리자 상세 조회 |
@@ -766,5 +879,5 @@ AdminResponse 형식
 
 ---
 
-**문서 버전**: 1.2
-**최종 업데이트**: 2026-03-04
+**문서 버전**: 2.0
+**최종 업데이트**: 2026-03-05

@@ -1,6 +1,7 @@
 package com.tech.n.ai.api.auth.service;
 
 import com.tech.n.ai.api.auth.dto.LoginRequest;
+import com.tech.n.ai.api.auth.dto.RefreshTokenRequest;
 import com.tech.n.ai.api.auth.dto.TokenResponse;
 import com.tech.n.ai.api.auth.dto.admin.AdminCreateRequest;
 import com.tech.n.ai.api.auth.dto.admin.AdminResponse;
@@ -9,7 +10,9 @@ import com.tech.n.ai.common.exception.exception.ConflictException;
 import com.tech.n.ai.common.exception.exception.ForbiddenException;
 import com.tech.n.ai.common.exception.exception.ResourceNotFoundException;
 import com.tech.n.ai.common.exception.exception.UnauthorizedException;
+import com.tech.n.ai.common.security.jwt.JwtTokenPayload;
 import com.tech.n.ai.domain.mariadb.entity.auth.AdminEntity;
+import com.tech.n.ai.domain.mariadb.entity.auth.RefreshTokenEntity;
 import com.tech.n.ai.domain.mariadb.repository.reader.auth.AdminReaderRepository;
 import com.tech.n.ai.domain.mariadb.repository.writer.auth.AdminWriterRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -21,6 +24,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -44,6 +48,9 @@ class AdminServiceTest {
 
     @Mock
     private TokenService tokenService;
+
+    @Mock
+    private RefreshTokenService refreshTokenService;
 
     @InjectMocks
     private AdminService adminService;
@@ -327,7 +334,7 @@ class AdminServiceTest {
     class DeleteAdmin {
 
         @Test
-        @DisplayName("정상 관리자 삭제")
+        @DisplayName("정상 관리자 삭제 - Refresh Token도 함께 삭제")
         void deleteAdmin_성공() {
             // Given
             AdminEntity admin = createAdminEntity(1L, "admin@example.com", "admin1");
@@ -337,6 +344,7 @@ class AdminServiceTest {
             adminService.deleteAdmin(1L, 2L);
 
             // Then
+            verify(refreshTokenService).deleteAllAdminRefreshTokens(1L);
             verify(adminWriterRepository).delete(admin);
             assertThat(admin.getIsActive()).isFalse();
             assertThat(admin.getDeletedBy()).isEqualTo(2L);
@@ -383,16 +391,17 @@ class AdminServiceTest {
     class Login {
 
         @Test
-        @DisplayName("정상 로그인 - TokenResponse 반환")
+        @DisplayName("정상 로그인 - TokenResponse 반환 및 실패 카운터 초기화")
         void login_성공() {
             // Given
             AdminEntity admin = createAdminEntity(1L, "admin@example.com", "admin1");
             admin.setPassword("$2a$10$encodedPassword");
+            admin.setFailedLoginAttempts(3);
             when(adminReaderRepository.findByEmailAndIsActiveTrueAndIsDeletedFalse("admin@example.com"))
                 .thenReturn(Optional.of(admin));
             when(passwordEncoder.matches("Password1!", "$2a$10$encodedPassword")).thenReturn(true);
 
-            TokenResponse expected = new TokenResponse("access", "refresh", "Bearer", 3600L, 604800L);
+            TokenResponse expected = new TokenResponse("access", "refresh", "Bearer", 900L, 86400L);
             when(tokenService.generateTokens(1L, "admin@example.com", "ADMIN")).thenReturn(expected);
 
             LoginRequest request = new LoginRequest("admin@example.com", "Password1!");
@@ -402,8 +411,9 @@ class AdminServiceTest {
 
             // Then
             assertThat(response).isEqualTo(expected);
+            assertThat(admin.getFailedLoginAttempts()).isEqualTo(0);
+            assertThat(admin.getAccountLockedUntil()).isNull();
             verify(adminWriterRepository).save(admin);
-            assertThat(admin.getLastLoginAt()).isNotNull();
         }
 
         @Test
@@ -420,11 +430,12 @@ class AdminServiceTest {
         }
 
         @Test
-        @DisplayName("비밀번호 불일치 시 UnauthorizedException")
+        @DisplayName("비밀번호 불일치 시 실패 카운터 증가 및 UnauthorizedException")
         void login_비밀번호_불일치() {
             // Given
             AdminEntity admin = createAdminEntity(1L, "admin@example.com", "admin1");
             admin.setPassword("$2a$10$encodedPassword");
+            admin.setFailedLoginAttempts(0);
             when(adminReaderRepository.findByEmailAndIsActiveTrueAndIsDeletedFalse("admin@example.com"))
                 .thenReturn(Optional.of(admin));
             when(passwordEncoder.matches("wrong", "$2a$10$encodedPassword")).thenReturn(false);
@@ -434,7 +445,275 @@ class AdminServiceTest {
             // When & Then
             assertThatThrownBy(() -> adminService.login(request))
                 .isInstanceOf(UnauthorizedException.class);
-            verify(adminWriterRepository, never()).save(any());
+            assertThat(admin.getFailedLoginAttempts()).isEqualTo(1);
+            verify(adminWriterRepository).save(admin);
+        }
+
+        @Test
+        @DisplayName("5회 실패 시 15분 계정 잠금")
+        void login_5회_실패_잠금() {
+            // Given
+            AdminEntity admin = createAdminEntity(1L, "admin@example.com", "admin1");
+            admin.setPassword("$2a$10$encodedPassword");
+            admin.setFailedLoginAttempts(4);
+            when(adminReaderRepository.findByEmailAndIsActiveTrueAndIsDeletedFalse("admin@example.com"))
+                .thenReturn(Optional.of(admin));
+            when(passwordEncoder.matches("wrong", "$2a$10$encodedPassword")).thenReturn(false);
+
+            LoginRequest request = new LoginRequest("admin@example.com", "wrong");
+
+            // When & Then
+            assertThatThrownBy(() -> adminService.login(request))
+                .isInstanceOf(UnauthorizedException.class);
+            assertThat(admin.getFailedLoginAttempts()).isEqualTo(5);
+            assertThat(admin.getAccountLockedUntil()).isNotNull();
+            assertThat(admin.getAccountLockedUntil()).isAfter(LocalDateTime.now());
+        }
+
+        @Test
+        @DisplayName("10회 실패 시 1시간 계정 잠금")
+        void login_10회_실패_잠금() {
+            // Given
+            AdminEntity admin = createAdminEntity(1L, "admin@example.com", "admin1");
+            admin.setPassword("$2a$10$encodedPassword");
+            admin.setFailedLoginAttempts(9);
+            when(adminReaderRepository.findByEmailAndIsActiveTrueAndIsDeletedFalse("admin@example.com"))
+                .thenReturn(Optional.of(admin));
+            when(passwordEncoder.matches("wrong", "$2a$10$encodedPassword")).thenReturn(false);
+
+            LoginRequest request = new LoginRequest("admin@example.com", "wrong");
+
+            // When & Then
+            assertThatThrownBy(() -> adminService.login(request))
+                .isInstanceOf(UnauthorizedException.class);
+            assertThat(admin.getFailedLoginAttempts()).isEqualTo(10);
+            assertThat(admin.getAccountLockedUntil()).isNotNull();
+            assertThat(admin.getAccountLockedUntil()).isAfter(LocalDateTime.now().plusMinutes(59));
+        }
+
+        @Test
+        @DisplayName("계정 잠금 상태에서 로그인 시도 시 UnauthorizedException")
+        void login_계정_잠금() {
+            // Given
+            AdminEntity admin = createAdminEntity(1L, "admin@example.com", "admin1");
+            admin.setPassword("$2a$10$encodedPassword");
+            admin.setAccountLockedUntil(LocalDateTime.now().plusMinutes(10));
+            when(adminReaderRepository.findByEmailAndIsActiveTrueAndIsDeletedFalse("admin@example.com"))
+                .thenReturn(Optional.of(admin));
+
+            LoginRequest request = new LoginRequest("admin@example.com", "Password1!");
+
+            // When & Then
+            assertThatThrownBy(() -> adminService.login(request))
+                .isInstanceOf(UnauthorizedException.class)
+                .hasMessageContaining("잠겨");
+            verify(passwordEncoder, never()).matches(any(), any());
+        }
+    }
+
+    // ========== logout 테스트 ==========
+
+    @Nested
+    @DisplayName("logout")
+    class Logout {
+
+        @Test
+        @DisplayName("정상 로그아웃 - Refresh Token 삭제")
+        void logout_성공() {
+            // Given
+            RefreshTokenEntity tokenEntity = createAdminRefreshTokenEntity(1L, "refresh-token");
+            when(refreshTokenService.findRefreshToken("refresh-token")).thenReturn(Optional.of(tokenEntity));
+
+            // When
+            adminService.logout(1L, "refresh-token");
+
+            // Then
+            verify(refreshTokenService).deleteRefreshToken(tokenEntity);
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 Refresh Token으로 로그아웃 시 UnauthorizedException")
+        void logout_토큰_미존재() {
+            // Given
+            when(refreshTokenService.findRefreshToken("invalid-token")).thenReturn(Optional.empty());
+
+            // When & Then
+            assertThatThrownBy(() -> adminService.logout(1L, "invalid-token"))
+                .isInstanceOf(UnauthorizedException.class);
+        }
+
+        @Test
+        @DisplayName("다른 Admin의 Refresh Token으로 로그아웃 시 UnauthorizedException")
+        void logout_소유권_불일치() {
+            // Given
+            RefreshTokenEntity tokenEntity = createAdminRefreshTokenEntity(2L, "refresh-token");
+            when(refreshTokenService.findRefreshToken("refresh-token")).thenReturn(Optional.of(tokenEntity));
+
+            // When & Then
+            assertThatThrownBy(() -> adminService.logout(1L, "refresh-token"))
+                .isInstanceOf(UnauthorizedException.class);
+            verify(refreshTokenService, never()).deleteRefreshToken(any());
+        }
+    }
+
+    // ========== refreshToken 테스트 ==========
+
+    @Nested
+    @DisplayName("refreshToken")
+    class RefreshToken {
+
+        @Test
+        @DisplayName("정상 토큰 갱신 - rotate-on-use")
+        void refreshToken_성공() {
+            // Given
+            String oldToken = "old-refresh-token";
+            RefreshTokenEntity tokenEntity = createAdminRefreshTokenEntity(1L, oldToken);
+            tokenEntity.setExpiresAt(LocalDateTime.now().plusDays(1));
+
+            AdminEntity activeAdmin = createAdminEntity(1L, "admin@example.com", "admin1");
+
+            when(tokenService.validateToken(oldToken)).thenReturn(true);
+            when(tokenService.getPayloadFromToken(oldToken))
+                .thenReturn(new JwtTokenPayload("1", "admin@example.com", "ADMIN"));
+            when(refreshTokenService.findRefreshToken(oldToken)).thenReturn(Optional.of(tokenEntity));
+            when(adminReaderRepository.findById(1L)).thenReturn(Optional.of(activeAdmin));
+
+            TokenResponse expected = new TokenResponse("new-access", "new-refresh", "Bearer", 900L, 86400L);
+            when(tokenService.generateTokens(1L, "admin@example.com", "ADMIN")).thenReturn(expected);
+
+            // When
+            TokenResponse response = adminService.refreshToken(new RefreshTokenRequest(oldToken));
+
+            // Then
+            assertThat(response).isEqualTo(expected);
+            verify(refreshTokenService).deleteRefreshToken(tokenEntity);
+            verify(tokenService).generateTokens(1L, "admin@example.com", "ADMIN");
+        }
+
+        @Test
+        @DisplayName("유효하지 않은 JWT 서명 시 UnauthorizedException")
+        void refreshToken_잘못된_서명() {
+            // Given
+            when(tokenService.validateToken("invalid")).thenReturn(false);
+
+            // When & Then
+            assertThatThrownBy(() -> adminService.refreshToken(new RefreshTokenRequest("invalid")))
+                .isInstanceOf(UnauthorizedException.class);
+        }
+
+        @Test
+        @DisplayName("User role 토큰으로 Admin 갱신 시 UnauthorizedException")
+        void refreshToken_USER_role_거부() {
+            // Given
+            String token = "user-refresh-token";
+            when(tokenService.validateToken(token)).thenReturn(true);
+            when(tokenService.getPayloadFromToken(token))
+                .thenReturn(new JwtTokenPayload("1", "user@example.com", "USER"));
+
+            // When & Then
+            assertThatThrownBy(() -> adminService.refreshToken(new RefreshTokenRequest(token)))
+                .isInstanceOf(UnauthorizedException.class)
+                .hasMessageContaining("관리자 전용");
+        }
+
+        @Test
+        @DisplayName("만료된 Refresh Token으로 갱신 시 UnauthorizedException")
+        void refreshToken_만료() {
+            // Given
+            String token = "expired-token";
+            RefreshTokenEntity tokenEntity = createAdminRefreshTokenEntity(1L, token);
+            tokenEntity.setExpiresAt(LocalDateTime.now().minusHours(1));
+
+            when(tokenService.validateToken(token)).thenReturn(true);
+            when(tokenService.getPayloadFromToken(token))
+                .thenReturn(new JwtTokenPayload("1", "admin@example.com", "ADMIN"));
+            when(refreshTokenService.findRefreshToken(token)).thenReturn(Optional.of(tokenEntity));
+
+            // When & Then
+            assertThatThrownBy(() -> adminService.refreshToken(new RefreshTokenRequest(token)))
+                .isInstanceOf(UnauthorizedException.class)
+                .hasMessageContaining("만료");
+        }
+
+        @Test
+        @DisplayName("DB에 없는 Refresh Token으로 갱신 시 UnauthorizedException")
+        void refreshToken_DB_미존재() {
+            // Given
+            String token = "not-in-db";
+            when(tokenService.validateToken(token)).thenReturn(true);
+            when(tokenService.getPayloadFromToken(token))
+                .thenReturn(new JwtTokenPayload("1", "admin@example.com", "ADMIN"));
+            when(refreshTokenService.findRefreshToken(token)).thenReturn(Optional.empty());
+
+            // When & Then
+            assertThatThrownBy(() -> adminService.refreshToken(new RefreshTokenRequest(token)))
+                .isInstanceOf(UnauthorizedException.class);
+        }
+
+        @Test
+        @DisplayName("비활성화된 Admin 계정으로 토큰 갱신 시 UnauthorizedException")
+        void refreshToken_비활성_계정() {
+            // Given
+            String token = "valid-token";
+            RefreshTokenEntity tokenEntity = createAdminRefreshTokenEntity(1L, token);
+            tokenEntity.setExpiresAt(LocalDateTime.now().plusDays(1));
+
+            AdminEntity inactiveAdmin = createAdminEntity(1L, "admin@example.com", "admin1");
+            inactiveAdmin.setIsActive(false);
+
+            when(tokenService.validateToken(token)).thenReturn(true);
+            when(tokenService.getPayloadFromToken(token))
+                .thenReturn(new JwtTokenPayload("1", "admin@example.com", "ADMIN"));
+            when(refreshTokenService.findRefreshToken(token)).thenReturn(Optional.of(tokenEntity));
+            when(adminReaderRepository.findById(1L)).thenReturn(Optional.of(inactiveAdmin));
+
+            // When & Then
+            assertThatThrownBy(() -> adminService.refreshToken(new RefreshTokenRequest(token)))
+                .isInstanceOf(UnauthorizedException.class)
+                .hasMessageContaining("비활성화");
+        }
+
+        @Test
+        @DisplayName("삭제된 Admin 계정으로 토큰 갱신 시 UnauthorizedException")
+        void refreshToken_삭제된_계정() {
+            // Given
+            String token = "valid-token";
+            RefreshTokenEntity tokenEntity = createAdminRefreshTokenEntity(1L, token);
+            tokenEntity.setExpiresAt(LocalDateTime.now().plusDays(1));
+
+            AdminEntity deletedAdmin = createAdminEntity(1L, "admin@example.com", "admin1");
+            deletedAdmin.setIsDeleted(true);
+
+            when(tokenService.validateToken(token)).thenReturn(true);
+            when(tokenService.getPayloadFromToken(token))
+                .thenReturn(new JwtTokenPayload("1", "admin@example.com", "ADMIN"));
+            when(refreshTokenService.findRefreshToken(token)).thenReturn(Optional.of(tokenEntity));
+            when(adminReaderRepository.findById(1L)).thenReturn(Optional.of(deletedAdmin));
+
+            // When & Then
+            assertThatThrownBy(() -> adminService.refreshToken(new RefreshTokenRequest(token)))
+                .isInstanceOf(UnauthorizedException.class)
+                .hasMessageContaining("비활성화");
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 Admin 계정으로 토큰 갱신 시 UnauthorizedException")
+        void refreshToken_미존재_계정() {
+            // Given
+            String token = "valid-token";
+            RefreshTokenEntity tokenEntity = createAdminRefreshTokenEntity(1L, token);
+            tokenEntity.setExpiresAt(LocalDateTime.now().plusDays(1));
+
+            when(tokenService.validateToken(token)).thenReturn(true);
+            when(tokenService.getPayloadFromToken(token))
+                .thenReturn(new JwtTokenPayload("1", "admin@example.com", "ADMIN"));
+            when(refreshTokenService.findRefreshToken(token)).thenReturn(Optional.of(tokenEntity));
+            when(adminReaderRepository.findById(1L)).thenReturn(Optional.empty());
+
+            // When & Then
+            assertThatThrownBy(() -> adminService.refreshToken(new RefreshTokenRequest(token)))
+                .isInstanceOf(UnauthorizedException.class)
+                .hasMessageContaining("비활성화");
         }
     }
 
@@ -449,6 +728,12 @@ class AdminServiceTest {
         admin.setRole("ADMIN");
         admin.setIsActive(true);
         admin.setIsDeleted(false);
+        admin.setFailedLoginAttempts(0);
         return admin;
+    }
+
+    private RefreshTokenEntity createAdminRefreshTokenEntity(Long adminId, String token) {
+        RefreshTokenEntity entity = RefreshTokenEntity.createForAdmin(adminId, token, LocalDateTime.now().plusDays(1));
+        return entity;
     }
 }

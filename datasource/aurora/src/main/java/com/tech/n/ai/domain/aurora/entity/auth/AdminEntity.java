@@ -30,4 +30,23 @@ public class AdminEntity extends BaseEntity {
 
     @Column(name = "last_login_at", precision = 6)
     private LocalDateTime lastLoginAt;
+
+    @Column(name = "failed_login_attempts", nullable = false)
+    private Integer failedLoginAttempts = 0;
+
+    @Column(name = "account_locked_until", precision = 6)
+    private LocalDateTime accountLockedUntil;
+
+    public boolean isAccountLocked() {
+        return accountLockedUntil != null && accountLockedUntil.isAfter(LocalDateTime.now());
+    }
+
+    public void recordLoginFailure() {
+        this.failedLoginAttempts = (this.failedLoginAttempts == null ? 0 : this.failedLoginAttempts) + 1;
+    }
+
+    public void resetLoginFailures() {
+        this.failedLoginAttempts = 0;
+        this.accountLockedUntil = null;
+    }
 }

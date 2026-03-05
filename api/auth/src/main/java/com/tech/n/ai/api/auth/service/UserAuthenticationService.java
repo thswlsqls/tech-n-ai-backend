@@ -45,15 +45,24 @@ public class UserAuthenticationService {
         if (!tokenService.validateToken(request.refreshToken())) {
             throw new UnauthorizedException("유효하지 않은 Refresh Token입니다.");
         }
-        
+
         RefreshTokenEntity tokenEntity = refreshTokenService.findRefreshToken(request.refreshToken())
             .orElseThrow(() -> new UnauthorizedException("유효하지 않은 Refresh Token입니다."));
-        
+
         validateTokenExpiry(tokenEntity);
-        
+
         JwtTokenPayload payload = tokenService.getPayloadFromToken(request.refreshToken());
+
+        if ("ADMIN".equals(payload.role())) {
+            throw new UnauthorizedException("관리자 토큰은 관리자 전용 갱신 경로를 사용하세요.");
+        }
+
+        if (tokenEntity.getUserId() == null || !tokenEntity.getUserId().equals(Long.parseLong(payload.userId()))) {
+            throw new UnauthorizedException("Refresh Token의 사용자 ID가 일치하지 않습니다.");
+        }
+
         refreshTokenService.deleteRefreshToken(tokenEntity);
-        
+
         return tokenService.generateTokens(Long.parseLong(payload.userId()), payload.email(), payload.role());
     }
     

@@ -20,15 +20,21 @@ public class JwtTokenProvider {
     private final SecretKey secretKey;
     private final Duration accessTokenValidity;
     private final Duration refreshTokenValidity;
+    private final Duration adminAccessTokenValidity;
+    private final Duration adminRefreshTokenValidity;
 
     public JwtTokenProvider(
         @Value("${jwt.secret-key:default-secret-key-change-in-production-minimum-256-bits}") String secretKey,
         @Value("${jwt.access-token-validity-minutes:60}") long accessTokenValidityInMinutes,
-        @Value("${jwt.refresh-token-validity-days:7}") long refreshTokenValidityInDays
+        @Value("${jwt.refresh-token-validity-days:7}") long refreshTokenValidityInDays,
+        @Value("${jwt.admin.access-token-validity-minutes:15}") long adminAccessTokenValidityInMinutes,
+        @Value("${jwt.admin.refresh-token-validity-days:1}") long adminRefreshTokenValidityInDays
     ) {
         this.secretKey = Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
         this.accessTokenValidity = Duration.ofMinutes(accessTokenValidityInMinutes);
         this.refreshTokenValidity = Duration.ofDays(refreshTokenValidityInDays);
+        this.adminAccessTokenValidity = Duration.ofMinutes(adminAccessTokenValidityInMinutes);
+        this.adminRefreshTokenValidity = Duration.ofDays(adminRefreshTokenValidityInDays);
     }
 
     public String generateAccessToken(JwtTokenPayload payload) {
@@ -37,6 +43,14 @@ public class JwtTokenProvider {
 
     public String generateRefreshToken(JwtTokenPayload payload) {
         return buildToken(payload, refreshTokenValidity);
+    }
+
+    public String generateAdminAccessToken(JwtTokenPayload payload) {
+        return buildToken(payload, adminAccessTokenValidity);
+    }
+
+    public String generateAdminRefreshToken(JwtTokenPayload payload) {
+        return buildToken(payload, adminRefreshTokenValidity);
     }
 
     public JwtTokenPayload getPayloadFromToken(String token) {
@@ -60,6 +74,10 @@ public class JwtTokenProvider {
 
     public LocalDateTime getRefreshTokenExpiresAt() {
         return LocalDateTime.now().plusDays(refreshTokenValidity.toDays());
+    }
+
+    public LocalDateTime getAdminRefreshTokenExpiresAt() {
+        return LocalDateTime.now().plusDays(adminRefreshTokenValidity.toDays());
     }
 
     private String buildToken(JwtTokenPayload payload, Duration validity) {

@@ -118,6 +118,8 @@ CREATE TABLE admins (
     role            VARCHAR(50)         NOT NULL                    COMMENT '역할 (ADMIN, SUPER_ADMIN 등)',
     is_active       BOOLEAN             NOT NULL    DEFAULT TRUE    COMMENT '활성화 여부',
     last_login_at   TIMESTAMP(6)        NULL                        COMMENT '마지막 로그인 일시',
+    failed_login_attempts INT          NOT NULL    DEFAULT 0       COMMENT '연속 로그인 실패 횟수',
+    account_locked_until  TIMESTAMP(6) NULL                        COMMENT '계정 잠금 해제 시각',
     is_deleted      BOOLEAN             NOT NULL    DEFAULT FALSE   COMMENT '삭제 여부',
     deleted_at      TIMESTAMP(6)        NULL                        COMMENT '삭제 일시',
     deleted_by      BIGINT UNSIGNED     NULL                        COMMENT '삭제한 사용자 ID',

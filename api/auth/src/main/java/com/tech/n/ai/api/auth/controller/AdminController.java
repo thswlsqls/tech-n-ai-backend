@@ -1,6 +1,8 @@
 package com.tech.n.ai.api.auth.controller;
 
 import com.tech.n.ai.api.auth.dto.LoginRequest;
+import com.tech.n.ai.api.auth.dto.LogoutRequest;
+import com.tech.n.ai.api.auth.dto.RefreshTokenRequest;
 import com.tech.n.ai.api.auth.dto.TokenResponse;
 import com.tech.n.ai.api.auth.dto.admin.AdminCreateRequest;
 import com.tech.n.ai.api.auth.dto.admin.AdminResponse;
@@ -27,6 +29,20 @@ public class AdminController {
     public ResponseEntity<ApiResponse<TokenResponse>> adminLogin(
             @Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(ApiResponse.success(adminFacade.login(request)));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> adminLogout(
+            @Valid @RequestBody LogoutRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        adminFacade.logout(principal.userId(), request.refreshToken());
+        return ResponseEntity.ok(ApiResponse.success());
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<ApiResponse<TokenResponse>> adminRefreshToken(
+            @Valid @RequestBody RefreshTokenRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(adminFacade.refreshToken(request)));
     }
 
     @PostMapping("/accounts")

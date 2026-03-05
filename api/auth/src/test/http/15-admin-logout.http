@@ -1,0 +1,82 @@
+###
+# POST /api/v1/auth/admin/logout - 관리자 로그아웃 API 테스트
+# Description: 관리자 Refresh Token을 무효화하여 로그아웃
+# Note: Authorization 헤더에 Admin Access Token 필요
+# @no-cookie-jar
+###
+
+### 사전 준비: 관리자 로그인하여 토큰 받기
+POST {{gatewayUrl}}/api/v1/auth/admin/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+> {%
+    client.global.set("adminAccessToken", response.body.data.accessToken);
+    client.global.set("adminRefreshToken", response.body.data.refreshToken);
+%}
+
+### 1. 정상적인 관리자 로그아웃
+POST {{gatewayUrl}}/api/v1/auth/admin/logout
+Content-Type: application/json
+Authorization: Bearer {{adminAccessToken}}
+
+{
+  "refreshToken": "{{adminRefreshToken}}"
+}
+
+> {%
+    client.test("관리자 로그아웃 성공", function() {
+        client.assert(response.status === 200, "응답 상태 코드가 200이어야 합니다");
+        client.assert(response.body.code === "2000", "code 필드가 2000이어야 합니다");
+    });
+
+    client.global.clear("adminAccessToken");
+    client.global.clear("adminRefreshToken");
+%}
+
+### 2. 실패 케이스 - Refresh Token 누락
+POST {{gatewayUrl}}/api/v1/auth/admin/logout
+Content-Type: application/json
+Authorization: Bearer {{adminAccessToken}}
+
+{
+}
+
+> {%
+    client.test("유효성 검증 실패", function() {
+        client.assert(response.status === 400, "응답 상태 코드가 400이어야 합니다");
+    });
+%}
+
+### 3. 실패 케이스 - Authorization 헤더 없음
+POST {{gatewayUrl}}/api/v1/auth/admin/logout
+Content-Type: application/json
+
+{
+  "refreshToken": "some-token"
+}
+
+> {%
+    client.test("인증 실패", function() {
+        client.assert(response.status === 401 || response.status === 403, "응답 상태 코드가 401 또는 403이어야 합니다");
+    });
+%}
+
+### 4. 실패 케이스 - 잘못된 Refresh Token
+POST {{gatewayUrl}}/api/v1/auth/admin/logout
+Content-Type: application/json
+Authorization: Bearer {{adminAccessToken}}
+
+{
+  "refreshToken": "invalid_refresh_token"
+}
+
+> {%
+    client.test("토큰 검증 실패", function() {
+        client.assert(response.status === 401, "응답 상태 코드가 401이어야 합니다");
+    });
+%}

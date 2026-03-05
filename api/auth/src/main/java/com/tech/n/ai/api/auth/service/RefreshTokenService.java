@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -57,5 +58,13 @@ public class RefreshTokenService {
             .filter(entity -> !Boolean.TRUE.equals(entity.getIsDeleted()))
             .filter(entity -> entity.getExpiresAt().isAfter(LocalDateTime.now()))
             .isPresent();
+    }
+
+    @Transactional
+    public void deleteAllAdminRefreshTokens(Long adminId) {
+        List<RefreshTokenEntity> tokens = refreshTokenReaderRepository.findByAdminIdAndIsDeletedFalse(adminId);
+        for (RefreshTokenEntity token : tokens) {
+            refreshTokenWriterRepository.delete(token);
+        }
     }
 }

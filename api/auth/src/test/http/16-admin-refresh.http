@@ -1,0 +1,102 @@
+###
+# POST /api/v1/auth/admin/refresh - 관리자 토큰 갱신 API 테스트
+# Description: 관리자 Refresh Token으로 새로운 Access Token과 Refresh Token 발급
+# @no-cookie-jar
+###
+
+### 사전 준비: 관리자 로그인하여 토큰 받기
+POST {{gatewayUrl}}/api/v1/auth/admin/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+> {%
+    client.global.set("adminAccessToken", response.body.data.accessToken);
+    client.global.set("adminRefreshToken", response.body.data.refreshToken);
+%}
+
+### 1. 정상적인 관리자 토큰 갱신
+POST {{gatewayUrl}}/api/v1/auth/admin/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{adminRefreshToken}}"
+}
+
+> {%
+    client.test("관리자 토큰 갱신 성공", function() {
+        client.assert(response.status === 200, "응답 상태 코드가 200이어야 합니다");
+        client.assert(response.body.code === "2000", "code 필드가 2000이어야 합니다");
+    });
+
+    client.test("새 토큰 발급 확인", function() {
+        var data = response.body.data;
+        client.assert(data.accessToken !== undefined, "새 accessToken이 존재해야 합니다");
+        client.assert(data.refreshToken !== undefined, "새 refreshToken이 존재해야 합니다");
+
+        client.global.set("adminAccessToken", data.accessToken);
+        client.global.set("adminRefreshToken", data.refreshToken);
+    });
+%}
+
+### 2. 실패 케이스 - Refresh Token 누락
+POST {{gatewayUrl}}/api/v1/auth/admin/refresh
+Content-Type: application/json
+
+{
+}
+
+> {%
+    client.test("유효성 검증 실패", function() {
+        client.assert(response.status === 400, "응답 상태 코드가 400이어야 합니다");
+    });
+%}
+
+### 3. 실패 케이스 - 잘못된 Refresh Token
+POST {{gatewayUrl}}/api/v1/auth/admin/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "invalid_refresh_token"
+}
+
+> {%
+    client.test("토큰 검증 실패", function() {
+        client.assert(response.status === 401, "응답 상태 코드가 401이어야 합니다");
+    });
+%}
+
+### 4. 연속 토큰 갱신 테스트 - 첫 번째 갱신
+POST {{gatewayUrl}}/api/v1/auth/admin/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{adminRefreshToken}}"
+}
+
+> {%
+    client.test("첫 번째 관리자 토큰 갱신 성공", function() {
+        client.assert(response.status === 200, "응답 상태 코드가 200이어야 합니다");
+        client.global.set("adminAccessToken", response.body.data.accessToken);
+        client.global.set("adminRefreshToken", response.body.data.refreshToken);
+    });
+%}
+
+### 5. 연속 토큰 갱신 테스트 - 두 번째 갱신
+POST {{gatewayUrl}}/api/v1/auth/admin/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{adminRefreshToken}}"
+}
+
+> {%
+    client.test("두 번째 관리자 토큰 갱신 성공", function() {
+        client.assert(response.status === 200, "응답 상태 코드가 200이어야 합니다");
+        client.global.set("adminAccessToken", response.body.data.accessToken);
+        client.global.set("adminRefreshToken", response.body.data.refreshToken);
+    });
+%}

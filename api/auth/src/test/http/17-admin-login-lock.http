@@ -1,0 +1,95 @@
+###
+# POST /api/v1/auth/admin/login - 관리자 로그인 실패 제한 테스트
+# Description: 5회/10회 실패 시 계정 잠금 동작 확인
+# @no-cookie-jar
+###
+
+### 1. 로그인 실패 1회차
+POST {{gatewayUrl}}/api/v1/auth/admin/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "wrong-password-1"
+}
+
+> {%
+    client.test("로그인 실패 1회차", function() {
+        client.assert(response.status === 401, "응답 상태 코드가 401이어야 합니다");
+    });
+%}
+
+### 2. 로그인 실패 2회차
+POST {{gatewayUrl}}/api/v1/auth/admin/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "wrong-password-2"
+}
+
+> {%
+    client.test("로그인 실패 2회차", function() {
+        client.assert(response.status === 401, "응답 상태 코드가 401이어야 합니다");
+    });
+%}
+
+### 3. 로그인 실패 3회차
+POST {{gatewayUrl}}/api/v1/auth/admin/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "wrong-password-3"
+}
+
+> {%
+    client.test("로그인 실패 3회차", function() {
+        client.assert(response.status === 401, "응답 상태 코드가 401이어야 합니다");
+    });
+%}
+
+### 4. 로그인 실패 4회차
+POST {{gatewayUrl}}/api/v1/auth/admin/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "wrong-password-4"
+}
+
+> {%
+    client.test("로그인 실패 4회차", function() {
+        client.assert(response.status === 401, "응답 상태 코드가 401이어야 합니다");
+    });
+%}
+
+### 5. 로그인 실패 5회차 - 계정 잠금 트리거
+POST {{gatewayUrl}}/api/v1/auth/admin/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "wrong-password-5"
+}
+
+> {%
+    client.test("로그인 실패 5회차 - 계정 잠금 트리거", function() {
+        client.assert(response.status === 401, "응답 상태 코드가 401이어야 합니다");
+    });
+%}
+
+### 6. 잠금 상태에서 올바른 비밀번호로 로그인 시도
+POST {{gatewayUrl}}/api/v1/auth/admin/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+> {%
+    client.test("계정 잠금 상태 - 올바른 비밀번호도 거부", function() {
+        client.assert(response.status === 401, "응답 상태 코드가 401이어야 합니다 (계정 잠김)");
+    });
+%}
