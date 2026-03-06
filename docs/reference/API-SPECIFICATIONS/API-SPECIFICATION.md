@@ -103,6 +103,29 @@
 - **Connection Timeout**: 30초
 - **Response Timeout**: 60초
 
+### 필터 실행 순서
+
+Gateway의 GlobalFilter는 다음 순서로 실행됩니다.
+
+| 순서 | 필터 | 설명 |
+|------|------|------|
+| 1 (HIGHEST_PRECEDENCE) | HeaderSanitizeGlobalFilter | 외부 요청의 `x-user-*` 헤더 제거 (스푸핑 방지) |
+| 2 (HIGHEST_PRECEDENCE + 1) | RequestIdGlobalFilter | `X-Request-Id` 헤더 발급/전파 |
+| 3 (HIGHEST_PRECEDENCE + 2) | JwtAuthenticationGlobalFilter | JWT 검증 및 사용자 정보 헤더 주입 |
+| 마지막 (LOWEST_PRECEDENCE) | AccessLogGlobalFilter | 구조화된 Access Log 출력 |
+
+### 헤더 보안 (Header Sanitization)
+
+외부 클라이언트가 전송한 `x-user-id`, `x-user-email`, `x-user-role` 헤더는 **모든 필터보다 먼저 제거**됩니다. 이를 통해 헤더 스푸핑을 방지하며, JWT 필터가 검증 후 주입하는 헤더만 백엔드에 전달됩니다.
+
+### 요청 추적 (X-Request-Id)
+
+모든 요청에 `X-Request-Id` 헤더가 부여됩니다.
+
+- 클라이언트가 유효한 UUID 형식의 `X-Request-Id`를 보내면 그대로 전파
+- 없거나 유효하지 않으면 Gateway에서 UUID를 새로 생성
+- 응답 헤더에도 동일한 `X-Request-Id`가 포함되어 클라이언트에서 추적 가능
+
 ### 인증된 요청 시 추가 헤더
 
 Gateway는 JWT 검증 성공 시 다음 헤더를 추가하여 백엔드 서버로 전달:
@@ -113,6 +136,51 @@ x-user-email: {email}
 x-user-role: {role}
 Authorization: Bearer {token}
 ```
+
+### Rate Limiting
+
+Redis 기반 Token Bucket 방식의 요청 제한이 라우트별로 적용됩니다.
+
+| 라우트 | Key Resolver | replenishRate (초당) | burstCapacity | 설명 |
+|--------|-------------|---------------------|---------------|------|
+| auth | IP 기반 | 10 | 20 | 비인증 요청 보호 |
+| emerging-tech | IP 기반 | 30 | 50 | 공개 API 보호 |
+| bookmark | 사용자 기반 | 100 | 150 | 인증된 사용자별 제한 |
+| chatbot | 사용자 기반 | 100 | 150 | 인증된 사용자별 제한 |
+| agent | 사용자 기반 | 100 | 150 | 인증된 사용자별 제한 |
+
+> **Key Resolver**: IP 기반은 클라이언트 IP로, 사용자 기반은 `x-user-id` 헤더(없으면 IP fallback)로 요청을 식별합니다.
+
+### Retry 정책
+
+- **대상**: `GET` 요청만
+- **조건**: `503 Service Unavailable` 응답 시
+- **최대 재시도**: 2회
+- **백오프**: 지수 백오프 (firstBackoff: 100ms, maxBackoff: 500ms, factor: 2)
+
+### Request Size 제한
+
+- **최대 요청 본문 크기**: 5MB
+- 초과 시 `413 Payload Too Large` 반환
+
+### Access Log
+
+모든 요청에 대해 구조화된 Access Log가 출력됩니다.
+
+```
+{method} {path} {statusCode} {durationMs}ms requestId={requestId} clientIp={clientIp} userId={userId} route={routeId} userAgent={userAgent}
+```
+
+### Metrics / Monitoring
+
+다음 Management 엔드포인트가 노출됩니다.
+
+| 엔드포인트 | 설명 |
+|-----------|------|
+| `/actuator/health` | 헬스 체크 |
+| `/actuator/info` | 애플리케이션 정보 |
+| `/actuator/prometheus` | Prometheus 메트릭 |
+| `/actuator/gateway` | Gateway 라우트 정보 |
 
 ---
 

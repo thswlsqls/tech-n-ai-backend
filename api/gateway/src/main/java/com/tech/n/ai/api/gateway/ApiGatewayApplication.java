@@ -12,8 +12,6 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 	"org.springframework.boot.data.mongodb.autoconfigure.DataMongoAutoConfiguration",
 	"org.springframework.boot.mongodb.autoconfigure.MongoReactiveAutoConfiguration",
 	"org.springframework.boot.data.mongodb.autoconfigure.DataMongoReactiveAutoConfiguration",
-	"org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration",
-	"org.springframework.boot.data.redis.autoconfigure.DataRedisReactiveAutoConfiguration",
 	"org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration",
 	"org.springframework.boot.security.autoconfigure.web.reactive.ReactiveWebSecurityAutoConfiguration",
 	"org.springframework.boot.security.autoconfigure.ReactiveUserDetailsServiceAutoConfiguration",

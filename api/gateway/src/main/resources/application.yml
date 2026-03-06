@@ -6,6 +6,8 @@ spring:
 
   cloud:
     gateway:
+      metrics:
+        enabled: true
       server:
         webflux:
           # 라우팅 설정
@@ -14,26 +16,66 @@ spring:
               uri: ${gateway.routes.auth.uri:http://localhost:8083}
               predicates:
                 - Path=/api/v1/auth/**
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 10
+                    redis-rate-limiter.burstCapacity: 20
+                    redis-rate-limiter.requestedTokens: 1
+                    key-resolver: "#{@ipKeyResolver}"
+                    deny-empty-key: false
 
             - id: bookmark-route
               uri: ${gateway.routes.bookmark.uri:http://localhost:8085}
               predicates:
                 - Path=/api/v1/bookmark/**
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 100
+                    redis-rate-limiter.burstCapacity: 150
+                    redis-rate-limiter.requestedTokens: 1
+                    key-resolver: "#{@userKeyResolver}"
+                    deny-empty-key: false
 
             - id: chatbot-route
               uri: ${gateway.routes.chatbot.uri:http://localhost:8084}
               predicates:
                 - Path=/api/v1/chatbot/**
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 100
+                    redis-rate-limiter.burstCapacity: 150
+                    redis-rate-limiter.requestedTokens: 1
+                    key-resolver: "#{@userKeyResolver}"
+                    deny-empty-key: false
 
             - id: agent-route
               uri: ${gateway.routes.agent.uri:http://localhost:8086}
               predicates:
                 - Path=/api/v1/agent/**
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 100
+                    redis-rate-limiter.burstCapacity: 150
+                    redis-rate-limiter.requestedTokens: 1
+                    key-resolver: "#{@userKeyResolver}"
+                    deny-empty-key: false
 
             - id: emerging-tech-route
               uri: ${gateway.routes.emerging-tech.uri:http://localhost:8082}
               predicates:
                 - Path=/api/v1/emerging-tech/**
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 30
+                    redis-rate-limiter.burstCapacity: 50
+                    redis-rate-limiter.requestedTokens: 1
+                    key-resolver: "#{@ipKeyResolver}"
+                    deny-empty-key: false
 
           # HTTP 클라이언트 연결 풀 설정
           httpclient:
@@ -65,8 +107,30 @@ spring:
           default-filters:
             # 외부 API 연동 시 중복 헤더 제거
             - DedupeResponseHeader=Access-Control-Allow-Origin, RETAIN_LAST
+            # GET 요청 503 응답 시 최대 2회 재시도 (지수 백오프)
+            - name: Retry
+              args:
+                retries: 2
+                methods: GET
+                statuses: SERVICE_UNAVAILABLE
+                backoff:
+                  firstBackoff: 100ms
+                  maxBackoff: 500ms
+                  factor: 2
+            # 요청 본문 크기 제한 (5MB 초과 시 413 반환)
+            - name: RequestSize
+              args:
+                maxSize: 5MB
 
 management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,gateway
+  prometheus:
+    metrics:
+      export:
+        enabled: true
   otlp:
     metrics:
       export:

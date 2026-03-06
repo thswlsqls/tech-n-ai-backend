@@ -2,21 +2,6 @@ spring:
   config:
     activate:
       on-profile: prod
-
-gateway:
-  routes:
-    auth:
-      uri: http://api-auth-service:8080
-    bookmark:
-      uri: http://api-bookmark-service:8080
-    chatbot:
-      uri: http://api-chatbot-service:8080
-    agent:
-      uri: http://api-agent-service:8080
-    emerging-tech:
-      uri: http://api-emerging-tech-service:8080
-
-spring:
   cloud:
     gateway:
       server:
@@ -31,10 +16,28 @@ spring:
                 allowedHeaders: "*"
                 allowedMethods: [GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD]
                 maxAge: 3600
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+gateway:
+  routes:
+    auth:
+      uri: http://api-auth-service:8080
+    bookmark:
+      uri: http://api-bookmark-service:8080
+    chatbot:
+      uri: http://api-chatbot-service:8080
+    agent:
+      uri: http://api-agent-service:8080
+    emerging-tech:
+      uri: http://api-emerging-tech-service:8080
 
 logging:
   level:
     com.tech.n.ai.api.gateway: WARN
+    ACCESS_LOG: INFO
     org.hibernate.type: info
     org.hibernate.sql: info
     org.hibernate.type.descriptor.sql: info

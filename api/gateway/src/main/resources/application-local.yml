@@ -16,6 +16,10 @@ spring:
                 allowedHeaders: "*"
                 allowedMethods: [GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD]
                 maxAge: 3600
+  data:
+    redis:
+      host: localhost
+      port: 6379
 
 server:
   port: 8081
@@ -33,7 +37,6 @@ gateway:
     emerging-tech:
       uri: http://localhost:8082
 
-
 jwt:
   secret-key: ${JWT_SECRET_KEY:default-secret-key-change-in-production-minimum-256-bits}
   access-token-validity-minutes: ${JWT_ACCESS_TOKEN_VALIDITY_MINUTES:60}
@@ -42,3 +45,4 @@ jwt:
 logging:
   level:
     com.tech.n.ai.api.gateway: DEBUG
+    ACCESS_LOG: INFO

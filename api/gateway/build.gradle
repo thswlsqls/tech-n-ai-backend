@@ -11,7 +11,6 @@ apply from: "${rootDir.absolutePath}/docs.gradle"
 configurations.all {
 	exclude group: 'org.springframework.boot', module: 'spring-boot-starter-web'
 	exclude group: 'org.springframework.boot', module: 'spring-boot-starter-webmvc'
-	exclude group: 'org.springframework.boot', module: 'spring-boot-starter-data-redis'
 	exclude group: 'org.springframework.boot', module: 'spring-boot-starter-security'
 	exclude group: 'org.springframework.boot', module: 'spring-boot-starter-oauth2-authorization-server'
 	exclude group: 'org.springframework.boot', module: 'spring-boot-starter-oauth2-client'
@@ -29,10 +28,13 @@ dependencies {
 	// Reactor Netty HTTP (classic 모드에서 transitive 제외되므로 명시 선언)
 	implementation 'io.projectreactor.netty:reactor-netty-http'
 
+	// Rate Limiting을 위한 Reactive Redis
+	implementation 'org.springframework.boot:spring-boot-starter-data-redis-reactive'
+
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
 	testImplementation 'org.springframework.boot:spring-boot-restdocs'
-	testImplementation 'org.springframework.restdocs:spring-restdocs-mockmvc'
+	testImplementation 'org.springframework.restdocs:spring-restdocs-webtestclient'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 

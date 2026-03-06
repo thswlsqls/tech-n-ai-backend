@@ -29,7 +29,7 @@ public class GatewayConfig {
      * @return GlobalFilter
      */
     @Bean
-    @Order(Ordered.HIGHEST_PRECEDENCE)
+    @Order(Ordered.HIGHEST_PRECEDENCE + 2)
     public GlobalFilter jwtAuthenticationGlobalFilter() {
         return (exchange, chain) -> {
             // JwtAuthenticationGatewayFilter를 GlobalFilter로 래핑
