@@ -37,7 +37,7 @@ public class ExceptionLoggingService {
      * @param exception 발생한 예외
      * @param context 컨텍스트 정보
      */
-    @Async
+    @Async("exceptionLoggingExecutor")
     public void logReadException(Exception exception, ExceptionContext.ContextInfo context) {
         ExceptionContext exceptionContext = buildExceptionContext(
             "READ",
@@ -59,7 +59,7 @@ public class ExceptionLoggingService {
      * @param exception 발생한 예외
      * @param context 컨텍스트 정보
      */
-    @Async
+    @Async("exceptionLoggingExecutor")
     public void logWriteException(Exception exception, ExceptionContext.ContextInfo context) {
         ExceptionContext exceptionContext = buildExceptionContext(
             "WRITE",
@@ -124,12 +124,13 @@ public class ExceptionLoggingService {
      */
     private void logExceptionLocally(String source, Exception exception, ExceptionContext.ContextInfo context) {
         log.error(
-            "Exception logged locally - Source: {}, Type: {}, Message: {}, Module: {}, Method: {}, UserId: {}, RequestId: {}",
+            "Exception logged locally - Source: {}, Type: {}, Message: {}, Module: {}, Method: {}, URI: {}, UserId: {}, RequestId: {}",
             source,
             exception.getClass().getName(),
             exception.getMessage(),
             context != null ? context.module() : null,
             context != null ? context.method() : null,
+            context != null ? context.requestUri() : null,
             context != null ? context.userId() : null,
             context != null ? context.requestId() : null,
             exception

@@ -50,6 +50,12 @@ subprojects {
 		compileOnly {
 			extendsFrom annotationProcessor
 		}
+		// Spring Data REST/HATEOAS는 사용하지 않으므로 전역 제외
+		// (spring-boot-starter-classic → spring-boot-autoconfigure-classic-modules 전이 의존성)
+		all {
+			exclude group: 'org.springframework.boot', module: 'spring-boot-data-rest'
+			exclude group: 'org.springframework.boot', module: 'spring-boot-hateoas'
+		}
 	}
 
 	repositories {

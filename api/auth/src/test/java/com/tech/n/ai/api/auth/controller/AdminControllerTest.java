@@ -270,7 +270,7 @@ class AdminControllerTest {
             mockMvc.perform(get("/api/v1/auth/admin/accounts/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("2000"))
-                .andExpect(jsonPath("$.data.id").value(1))
+                .andExpect(jsonPath("$.data.id").value("1"))
                 .andExpect(jsonPath("$.data.email").value("admin@example.com"));
         }
     }

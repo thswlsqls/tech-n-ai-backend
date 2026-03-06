@@ -416,7 +416,8 @@ public class GlobalExceptionHandler {
      * 컨텍스트 정보 생성
      */
     private ExceptionContext.ContextInfo buildContextInfo(HttpServletRequest request) {
-        String module = request.getRequestURI().split("/")[1]; // 첫 번째 경로를 모듈명으로 사용
+        String[] pathSegments = request.getRequestURI().split("/");
+        String module = pathSegments.length > 1 ? pathSegments[1] : "unknown";
         String method = request.getMethod();
         Map<String, Object> parameters = new HashMap<>();
         request.getParameterMap().forEach((key, values) -> {
@@ -427,13 +428,15 @@ public class GlobalExceptionHandler {
             }
         });
         
+        String requestUri = request.getRequestURI();
         String userId = request.getHeader("X-User-Id");
         String requestId = request.getHeader("X-Request-Id");
-        
+
         return new ExceptionContext.ContextInfo(
             module,
             method,
             parameters,
+            requestUri,
             userId,
             requestId
         );

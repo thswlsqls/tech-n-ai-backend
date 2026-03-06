@@ -63,10 +63,15 @@ public record ExceptionContext(
         Map<String, Object> parameters,
         
         /**
+         * 요청 URI (nullable)
+         */
+        String requestUri,
+
+        /**
          * 사용자 ID (nullable)
          */
         String userId,
-        
+
         /**
          * 요청 ID (nullable)
          */
