@@ -1,5 +1,6 @@
 package com.tech.n.ai.api.chatbot.dto.response;
 
+import com.tech.n.ai.common.conversation.dto.MessageResponse;
 import com.tech.n.ai.common.core.dto.PageData;
 
 /**

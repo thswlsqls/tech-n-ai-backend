@@ -1589,9 +1589,9 @@ langchain4j는 `ChatMemory` 인터페이스를 통해 대화 메모리를 관리
 **Command Side (Aurora MySQL) - ConversationSession 엔티티**:
 
 ```java
-package com.ebson.shrimp.tm.demo.domain.mariadb.entity.chatbot;
+package com.ebson.shrimp.tm.demo.domain.aurora.entity.chatbot;
 
-import com.ebson.shrimp.tm.demo.domain.mariadb.entity.BaseEntity;
+import com.ebson.shrimp.tm.demo.domain.aurora.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -1691,7 +1691,7 @@ public class ConversationSessionDocument {
 **Command Side (Aurora MySQL) - ConversationMessage 엔티티**:
 
 ```java
-package com.ebson.shrimp.tm.demo.domain.mariadb.entity.chatbot;
+package com.ebson.shrimp.tm.demo.domain.aurora.entity.chatbot;
 
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -2404,8 +2404,8 @@ import com.ebson.shrimp.tm.demo.api.chatbot.dto.response.SessionResponse;
 import com.ebson.shrimp.tm.demo.api.chatbot.service.ConversationSessionService;
 import com.ebson.shrimp.tm.demo.api.chatbot.common.exception.ConversationSessionNotFoundException;
 import com.ebson.shrimp.tm.demo.api.chatbot.common.exception.UnauthorizedException;
-import com.ebson.shrimp.tm.demo.domain.mariadb.entity.chatbot.ConversationSessionEntity;
-import com.ebson.shrimp.tm.demo.domain.mariadb.repository.writer.chatbot.ConversationSessionWriterRepository;
+import com.ebson.shrimp.tm.demo.domain.aurora.entity.chatbot.ConversationSessionEntity;
+import com.ebson.shrimp.tm.demo.domain.aurora.repository.writer.chatbot.ConversationSessionWriterRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -2581,9 +2581,9 @@ public class ConversationSessionServiceImpl implements ConversationSessionServic
 세션 생명주기 관리를 위한 Repository 메서드 추가:
 
 ```java
-package com.ebson.shrimp.tm.demo.domain.mariadb.repository.writer.chatbot;
+package com.ebson.shrimp.tm.demo.domain.aurora.repository.writer.chatbot;
 
-import com.ebson.shrimp.tm.demo.domain.mariadb.entity.chatbot.ConversationSessionEntity;
+import com.ebson.shrimp.tm.demo.domain.aurora.entity.chatbot.ConversationSessionEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

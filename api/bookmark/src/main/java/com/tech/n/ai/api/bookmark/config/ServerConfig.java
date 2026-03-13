@@ -18,7 +18,7 @@ import org.springframework.context.annotation.Import;
     "com.tech.n.ai.common.core",
     "com.tech.n.ai.common.exception",
     "com.tech.n.ai.common.security",
-    "com.tech.n.ai.domain.mariadb",
+    "com.tech.n.ai.domain.aurora",
     "com.tech.n.ai.domain.mongodb"
 })
 @Import({

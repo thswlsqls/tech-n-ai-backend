@@ -1,6 +1,6 @@
 package com.tech.n.ai.api.bookmark.dto.response;
 
-import com.tech.n.ai.domain.mariadb.entity.bookmark.BookmarkEntity;
+import com.tech.n.ai.domain.aurora.entity.bookmark.BookmarkEntity;
 
 import java.time.LocalDateTime;
 import java.util.List;

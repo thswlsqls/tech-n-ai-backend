@@ -1,6 +1,6 @@
 package com.tech.n.ai.api.chatbot.scheduler;
 
-import com.tech.n.ai.api.chatbot.service.ConversationSessionService;
+import com.tech.n.ai.common.conversation.service.ConversationSessionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

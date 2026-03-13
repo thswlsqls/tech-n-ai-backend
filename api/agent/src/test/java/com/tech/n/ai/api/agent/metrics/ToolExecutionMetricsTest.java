@@ -130,10 +130,11 @@ class ToolExecutionMetricsTest {
                 });
             }
 
-            latch.await(5, TimeUnit.SECONDS);
+            boolean completed = latch.await(5, TimeUnit.SECONDS);
             executor.shutdown();
 
             // Then
+            assertThat(completed).isTrue();
             assertThat(metrics.getToolCallCount()).isEqualTo(threadCount * incrementsPerThread);
         }
 
@@ -158,10 +159,11 @@ class ToolExecutionMetricsTest {
                 });
             }
 
-            latch.await(5, TimeUnit.SECONDS);
+            boolean completed = latch.await(5, TimeUnit.SECONDS);
             executor.shutdown();
 
             // Then
+            assertThat(completed).isTrue();
             assertThat(metrics.getToolCallCount()).isEqualTo(threadCount);
             assertThat(metrics.getAnalyticsCallCount()).isEqualTo(threadCount);
             assertThat(metrics.getValidationErrorCount()).isEqualTo(threadCount);

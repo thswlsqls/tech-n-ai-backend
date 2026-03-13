@@ -1,6 +1,6 @@
-package com.tech.n.ai.domain.mariadb.entity.auth;
+package com.tech.n.ai.domain.aurora.entity.auth;
 
-import com.tech.n.ai.domain.mariadb.annotation.Tsid;
+import com.tech.n.ai.domain.aurora.annotation.Tsid;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;

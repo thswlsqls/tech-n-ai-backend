@@ -7,6 +7,8 @@ spring:
   profiles:
     include:
       - common-core
+      - kafka
+      - api-domain
       - agent-api
       - mongodb-domain
       - feign-github
@@ -14,3 +16,9 @@ spring:
       - slack
       - scraper
       - rss
+
+module:
+  mysql:
+    port: ${MYSQL_PORT:3310}
+  aurora:
+    schema: ${AURORA_SCHEMA:chatbot}

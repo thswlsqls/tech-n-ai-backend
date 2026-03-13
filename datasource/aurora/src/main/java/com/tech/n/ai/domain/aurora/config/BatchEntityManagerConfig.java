@@ -1,4 +1,4 @@
-package com.tech.n.ai.domain.mariadb.config;
+package com.tech.n.ai.domain.aurora.config;
 
 
 import java.util.Properties;
@@ -23,15 +23,15 @@ import lombok.extern.slf4j.Slf4j;
 @Profile("batch-domain")
 @Configuration
 @EnableJpaRepositories(basePackages = {
-    "com.tech.n.ai.domain.mariadb.repository",
+    "com.tech.n.ai.domain.aurora.repository",
 }
     , transactionManagerRef = "jpaTransactionManagerAutoCommitF"
     , entityManagerFactoryRef = "secondaryEMF")
 @EntityScan(basePackages = {
-    "com.tech.n.ai.domain.mariadb.entity"
+    "com.tech.n.ai.domain.aurora.entity"
 })
 @ComponentScan(basePackages = {
-    "com.tech.n.ai.domain.mariadb",
+    "com.tech.n.ai.domain.aurora",
 })
 public class BatchEntityManagerConfig {
 
@@ -58,7 +58,7 @@ public class BatchEntityManagerConfig {
         LocalContainerEntityManagerFactoryBean em = new LocalContainerEntityManagerFactoryBean();
         em.setDataSource(batchBusinessWriterDataSource);
         em.setPackagesToScan(new String[] {
-            "com.tech.n.ai.domain.mariadb.entity",
+            "com.tech.n.ai.domain.aurora.entity",
         });
         em.setPersistenceUnitName("batch-writer-primary");
 
@@ -81,7 +81,7 @@ public class BatchEntityManagerConfig {
         LocalContainerEntityManagerFactoryBean em = new LocalContainerEntityManagerFactoryBean();
         em.setDataSource(batchBusinessWriterDataSource);
         em.setPackagesToScan(new String[] {
-           "com.tech.n.ai.domain.mariadb.entity",
+           "com.tech.n.ai.domain.aurora.entity",
             });
         em.setPersistenceUnitName("batch-writer-secondary");
 

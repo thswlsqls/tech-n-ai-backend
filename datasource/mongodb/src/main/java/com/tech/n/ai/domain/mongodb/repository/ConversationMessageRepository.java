@@ -24,4 +24,7 @@ public interface ConversationMessageRepository extends MongoRepository<Conversat
 
     @Query(value = "{ 'session_id': ?0 }", sort = "{ 'sequence_number': 1 }")
     Page<ConversationMessageDocument> findBySessionIdOrderBySequenceNumberAsc(String sessionId, Pageable pageable);
+
+    @Query(value = "{ 'session_id': ?0 }")
+    Page<ConversationMessageDocument> findBySessionId(String sessionId, Pageable pageable);
 }

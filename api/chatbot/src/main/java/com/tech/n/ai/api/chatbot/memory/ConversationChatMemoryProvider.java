@@ -1,5 +1,6 @@
 package com.tech.n.ai.api.chatbot.memory;
 
+import com.tech.n.ai.common.conversation.memory.MongoDbChatMemoryStore;
 import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.memory.chat.ChatMemoryProvider;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;

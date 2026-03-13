@@ -1,6 +1,6 @@
 package com.tech.n.ai.api.auth.dto.admin;
 
-import com.tech.n.ai.domain.mariadb.entity.auth.AdminEntity;
+import com.tech.n.ai.domain.aurora.entity.auth.AdminEntity;
 
 import java.time.LocalDateTime;
 

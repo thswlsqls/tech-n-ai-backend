@@ -6,6 +6,8 @@ import dev.langchain4j.service.tool.ToolErrorContext;
 import dev.langchain4j.service.tool.ToolErrorHandlerResult;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.List;
+
 /**
  * LangChain4j Tool Error Handler 구현
  * AiServices.builder()에서 사용되는 3종 에러 핸들러를 제공
@@ -74,17 +76,21 @@ public final class ToolErrorHandlers {
      * @param request Tool 실행 요청 정보
      * @return ToolExecutionResultMessage 에러 메시지
      */
+    /** 사용 가능한 Tool 이름 목록 (Tool 추가/삭제 시 이 목록도 갱신) */
+    private static final List<String> AVAILABLE_TOOLS = List.of(
+        "fetch_github_releases", "scrape_web_page",
+        "list_emerging_techs", "get_emerging_tech_detail", "search_emerging_techs",
+        "get_emerging_tech_statistics", "analyze_text_frequency",
+        "send_slack_notification",
+        "collect_github_releases", "collect_rss_feeds", "collect_scraped_articles"
+    );
+
     public static ToolExecutionResultMessage handleHallucinatedToolName(ToolExecutionRequest request) {
         String toolName = request.name();
         log.warn("존재하지 않는 Tool 호출 시도: {}", toolName);
 
-        String errorMessage = String.format("Error: Tool '%s'은(는) 존재하지 않습니다. " +
-                        "사용 가능한 Tool: fetch_github_releases, scrape_web_page, " +
-                        "list_emerging_techs, get_emerging_tech_detail, search_emerging_techs, " +
-                        "get_emerging_tech_statistics, analyze_text_frequency, " +
-                        "send_slack_notification, " +
-                        "collect_github_releases, collect_rss_feeds, collect_scraped_articles",
-                toolName);
+        String errorMessage = String.format("Error: Tool '%s'은(는) 존재하지 않습니다. 사용 가능한 Tool: %s",
+                toolName, String.join(", ", AVAILABLE_TOOLS));
 
         return ToolExecutionResultMessage.from(request, errorMessage);
     }

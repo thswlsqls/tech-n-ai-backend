@@ -1,4 +1,4 @@
-package com.tech.n.ai.domain.mariadb.utils;
+package com.tech.n.ai.domain.aurora.utils;
 
 import org.hibernate.boot.model.naming.Identifier;
 import org.hibernate.boot.model.naming.PhysicalNamingStrategy;

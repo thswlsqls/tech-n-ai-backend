@@ -1,4 +1,4 @@
-package com.tech.n.ai.domain.mariadb.util;
+package com.tech.n.ai.domain.aurora.util;
 
 import jakarta.persistence.EntityManager;
 import org.springframework.beans.BeansException;

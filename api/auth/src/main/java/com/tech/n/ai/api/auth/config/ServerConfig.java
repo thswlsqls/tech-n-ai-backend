@@ -16,7 +16,7 @@ import org.springframework.context.annotation.Import;
 @Configuration
 @ComponentScan(basePackages = {
     "com.tech.n.ai.api.auth",
-    "com.tech.n.ai.domain.mariadb",
+    "com.tech.n.ai.domain.aurora",
     "com.tech.n.ai.common.core",
     "com.tech.n.ai.common.exception",
     "com.tech.n.ai.common.security"

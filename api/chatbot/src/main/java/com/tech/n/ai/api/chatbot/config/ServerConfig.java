@@ -17,9 +17,10 @@ import org.springframework.context.annotation.Import;
 @Configuration
 @ComponentScan(basePackages = {
     "com.tech.n.ai.api.chatbot",
-    "com.tech.n.ai.domain.mariadb",
+    "com.tech.n.ai.domain.aurora",
     "com.tech.n.ai.domain.mongodb",
     "com.tech.n.ai.common.core",
+    "com.tech.n.ai.common.conversation",
     "com.tech.n.ai.common.kafka",
     "com.tech.n.ai.common.security",
     "com.tech.n.ai.common.exception"

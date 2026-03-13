@@ -7,6 +7,8 @@ import com.tech.n.ai.api.chatbot.converter.MessageFormatConverter;
 import com.tech.n.ai.api.chatbot.dto.request.ChatRequest;
 import com.tech.n.ai.api.chatbot.dto.response.ChatResponse;
 import com.tech.n.ai.api.chatbot.memory.ConversationChatMemoryProvider;
+import com.tech.n.ai.common.conversation.service.ConversationMessageService;
+import com.tech.n.ai.common.conversation.service.ConversationSessionService;
 import com.tech.n.ai.api.chatbot.service.dto.Intent;
 import com.tech.n.ai.api.chatbot.service.dto.SearchContext;
 import com.tech.n.ai.api.chatbot.service.dto.SearchQuery;
@@ -110,7 +112,7 @@ class ChatbotServiceTest {
             // Given
             ChatRequest request = new ChatRequest("안녕하세요", null);
             setupCommonMocks(Intent.LLM_DIRECT);
-            when(sessionService.createSession(TEST_USER_ID, null)).thenReturn(TEST_SESSION_ID);
+            when(sessionService.createSession(TEST_USER_ID.toString(), null)).thenReturn(TEST_SESSION_ID);
             when(messageConverter.convertToProviderFormat(anyList(), any())).thenReturn("formatted");
             when(llmService.generate(anyString())).thenReturn("안녕하세요! 무엇을 도와드릴까요?");
 
@@ -121,7 +123,7 @@ class ChatbotServiceTest {
             assertThat(result.response()).isEqualTo("안녕하세요! 무엇을 도와드릴까요?");
             assertThat(result.conversationId()).isEqualTo(TEST_SESSION_ID);
             assertThat(result.sources()).isEmpty();
-            verify(sessionService).createSession(TEST_USER_ID, null);
+            verify(sessionService).createSession(TEST_USER_ID.toString(), null);
         }
 
         @Test
@@ -139,8 +141,8 @@ class ChatbotServiceTest {
 
             // Then
             assertThat(result.conversationId()).isEqualTo(TEST_SESSION_ID);
-            verify(sessionService).getSession(TEST_SESSION_ID, TEST_USER_ID);
-            verify(sessionService, never()).createSession(anyLong(), any());
+            verify(sessionService).getSession(TEST_SESSION_ID, TEST_USER_ID.toString());
+            verify(sessionService, never()).createSession(anyString(), any());
         }
     }
 
@@ -156,7 +158,7 @@ class ChatbotServiceTest {
             // Given
             ChatRequest request = new ChatRequest("대회 정보 알려줘", null);
             setupCommonMocks(Intent.RAG_REQUIRED);
-            when(sessionService.createSession(TEST_USER_ID, null)).thenReturn(TEST_SESSION_ID);
+            when(sessionService.createSession(TEST_USER_ID.toString(), null)).thenReturn(TEST_SESSION_ID);
 
             SearchContext context = new SearchContext();
             context.addCollection("emerging_techs");
@@ -203,7 +205,7 @@ class ChatbotServiceTest {
             // Given
             ChatRequest request = new ChatRequest("오늘 AI 뉴스", null);
             setupCommonMocks(Intent.WEB_SEARCH_REQUIRED);
-            when(sessionService.createSession(TEST_USER_ID, null)).thenReturn(TEST_SESSION_ID);
+            when(sessionService.createSession(TEST_USER_ID.toString(), null)).thenReturn(TEST_SESSION_ID);
 
             List<WebSearchDocument> webResults = List.of(
                 new WebSearchDocument("AI 뉴스 제목", "https://example.com", "뉴스 요약", "example.com")
@@ -227,7 +229,7 @@ class ChatbotServiceTest {
             // Given
             ChatRequest request = new ChatRequest("오늘 날씨", null);
             setupCommonMocks(Intent.WEB_SEARCH_REQUIRED);
-            when(sessionService.createSession(TEST_USER_ID, null)).thenReturn(TEST_SESSION_ID);
+            when(sessionService.createSession(TEST_USER_ID.toString(), null)).thenReturn(TEST_SESSION_ID);
             when(webSearchService.search(anyString())).thenReturn(Collections.emptyList());
             when(llmService.generate(anyString())).thenReturn("날씨 정보를 찾을 수 없습니다.");
 
@@ -252,7 +254,7 @@ class ChatbotServiceTest {
             // Given
             ChatRequest request = new ChatRequest("@agent AI 트렌드 분석", null);
             setupCommonMocks(Intent.AGENT_COMMAND);
-            when(sessionService.createSession(TEST_USER_ID, null)).thenReturn(TEST_SESSION_ID);
+            when(sessionService.createSession(TEST_USER_ID.toString(), null)).thenReturn(TEST_SESSION_ID);
             when(agentDelegationService.delegateToAgent(anyString(), anyLong(), anyString()))
                 .thenReturn("Agent 실행 결과입니다.");
 
@@ -270,7 +272,7 @@ class ChatbotServiceTest {
             // Given
             ChatRequest request = new ChatRequest("@agent 작업 실행", null);
             setupCommonMocks(Intent.AGENT_COMMAND);
-            when(sessionService.createSession(TEST_USER_ID, null)).thenReturn(TEST_SESSION_ID);
+            when(sessionService.createSession(TEST_USER_ID.toString(), null)).thenReturn(TEST_SESSION_ID);
 
             // When
             ChatResponse result = chatbotService.generateResponse(request, TEST_USER_ID, "USER");
@@ -293,7 +295,7 @@ class ChatbotServiceTest {
             // Given
             ChatRequest request = new ChatRequest("테스트 메시지", null);
             setupCommonMocks(Intent.LLM_DIRECT);
-            when(sessionService.createSession(TEST_USER_ID, null)).thenReturn(TEST_SESSION_ID);
+            when(sessionService.createSession(TEST_USER_ID.toString(), null)).thenReturn(TEST_SESSION_ID);
             when(messageConverter.convertToProviderFormat(anyList(), any())).thenReturn("formatted");
             when(llmService.generate(anyString())).thenReturn("테스트 응답");
 
@@ -311,7 +313,7 @@ class ChatbotServiceTest {
             // Given
             ChatRequest request = new ChatRequest("테스트", null);
             setupCommonMocks(Intent.LLM_DIRECT);
-            when(sessionService.createSession(TEST_USER_ID, null)).thenReturn(TEST_SESSION_ID);
+            when(sessionService.createSession(TEST_USER_ID.toString(), null)).thenReturn(TEST_SESSION_ID);
             when(messageConverter.convertToProviderFormat(anyList(), any())).thenReturn("formatted");
             when(llmService.generate(anyString())).thenReturn("응답");
 
@@ -328,16 +330,14 @@ class ChatbotServiceTest {
             // Given
             ChatRequest request = new ChatRequest("테스트", null);
             setupCommonMocks(Intent.LLM_DIRECT);
-            when(sessionService.createSession(TEST_USER_ID, null)).thenReturn(TEST_SESSION_ID);
+            when(sessionService.createSession(TEST_USER_ID.toString(), null)).thenReturn(TEST_SESSION_ID);
             when(messageConverter.convertToProviderFormat(anyList(), any())).thenReturn("formatted");
             when(llmService.generate(anyString())).thenReturn("응답");
-            when(tokenService.estimateTokens(anyString())).thenReturn(10);
-
             // When
             chatbotService.generateResponse(request, TEST_USER_ID, "USER");
 
             // Then
-            verify(tokenService).trackUsage(eq(TEST_SESSION_ID), eq(TEST_USER_ID.toString()), anyInt(), anyInt());
+            verify(tokenService).trackUsage(eq(TEST_SESSION_ID), eq(TEST_USER_ID.toString()), eq(10), eq(10));
         }
     }
 
@@ -353,7 +353,7 @@ class ChatbotServiceTest {
             // Given
             ChatRequest request = new ChatRequest("AI 트렌드 알려줘", null);
             setupCommonMocks(Intent.LLM_DIRECT);
-            when(sessionService.createSession(TEST_USER_ID, null)).thenReturn(TEST_SESSION_ID);
+            when(sessionService.createSession(TEST_USER_ID.toString(), null)).thenReturn(TEST_SESSION_ID);
             when(messageConverter.convertToProviderFormat(anyList(), any())).thenReturn("formatted");
             when(llmService.generate(anyString())).thenReturn("AI 트렌드 답변");
 
@@ -389,7 +389,7 @@ class ChatbotServiceTest {
             // Given
             ChatRequest request = new ChatRequest("안녕", null);
             setupCommonMocks(Intent.LLM_DIRECT);
-            when(sessionService.createSession(TEST_USER_ID, null)).thenReturn(TEST_SESSION_ID);
+            when(sessionService.createSession(TEST_USER_ID.toString(), null)).thenReturn(TEST_SESSION_ID);
             when(messageConverter.convertToProviderFormat(anyList(), any())).thenReturn("formatted");
             when(llmService.generate(anyString())).thenReturn("안녕하세요!");
 

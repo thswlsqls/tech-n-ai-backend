@@ -540,7 +540,7 @@ class EmergingTechAgentToolsTest {
         @DisplayName("잘못된 provider 검증 실패")
         void collectScrapedArticles_잘못된provider() {
             // When
-            DataCollectionResultDto result = tools.collectScrapedArticles("OPENAI");
+            DataCollectionResultDto result = tools.collectScrapedArticles("INVALID_PROVIDER");
 
             // Then
             assertThat(result.failureMessages()).isNotEmpty();

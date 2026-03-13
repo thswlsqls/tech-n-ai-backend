@@ -34,6 +34,8 @@ flowchart TB
         T4["get_emerging_tech_statistics"]
         T5["analyze_text_frequency"]
         T6["send_slack_notification"]
+        T7["list_emerging_techs"]
+        T8["get_emerging_tech_detail"]
     end
 
     subgraph Adapters["Tool Adapters"]
@@ -69,6 +71,8 @@ flowchart TB
     T4 --> AnalyticsAdapter --> MongoDB
     T5 --> AnalyticsAdapter
     T6 --> SlackAdapter --> Slack
+    T7 --> EmergingTechAdapter
+    T8 --> EmergingTechAdapter
 ```
 
 ## 주요 기능
@@ -89,12 +93,14 @@ flowchart TB
 
 | Tool | 설명 |
 |------|------|
-| `fetch_github_releases` | GitHub 저장소의 최신 릴리스 목록 조회 |
+| `fetch_github_releases` | GitHub 저장소의 최신 릴리스 목록 조회 (owner 자동 보정 지원) |
 | `scrape_web_page` | 웹 페이지 크롤링 (robots.txt 준수) |
 | `search_emerging_techs` | 저장된 Emerging Tech 데이터 검색 |
+| `list_emerging_techs` | 기간/Provider/UpdateType/SourceType/Status 필터 + 페이징 목록 조회 |
+| `get_emerging_tech_detail` | ID 기반 Emerging Tech 상세 조회 |
 | `get_emerging_tech_statistics` | Provider/SourceType/UpdateType별 통계 집계 (MongoDB Aggregation) |
-| `analyze_text_frequency` | title/summary 텍스트 키워드 빈도 분석 (서버사이드 집계) |
-| `send_slack_notification` | Slack 알림 전송 |
+| `analyze_text_frequency` | title/summary 키워드 빈도 분석 (Provider/UpdateType/SourceType 필터 지원) |
+| `send_slack_notification` | Slack 알림 전송 (활성화/비활성화 설정 가능) |
 
 ## Agent 동작 흐름
 
@@ -128,7 +134,7 @@ Agent 추론 과정:
 사용자 Goal: "올해 수집된 데이터의 주요 키워드를 분석해줘"
 
 Agent 추론 과정:
-1. analyze_text_frequency("", "2025-01-01", "2025-12-31", 20)
+1. analyze_text_frequency("", "", "", "2025-01-01", "2025-12-31", 20)
    → { totalDocuments: 179, topWords: [{word:"model", count:312}, ...] }
 
 2. Mermaid xychart-beta 바 차트 + Markdown 표 생성
@@ -141,7 +147,24 @@ Agent 추론 과정:
 | ...  | ...    | ...  |
 ```
 
-## 현재 개발 상황
+## 테스트
+
+### 단위 테스트
+
+langchain4j 1.10.0 업그레이드와 함께 주요 컴포넌트에 대한 단위 테스트가 추가되었습니다.
+
+| 테스트 클래스 | 대상 |
+|--------------|------|
+| `AgentControllerTest` | REST API 컨트롤러 |
+| `AgentFacadeTest` | Facade 계층 |
+| `EmergingTechAgentToolsTest` | Tool 정의 및 검증 로직 |
+| `ToolExecutionMetricsTest` | ThreadLocal 메트릭 집계 |
+| `AnalyticsToolAdapterTest` | 통계/빈도 분석 어댑터 |
+| `DataCollectionToolAdapterTest` | 데이터 수집 어댑터 |
+| `EmergingTechToolAdapterTest` | Emerging Tech 검색/목록/상세 어댑터 |
+| `GitHubToolAdapterTest` | GitHub API 어댑터 |
+| `ToolErrorHandlersTest` | Tool 오류 처리 전략 |
+| `ToolInputValidatorTest` | Tool 입력값 검증 |
 
 ### Agent 실행 테스트 결과
 
@@ -267,12 +290,15 @@ api/agent/
 │       │   ├── ScraperToolAdapter.java      # 웹 스크래핑 어댑터
 │       │   └── SlackToolAdapter.java        # Slack 알림 어댑터
 │       ├── dto/
+│       │   ├── DataCollectionResultDto.java  # 데이터 수집 결과
+│       │   ├── EmergingTechDetailDto.java    # 상세 조회 결과
 │       │   ├── EmergingTechDto.java
+│       │   ├── EmergingTechListDto.java      # 목록 조회 결과 (페이징)
 │       │   ├── GitHubReleaseDto.java
 │       │   ├── ScrapedContentDto.java
-│       │   ├── StatisticsDto.java           # 통계 집계 결과
+│       │   ├── StatisticsDto.java            # 통계 집계 결과
 │       │   ├── ToolResult.java
-│       │   └── WordFrequencyDto.java        # 키워드 빈도 분석 결과
+│       │   └── WordFrequencyDto.java         # 키워드 빈도 분석 결과
 │       ├── handler/
 │       │   └── ToolErrorHandlers.java       # Tool 오류 처리 전략
 │       ├── util/
@@ -291,7 +317,7 @@ api/agent/
 
 ```yaml
 server:
-  port: 8087
+  port: 8086
 
 spring:
   application:
@@ -305,6 +331,7 @@ spring:
       - feign-internal
       - slack
       - scraper
+      - rss
 ```
 
 ### application-agent-api.yml
@@ -318,14 +345,14 @@ langchain4j:
       model-name: gpt-4o-mini
       temperature: 0.3
       max-tokens: 4096
-      timeout: 120s
+      timeout: 120
 
 # Emerging Tech 내부 API 설정
 internal-api:
-  ai-update:
-    api-key: ${AI_UPDATE_INTERNAL_API_KEY:}
+  emerging-tech:
+    api-key: ${EMERGING_TECH_INTERNAL_API_KEY:}
 
-# Agent 스케줄러 설정
+# Emerging Tech Agent 스케줄러 설정
 agent:
   scheduler:
     enabled: ${AGENT_SCHEDULER_ENABLED:false}
@@ -333,6 +360,8 @@ agent:
   analytics:
     default-top-n: 20
     max-top-n: 100
+  slack:
+    enabled: false    # Slack 발송 비활성화 (true로 변경 시 실제 발송)
 ```
 
 ### 환경 변수
@@ -340,7 +369,7 @@ agent:
 | 변수명 | 설명 | 필수 |
 |--------|------|------|
 | `OPENAI_API_KEY` | OpenAI API 키 | Yes |
-| `AI_UPDATE_INTERNAL_API_KEY` | emerging-tech 및 Agent API 인증 키 | Yes |
+| `EMERGING_TECH_INTERNAL_API_KEY` | emerging-tech 및 Agent API 인증 키 | Yes |
 | `AGENT_SCHEDULER_ENABLED` | 스케줄러 활성화 (true/false) | No |
 | `GITHUB_TOKEN` | GitHub API 토큰 (Rate Limit 완화) | No |
 
@@ -348,17 +377,20 @@ agent:
 
 ```gradle
 dependencies {
-    // LangChain4j
-    implementation 'dev.langchain4j:langchain4j:1.10.0'
-    implementation 'dev.langchain4j:langchain4j-open-ai:1.10.0'
-
     // 프로젝트 모듈
     implementation project(':common-core')
     implementation project(':common-exception')
     implementation project(':datasource-mongodb')
+
+    // LangChain4j Core + OpenAI (1.10.0: Tool Error Handler 지원)
+    implementation 'dev.langchain4j:langchain4j:1.10.0'
+    implementation 'dev.langchain4j:langchain4j-open-ai:1.10.0'
+
+    // Agent Tool용 클라이언트 모듈
     implementation project(':client-feign')
     implementation project(':client-slack')
     implementation project(':client-scraper')
+    implementation project(':client-rss')    // RSS 피드 수집용
 
     // HTML 파싱
     implementation 'org.jsoup:jsoup:1.17.2'
@@ -397,6 +429,7 @@ dependencies {
 - **client-feign**: GitHub API, Internal API Feign 클라이언트
 - **client-slack**: Slack 알림 전송
 - **client-scraper**: 웹 페이지 크롤링
+- **client-rss**: RSS 피드 수집
 
 ## 참고 자료
 

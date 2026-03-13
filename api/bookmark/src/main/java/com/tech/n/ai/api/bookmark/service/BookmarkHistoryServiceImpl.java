@@ -5,11 +5,11 @@ import com.tech.n.ai.api.bookmark.common.exception.BookmarkNotFoundException;
 import com.tech.n.ai.api.bookmark.common.exception.BookmarkValidationException;
 import com.tech.n.ai.api.bookmark.dto.request.BookmarkHistoryListRequest;
 import com.tech.n.ai.common.exception.exception.UnauthorizedException;
-import com.tech.n.ai.domain.mariadb.entity.bookmark.BookmarkEntity;
-import com.tech.n.ai.domain.mariadb.entity.bookmark.BookmarkHistoryEntity;
-import com.tech.n.ai.domain.mariadb.repository.reader.bookmark.BookmarkHistoryReaderRepository;
-import com.tech.n.ai.domain.mariadb.repository.reader.bookmark.BookmarkReaderRepository;
-import com.tech.n.ai.domain.mariadb.repository.writer.bookmark.BookmarkWriterRepository;
+import com.tech.n.ai.domain.aurora.entity.bookmark.BookmarkEntity;
+import com.tech.n.ai.domain.aurora.entity.bookmark.BookmarkHistoryEntity;
+import com.tech.n.ai.domain.aurora.repository.reader.bookmark.BookmarkHistoryReaderRepository;
+import com.tech.n.ai.domain.aurora.repository.reader.bookmark.BookmarkReaderRepository;
+import com.tech.n.ai.domain.aurora.repository.writer.bookmark.BookmarkWriterRepository;
 
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;

@@ -1,8 +1,8 @@
 package com.tech.n.ai.api.auth.service;
 
 import com.tech.n.ai.common.exception.exception.ConflictException;
-import com.tech.n.ai.domain.mariadb.entity.auth.UserEntity;
-import com.tech.n.ai.domain.mariadb.repository.reader.auth.UserReaderRepository;
+import com.tech.n.ai.domain.aurora.entity.auth.UserEntity;
+import com.tech.n.ai.domain.aurora.repository.reader.auth.UserReaderRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;

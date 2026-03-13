@@ -24,6 +24,7 @@ dependencies {
     // 프로젝트 모듈 의존성
     implementation project(':common-core')
     implementation project(':common-exception')
+    implementation project(':common-conversation')
     implementation project(':common-security')
     implementation project(':common-kafka')
     implementation project(':datasource-aurora')

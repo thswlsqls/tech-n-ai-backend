@@ -1,5 +1,6 @@
 package com.tech.n.ai.api.agent.tool.validation;
 
+import java.net.InetAddress;
 import java.net.URI;
 import java.util.Map;
 import java.util.Set;
@@ -26,6 +27,14 @@ public final class ToolInputValidator {
     private static final Set<String> VALID_SOURCE_TYPES = Set.of("GITHUB_RELEASE", "RSS", "WEB_SCRAPING");
     private static final Set<String> VALID_STATUSES = Set.of("DRAFT", "PENDING", "PUBLISHED", "REJECTED");
     private static final Pattern OBJECT_ID_PATTERN = Pattern.compile("^[a-fA-F0-9]{24}$");
+
+    /** SSRF 방어: 차단 대상 호스트명 */
+    private static final Set<String> BLOCKED_HOSTS = Set.of(
+        "localhost", "127.0.0.1", "0.0.0.0",
+        "::1", "[::1]",
+        "169.254.169.254",  // AWS/GCP metadata endpoint
+        "metadata.google.internal"
+    );
 
     /**
      * LLM이 자주 틀리는 GitHub org 이름 교정 맵
@@ -87,13 +96,51 @@ public final class ToolInputValidator {
             if (scheme == null || (!scheme.equalsIgnoreCase("http") && !scheme.equalsIgnoreCase("https"))) {
                 return "Error: URL은 http 또는 https 프로토콜만 지원합니다.";
             }
-            if (uri.getHost() == null || uri.getHost().isBlank()) {
+            String host = uri.getHost();
+            if (host == null || host.isBlank()) {
                 return "Error: 유효하지 않은 URL 형식입니다. 호스트가 필요합니다.";
             }
+
+            // SSRF 방어: 내부 네트워크 접근 차단
+            String ssrfError = checkSsrf(host);
+            if (ssrfError != null) {
+                return ssrfError;
+            }
+
             return null;
         } catch (Exception e) {
             return "Error: 유효하지 않은 URL 형식입니다: " + e.getMessage();
         }
+    }
+
+    /**
+     * SSRF 방어: 내부 네트워크 및 메타데이터 엔드포인트 접근 차단
+     *
+     * @param host 검증할 호스트명
+     * @return 에러 메시지 또는 null (검증 성공)
+     */
+    static String checkSsrf(String host) {
+        String lowerHost = host.toLowerCase();
+
+        // 차단 목록 확인
+        if (BLOCKED_HOSTS.contains(lowerHost)) {
+            return "Error: 내부 네트워크 주소로의 접근은 허용되지 않습니다.";
+        }
+
+        // IP 주소 기반 private 대역 확인
+        try {
+            InetAddress address = InetAddress.getByName(host);
+            if (address.isLoopbackAddress()
+                    || address.isSiteLocalAddress()
+                    || address.isLinkLocalAddress()
+                    || address.isAnyLocalAddress()) {
+                return "Error: 내부 네트워크 주소로의 접근은 허용되지 않습니다.";
+            }
+        } catch (Exception e) {
+            // DNS 확인 실패 시 호스트명 패턴만으로 검증 (차단하지 않음)
+        }
+
+        return null;
     }
 
     /**
@@ -296,6 +343,29 @@ public final class ToolInputValidator {
     public static int normalizeSize(int size) {
         if (size <= 0) return 20;
         return Math.min(size, 100);
+    }
+
+    private static final Set<String> VALID_RSS_PROVIDERS = Set.of("OPENAI", "GOOGLE");
+    private static final Set<String> VALID_SCRAPER_PROVIDERS = Set.of("ANTHROPIC", "META");
+
+    /**
+     * RSS 수집 대상 Provider 검증 (선택적, 빈 문자열 허용)
+     */
+    public static String validateRssProviderOptional(String provider) {
+        if (provider == null || provider.isBlank()) {
+            return null;
+        }
+        return validateEnum(provider, "provider", VALID_RSS_PROVIDERS);
+    }
+
+    /**
+     * 스크래핑 수집 대상 Provider 검증 (선택적, 빈 문자열 허용)
+     */
+    public static String validateScraperProviderOptional(String provider) {
+        if (provider == null || provider.isBlank()) {
+            return null;
+        }
+        return validateEnum(provider, "provider", VALID_SCRAPER_PROVIDERS);
     }
 
     /**

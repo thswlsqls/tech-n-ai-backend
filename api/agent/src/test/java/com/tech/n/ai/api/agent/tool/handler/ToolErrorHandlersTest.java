@@ -47,11 +47,12 @@ class ToolErrorHandlersTest {
             ToolErrorHandlerResult result = ToolErrorHandlers.handleToolExecutionError(error, toolErrorContext);
 
             // Then
-            assertThat(result).isNotNull();
+            assertThat(result.text()).contains("fetch_github_releases");
+            assertThat(result.text()).contains("API 호출 실패");
         }
 
         @Test
-        @DisplayName("에러 메시지에 Tool 이름 포함")
+        @DisplayName("에러 메시지에 Tool 이름과 에러 내용 포함")
         void handleToolExecutionError_Tool이름포함() {
             // Given
             String toolName = "scrape_web_page";
@@ -65,7 +66,8 @@ class ToolErrorHandlersTest {
             ToolErrorHandlerResult result = ToolErrorHandlers.handleToolExecutionError(error, toolErrorContext);
 
             // Then
-            assertThat(result).isNotNull();
+            assertThat(result.text()).contains(toolName);
+            assertThat(result.text()).contains("타임아웃");
         }
     }
 
@@ -89,11 +91,12 @@ class ToolErrorHandlersTest {
             ToolErrorHandlerResult result = ToolErrorHandlers.handleToolArgumentsError(error, toolErrorContext);
 
             // Then
-            assertThat(result).isNotNull();
+            assertThat(result.text()).contains("list_emerging_techs");
+            assertThat(result.text()).contains("JSON 파싱 실패");
         }
 
         @Test
-        @DisplayName("에러 메시지에 Tool 이름 포함")
+        @DisplayName("에러 메시지에 Tool 이름과 에러 내용 포함")
         void handleToolArgumentsError_Tool이름포함() {
             // Given
             String toolName = "get_emerging_tech_detail";
@@ -107,7 +110,8 @@ class ToolErrorHandlersTest {
             ToolErrorHandlerResult result = ToolErrorHandlers.handleToolArgumentsError(error, toolErrorContext);
 
             // Then
-            assertThat(result).isNotNull();
+            assertThat(result.text()).contains(toolName);
+            assertThat(result.text()).contains("타입 불일치");
         }
     }
 

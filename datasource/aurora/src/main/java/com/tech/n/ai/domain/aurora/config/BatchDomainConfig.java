@@ -1,4 +1,4 @@
-package com.tech.n.ai.domain.mariadb.config;
+package com.tech.n.ai.domain.aurora.config;
 
 
 import jakarta.persistence.EntityManager;
@@ -15,8 +15,8 @@ import lombok.RequiredArgsConstructor;
 
 @Profile("batch-domain")
 @Configuration
-@EntityScan(value = {"com.tech.n.ai.domain.mariadb.entity"})
-@ComponentScan(basePackages = {"com.tech.n.ai.domain.mariadb"})
+@EntityScan(value = {"com.tech.n.ai.domain.aurora.entity"})
+@ComponentScan(basePackages = {"com.tech.n.ai.domain.aurora"})
 @Import({
     BatchMetaDataSourceConfig.class,
     BatchBusinessDataSourceConfig.class,    

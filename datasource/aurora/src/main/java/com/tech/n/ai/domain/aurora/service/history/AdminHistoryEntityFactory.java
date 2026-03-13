@@ -1,9 +1,9 @@
-package com.tech.n.ai.domain.mariadb.service.history;
+package com.tech.n.ai.domain.aurora.service.history;
 
-import com.tech.n.ai.domain.mariadb.entity.BaseEntity;
-import com.tech.n.ai.domain.mariadb.entity.auth.AdminEntity;
-import com.tech.n.ai.domain.mariadb.entity.auth.AdminHistoryEntity;
-import com.tech.n.ai.domain.mariadb.repository.writer.history.AdminHistoryWriterRepository;
+import com.tech.n.ai.domain.aurora.entity.BaseEntity;
+import com.tech.n.ai.domain.aurora.entity.auth.AdminEntity;
+import com.tech.n.ai.domain.aurora.entity.auth.AdminHistoryEntity;
+import com.tech.n.ai.domain.aurora.repository.writer.history.AdminHistoryWriterRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

@@ -1,5 +1,6 @@
 package com.tech.n.ai.api.chatbot.common.exception;
 
+import com.tech.n.ai.common.conversation.exception.ConversationSessionNotFoundException;
 import com.tech.n.ai.common.core.constants.ErrorCodeConstants;
 import com.tech.n.ai.common.core.dto.ApiResponse;
 import com.tech.n.ai.common.core.dto.MessageCode;

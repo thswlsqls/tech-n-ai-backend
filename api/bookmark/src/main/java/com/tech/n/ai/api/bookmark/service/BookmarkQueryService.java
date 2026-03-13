@@ -2,7 +2,7 @@ package com.tech.n.ai.api.bookmark.service;
 
 import com.tech.n.ai.api.bookmark.dto.request.BookmarkListRequest;
 import com.tech.n.ai.api.bookmark.dto.request.BookmarkSearchRequest;
-import com.tech.n.ai.domain.mariadb.entity.bookmark.BookmarkEntity;
+import com.tech.n.ai.domain.aurora.entity.bookmark.BookmarkEntity;
 import org.springframework.data.domain.Page;
 
 /**

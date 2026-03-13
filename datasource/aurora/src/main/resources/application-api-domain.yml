@@ -20,8 +20,8 @@ spring:
           globally_quoted_identifiers: true
           order_inserts: true
           order_updates: true
-          implicit_naming_strategy: com.tech.n.ai.domain.mariadb.utils.JpaImplicitNamingStrategyCustom
-          physical_naming_strategy: com.tech.n.ai.domain.mariadb.utils.JpaPhysicalNamingStrategyCustom
+          implicit_naming_strategy: com.tech.n.ai.domain.aurora.utils.JpaImplicitNamingStrategyCustom
+          physical_naming_strategy: com.tech.n.ai.domain.aurora.utils.JpaPhysicalNamingStrategyCustom
           jdbc:
             batch_size: ${DB_BATCH_SIZE:50}
             time_zone: ${TZ:Asia/Seoul}

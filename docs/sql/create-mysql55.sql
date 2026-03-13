@@ -45,7 +45,7 @@ USE auth;
 -- ---------------------------------------------------------------------
 -- 2.1. providers (OAuth 제공자)
 -- 의존성: 없음
--- Entity: com.tech.n.ai.domain.mariadb.entity.auth.ProviderEntity
+-- Entity: com.tech.n.ai.domain.aurora.entity.auth.ProviderEntity
 -- ---------------------------------------------------------------------
 
 CREATE TABLE providers (
@@ -73,7 +73,7 @@ CREATE TABLE providers (
 -- ---------------------------------------------------------------------
 -- 2.2. users (사용자)
 -- 의존성: providers (provider_id FK)
--- Entity: com.tech.n.ai.domain.mariadb.entity.auth.UserEntity
+-- Entity: com.tech.n.ai.domain.aurora.entity.auth.UserEntity
 -- ---------------------------------------------------------------------
 
 CREATE TABLE users (
@@ -105,7 +105,7 @@ CREATE TABLE users (
 -- ---------------------------------------------------------------------
 -- 2.3. admins (관리자)
 -- 의존성: 없음
--- Entity: com.tech.n.ai.domain.mariadb.entity.auth.AdminEntity
+-- Entity: com.tech.n.ai.domain.aurora.entity.auth.AdminEntity
 -- ---------------------------------------------------------------------
 
 CREATE TABLE admins (
@@ -136,7 +136,7 @@ CREATE TABLE admins (
 -- ---------------------------------------------------------------------
 -- 2.4. refresh_tokens (JWT Refresh Token)
 -- 의존성: users (user_id FK), admins (admin_id FK)
--- Entity: com.tech.n.ai.domain.mariadb.entity.auth.RefreshTokenEntity
+-- Entity: com.tech.n.ai.domain.aurora.entity.auth.RefreshTokenEntity
 -- ---------------------------------------------------------------------
 
 CREATE TABLE refresh_tokens (
@@ -167,7 +167,7 @@ CREATE TABLE refresh_tokens (
 -- ---------------------------------------------------------------------
 -- 2.5. email_verifications (이메일 인증/비밀번호 재설정 토큰)
 -- 의존성: 없음
--- Entity: com.tech.n.ai.domain.mariadb.entity.auth.EmailVerificationEntity
+-- Entity: com.tech.n.ai.domain.aurora.entity.auth.EmailVerificationEntity
 -- ---------------------------------------------------------------------
 
 CREATE TABLE email_verifications (
@@ -197,7 +197,7 @@ CREATE TABLE email_verifications (
 -- ---------------------------------------------------------------------
 -- 2.6. user_history (사용자 변경 이력)
 -- 의존성: users (user_id FK)
--- Entity: com.tech.n.ai.domain.mariadb.entity.auth.UserHistoryEntity
+-- Entity: com.tech.n.ai.domain.aurora.entity.auth.UserHistoryEntity
 -- ---------------------------------------------------------------------
 
 CREATE TABLE user_history (
@@ -221,7 +221,7 @@ CREATE TABLE user_history (
 -- ---------------------------------------------------------------------
 -- 2.7. admin_history (관리자 변경 이력)
 -- 의존성: admins (admin_id FK)
--- Entity: com.tech.n.ai.domain.mariadb.entity.auth.AdminHistoryEntity
+-- Entity: com.tech.n.ai.domain.aurora.entity.auth.AdminHistoryEntity
 -- ---------------------------------------------------------------------
 
 CREATE TABLE admin_history (
@@ -252,7 +252,7 @@ USE bookmark;
 -- ---------------------------------------------------------------------
 -- 3.1. bookmarks (EmergingTech 북마크)
 -- 의존성: 없음 (user_id는 auth.users 참조이나 스키마 간 FK 미지원)
--- Entity: com.tech.n.ai.domain.mariadb.entity.bookmark.BookmarkEntity
+-- Entity: com.tech.n.ai.domain.aurora.entity.bookmark.BookmarkEntity
 -- ---------------------------------------------------------------------
 
 CREATE TABLE bookmarks (
@@ -284,7 +284,7 @@ CREATE TABLE bookmarks (
 -- ---------------------------------------------------------------------
 -- 3.2. bookmark_history (북마크 변경 이력)
 -- 의존성: bookmarks (bookmark_id FK)
--- Entity: com.tech.n.ai.domain.mariadb.entity.bookmark.BookmarkHistoryEntity
+-- Entity: com.tech.n.ai.domain.aurora.entity.bookmark.BookmarkHistoryEntity
 -- ---------------------------------------------------------------------
 
 CREATE TABLE bookmark_history (
@@ -315,7 +315,7 @@ USE chatbot;
 -- ---------------------------------------------------------------------
 -- 4.1. conversation_sessions (대화 세션)
 -- 의존성: 없음 (user_id는 auth.users 참조이나 스키마 간 FK 미지원)
--- Entity: com.tech.n.ai.domain.mariadb.entity.chatbot.ConversationSessionEntity
+-- Entity: com.tech.n.ai.domain.aurora.entity.chatbot.ConversationSessionEntity
 -- Note: BaseEntity의 id 컬럼이 session_id로 @AttributeOverride됨
 -- ---------------------------------------------------------------------
 
@@ -341,7 +341,7 @@ CREATE TABLE conversation_sessions (
 -- ---------------------------------------------------------------------
 -- 4.2. conversation_messages (대화 메시지)
 -- 의존성: conversation_sessions (session_id FK)
--- Entity: com.tech.n.ai.domain.mariadb.entity.chatbot.ConversationMessageEntity
+-- Entity: com.tech.n.ai.domain.aurora.entity.chatbot.ConversationMessageEntity
 -- Note: BaseEntity를 상속하지 않음 (독립 PK, 최소 감사 필드)
 -- ---------------------------------------------------------------------
 

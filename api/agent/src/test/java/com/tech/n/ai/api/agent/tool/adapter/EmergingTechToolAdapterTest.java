@@ -3,6 +3,7 @@ package com.tech.n.ai.api.agent.tool.adapter;
 import com.tech.n.ai.api.agent.tool.dto.EmergingTechDetailDto;
 import com.tech.n.ai.api.agent.tool.dto.EmergingTechDto;
 import com.tech.n.ai.api.agent.tool.dto.EmergingTechListDto;
+import com.tech.n.ai.api.agent.tool.dto.InternalApiResponse;
 import com.tech.n.ai.client.feign.domain.internal.contract.EmergingTechInternalContract;
 import com.tech.n.ai.common.core.dto.ApiResponse;
 import tools.jackson.databind.ObjectMapper;
@@ -15,6 +16,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -53,10 +55,12 @@ class EmergingTechToolAdapterTest {
         @DisplayName("정상 검색 - 결과 목록 반환")
         void search_정상검색() {
             // Given
-            Map<String, Object> item1 = createItemMap("id1", "OPENAI", "MODEL_RELEASE", "Title1");
-            Map<String, Object> item2 = createItemMap("id2", "ANTHROPIC", "SDK_RELEASE", "Title2");
-            Map<String, Object> data = Map.of("items", List.of(item1, item2));
-            ApiResponse<Object> response = ApiResponse.success(data);
+            ApiResponse<Object> response = ApiResponse.success(
+                createPageData(List.of(
+                    createDetailData("id1", "OPENAI", "MODEL_RELEASE", "Title1"),
+                    createDetailData("id2", "ANTHROPIC", "SDK_RELEASE", "Title2")
+                ), 2, 1, 20)
+            );
 
             when(emergingTechContract.searchEmergingTech(anyString(), anyString(), any(), anyInt(), anyInt()))
                     .thenReturn(response);
@@ -73,9 +77,11 @@ class EmergingTechToolAdapterTest {
         @DisplayName("provider 필터 빈 값 - 전체 검색")
         void search_provider빈값() {
             // Given
-            Map<String, Object> item = createItemMap("id1", "GOOGLE", "API_UPDATE", "Title");
-            Map<String, Object> data = Map.of("items", List.of(item));
-            ApiResponse<Object> response = ApiResponse.success(data);
+            ApiResponse<Object> response = ApiResponse.success(
+                createPageData(List.of(
+                    createDetailData("id1", "GOOGLE", "API_UPDATE", "Title")
+                ), 1, 1, 20)
+            );
 
             when(emergingTechContract.searchEmergingTech(anyString(), anyString(), isNull(), anyInt(), anyInt()))
                     .thenReturn(response);
@@ -135,8 +141,9 @@ class EmergingTechToolAdapterTest {
         @DisplayName("items null 시 빈 리스트")
         void search_items_null() {
             // Given
-            Map<String, Object> data = Map.of("totalCount", 0);
-            ApiResponse<Object> response = ApiResponse.success(data);
+            ApiResponse<Object> response = ApiResponse.success(
+                createPageData(null, 0, 1, 20)
+            );
             when(emergingTechContract.searchEmergingTech(any(), any(), any(), anyInt(), anyInt()))
                     .thenReturn(response);
 
@@ -158,14 +165,11 @@ class EmergingTechToolAdapterTest {
         @DisplayName("정상 조회 - 페이징 정보 포함")
         void list_정상조회() {
             // Given
-            Map<String, Object> item = createItemMap("id1", "OPENAI", "MODEL_RELEASE", "Title");
-            Map<String, Object> data = Map.of(
-                    "items", List.of(item),
-                    "totalCount", 100,
-                    "pageNumber", 1,
-                    "pageSize", 20
+            ApiResponse<Object> response = ApiResponse.success(
+                createPageData(List.of(
+                    createDetailData("id1", "OPENAI", "MODEL_RELEASE", "Title")
+                ), 100, 1, 20)
             );
-            ApiResponse<Object> response = ApiResponse.success(data);
 
             when(emergingTechContract.listEmergingTechs(any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt(), any()))
                     .thenReturn(response);
@@ -184,8 +188,9 @@ class EmergingTechToolAdapterTest {
         @DisplayName("빈 필터 - null 변환")
         void list_빈필터() {
             // Given
-            Map<String, Object> data = Map.of("items", List.of(), "totalCount", 0, "pageNumber", 1, "pageSize", 20);
-            ApiResponse<Object> response = ApiResponse.success(data);
+            ApiResponse<Object> response = ApiResponse.success(
+                createPageData(List.of(), 0, 1, 20)
+            );
 
             when(emergingTechContract.listEmergingTechs(any(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), anyInt(), anyInt(), any()))
                     .thenReturn(response);
@@ -232,8 +237,9 @@ class EmergingTechToolAdapterTest {
         @DisplayName("period 문자열 생성 - 시작일만 있을 때")
         void list_period_시작일만() {
             // Given
-            Map<String, Object> data = Map.of("items", List.of(), "totalCount", 0, "pageNumber", 1, "pageSize", 20);
-            ApiResponse<Object> response = ApiResponse.success(data);
+            ApiResponse<Object> response = ApiResponse.success(
+                createPageData(List.of(), 0, 1, 20)
+            );
             when(emergingTechContract.listEmergingTechs(any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt(), any()))
                     .thenReturn(response);
 
@@ -255,17 +261,14 @@ class EmergingTechToolAdapterTest {
         @DisplayName("정상 조회 - 상세 정보 반환")
         void getDetail_정상조회() {
             // Given
-            Map<String, Object> data = Map.of(
-                    "id", "507f1f77bcf86cd799439011",
-                    "provider", "OPENAI",
-                    "updateType", "MODEL_RELEASE",
-                    "title", "GPT-5 Release",
-                    "summary", "New model release",
-                    "url", "https://openai.com/blog/gpt-5",
-                    "publishedAt", "2024-01-15",
-                    "sourceType", "RSS",
-                    "status", "PUBLISHED"
-            );
+            Map<String, Object> data = createDetailData(
+                "507f1f77bcf86cd799439011", "OPENAI", "MODEL_RELEASE", "GPT-5 Release");
+            data.put("summary", "New model release");
+            data.put("url", "https://openai.com/blog/gpt-5");
+            data.put("publishedAt", "2024-01-15");
+            data.put("sourceType", "RSS");
+            data.put("status", "PUBLISHED");
+
             ApiResponse<Object> response = ApiResponse.success(data);
 
             when(emergingTechContract.getEmergingTechDetail(anyString(), anyString()))
@@ -315,18 +318,14 @@ class EmergingTechToolAdapterTest {
         @DisplayName("metadata 포함된 상세 정보")
         void getDetail_metadata포함() {
             // Given
-            Map<String, Object> metadata = Map.of(
-                    "version", "1.0.0",
-                    "tags", List.of("AI", "LLM"),
-                    "author", "OpenAI"
-            );
-            Map<String, Object> data = Map.of(
-                    "id", "id1",
-                    "provider", "OPENAI",
-                    "updateType", "SDK_RELEASE",
-                    "title", "SDK Update",
-                    "metadata", metadata
-            );
+            Map<String, Object> metadata = new HashMap<>();
+            metadata.put("version", "1.0.0");
+            metadata.put("tags", List.of("AI", "LLM"));
+            metadata.put("author", "OpenAI");
+
+            Map<String, Object> data = createDetailData("id1", "OPENAI", "SDK_RELEASE", "SDK Update");
+            data.put("metadata", metadata);
+
             ApiResponse<Object> response = ApiResponse.success(data);
 
             when(emergingTechContract.getEmergingTechDetail(any(), any()))
@@ -344,14 +343,31 @@ class EmergingTechToolAdapterTest {
 
     // ========== 헬퍼 메서드 ==========
 
-    private Map<String, Object> createItemMap(String id, String provider, String updateType, String title) {
-        return Map.of(
-                "id", id,
-                "provider", provider,
-                "updateType", updateType,
-                "title", title,
-                "url", "https://example.com/" + id,
-                "status", "PUBLISHED"
-        );
+    /**
+     * Internal API PageResponse 구조에 맞는 테스트 데이터 생성
+     */
+    private Map<String, Object> createPageData(List<Map<String, Object>> items,
+                                                int totalCount, int pageNumber, int pageSize) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("items", items);
+        data.put("totalCount", totalCount);
+        data.put("pageNumber", pageNumber);
+        data.put("pageSize", pageSize);
+        return data;
+    }
+
+    /**
+     * Internal API DetailResponse 구조에 맞는 테스트 데이터 생성
+     */
+    private Map<String, Object> createDetailData(String id, String provider,
+                                                   String updateType, String title) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("id", id);
+        data.put("provider", provider);
+        data.put("updateType", updateType);
+        data.put("title", title);
+        data.put("url", "https://example.com/" + id);
+        data.put("status", "PUBLISHED");
+        return data;
     }
 }

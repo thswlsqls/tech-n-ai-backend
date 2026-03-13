@@ -8,6 +8,8 @@ import com.tech.n.ai.api.chatbot.dto.request.ChatRequest;
 import com.tech.n.ai.api.chatbot.dto.response.ChatResponse;
 import com.tech.n.ai.api.chatbot.dto.response.SourceResponse;
 import com.tech.n.ai.api.chatbot.memory.ConversationChatMemoryProvider;
+import com.tech.n.ai.common.conversation.service.ConversationMessageService;
+import com.tech.n.ai.common.conversation.service.ConversationSessionService;
 import com.tech.n.ai.api.chatbot.service.dto.Intent;
 import com.tech.n.ai.api.chatbot.service.dto.SearchOptions;
 import com.tech.n.ai.api.chatbot.service.dto.SearchQuery;
@@ -120,10 +122,10 @@ public class ChatbotServiceImpl implements ChatbotService {
     
     private String getOrCreateSession(ChatRequest request, Long userId) {
         if (request.conversationId() != null && !request.conversationId().isBlank()) {
-            sessionService.getSession(request.conversationId(), userId);
+            sessionService.getSession(request.conversationId(), userId.toString());
             return request.conversationId();
         }
-        return sessionService.createSession(userId, null);
+        return sessionService.createSession(userId.toString(), null);
     }
     
     /**

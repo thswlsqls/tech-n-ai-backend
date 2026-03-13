@@ -26,13 +26,13 @@ import lombok.RequiredArgsConstructor;
 @Profile("api-domain")
 @EnableTransactionManagement
 @EnableJpaRepositories(
-    basePackages = {"com.tech.n.ai.domain.mariadb.repository"}
+    basePackages = {"com.tech.n.ai.domain.aurora.repository"}
 )
-@EntityScan(value = {"com.tech.n.ai.domain.mariadb.entity"})
-@ComponentScan(basePackages = {"com.tech.n.ai.domain.mariadb"})
+@EntityScan(value = {"com.tech.n.ai.domain.aurora.entity"})
+@ComponentScan(basePackages = {"com.tech.n.ai.domain.aurora"})
 @Import({
     ApiDataSourceConfig.class,
-    com.tech.n.ai.domain.mariadb.config.ApiMybatisConfig.class
+    com.tech.n.ai.domain.aurora.config.ApiMybatisConfig.class
 })
 @RequiredArgsConstructor
 public class ApiDomainConfig {

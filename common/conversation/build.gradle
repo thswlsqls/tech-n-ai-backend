@@ -1,0 +1,27 @@
+group = 'com.tech.n.ai.common'
+version = '0.0.1-SNAPSHOT'
+description = 'common-conversation'
+
+bootJar.enabled = false
+jar.enabled = true
+
+dependencies {
+    implementation project(':common-core')
+    implementation project(':common-exception')
+    implementation project(':common-kafka')
+    implementation project(':datasource-aurora')
+    implementation project(':datasource-mongodb')
+
+    // LangChain4j ChatMemory 인터페이스 (ChatMessage, ChatMemoryStore 등)
+    api 'dev.langchain4j:langchain4j:1.10.0'
+
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+task prepareKotlinBuildScriptModel {
+
+}

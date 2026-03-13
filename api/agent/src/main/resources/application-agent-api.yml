@@ -7,6 +7,8 @@ langchain4j:
       temperature: 0.3
       max-tokens: 4096
       timeout: 120
+      log-requests: ${AGENT_LOG_REQUESTS:false}
+      log-responses: ${AGENT_LOG_RESPONSES:false}
 
 # Emerging Tech 내부 API 설정
 internal-api:

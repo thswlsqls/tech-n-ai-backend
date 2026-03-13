@@ -1,10 +1,10 @@
 package com.tech.n.ai.api.auth.service;
 
-import com.tech.n.ai.domain.mariadb.entity.auth.RefreshTokenEntity;
-import com.tech.n.ai.domain.mariadb.entity.auth.UserEntity;
-import com.tech.n.ai.domain.mariadb.repository.reader.auth.RefreshTokenReaderRepository;
-import com.tech.n.ai.domain.mariadb.repository.reader.auth.UserReaderRepository;
-import com.tech.n.ai.domain.mariadb.repository.writer.auth.RefreshTokenWriterRepository;
+import com.tech.n.ai.domain.aurora.entity.auth.RefreshTokenEntity;
+import com.tech.n.ai.domain.aurora.entity.auth.UserEntity;
+import com.tech.n.ai.domain.aurora.repository.reader.auth.RefreshTokenReaderRepository;
+import com.tech.n.ai.domain.aurora.repository.reader.auth.UserReaderRepository;
+import com.tech.n.ai.domain.aurora.repository.writer.auth.RefreshTokenWriterRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;

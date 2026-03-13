@@ -1,13 +1,14 @@
 package com.tech.n.ai.api.chatbot.service;
 
-import com.tech.n.ai.api.chatbot.common.exception.ConversationSessionNotFoundException;
-import com.tech.n.ai.api.chatbot.common.exception.InvalidInputException;
-import com.tech.n.ai.api.chatbot.dto.response.SessionResponse;
+import com.tech.n.ai.common.conversation.dto.SessionResponse;
+import com.tech.n.ai.common.conversation.exception.ConversationSessionNotFoundException;
+import com.tech.n.ai.common.conversation.exception.InvalidSessionIdException;
+import com.tech.n.ai.common.conversation.service.ConversationSessionServiceImpl;
 import com.tech.n.ai.common.exception.exception.UnauthorizedException;
 import com.tech.n.ai.common.kafka.publisher.EventPublisher;
-import com.tech.n.ai.domain.mariadb.entity.chatbot.ConversationSessionEntity;
-import com.tech.n.ai.domain.mariadb.repository.reader.chatbot.ConversationSessionReaderRepository;
-import com.tech.n.ai.domain.mariadb.repository.writer.chatbot.ConversationSessionWriterRepository;
+import com.tech.n.ai.domain.aurora.entity.conversation.ConversationSessionEntity;
+import com.tech.n.ai.domain.aurora.repository.reader.conversation.ConversationSessionReaderRepository;
+import com.tech.n.ai.domain.aurora.repository.writer.conversation.ConversationSessionWriterRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -50,7 +51,7 @@ class ConversationSessionServiceTest {
     @InjectMocks
     private ConversationSessionServiceImpl sessionService;
 
-    private static final Long TEST_USER_ID = 1L;
+    private static final String TEST_USER_ID = "1";
     private static final Long TEST_SESSION_ID = 100L;
 
     // ========== createSession 테스트 ==========
@@ -127,7 +128,7 @@ class ConversationSessionServiceTest {
         @DisplayName("다른 사용자 세션 접근 시 UnauthorizedException")
         void getSession_권한없음() {
             // Given
-            Long otherUserId = 2L;
+            String otherUserId = "2";
             ConversationSessionEntity session = createSessionEntity(TEST_SESSION_ID, TEST_USER_ID);
             when(readerRepository.findById(TEST_SESSION_ID)).thenReturn(Optional.of(session));
 
@@ -151,14 +152,14 @@ class ConversationSessionServiceTest {
         }
 
         @Test
-        @DisplayName("유효하지 않은 세션 ID 형식 시 InvalidInputException")
+        @DisplayName("유효하지 않은 세션 ID 형식 시 InvalidSessionIdException")
         void getSession_잘못된_ID_형식() {
             // Given
             String invalidId = "invalid-id";
 
             // When & Then
             assertThatThrownBy(() -> sessionService.getSession(invalidId, TEST_USER_ID))
-                .isInstanceOf(InvalidInputException.class)
+                .isInstanceOf(InvalidSessionIdException.class)
                 .hasMessageContaining("유효하지 않은 세션 ID");
         }
     }
@@ -202,15 +203,14 @@ class ConversationSessionServiceTest {
         }
 
         @Test
-        @DisplayName("존재하지 않는 세션은 무시")
-        void updateLastMessageAt_미존재_무시() {
+        @DisplayName("존재하지 않는 세션은 ConversationSessionNotFoundException 발생")
+        void updateLastMessageAt_미존재_예외() {
             // Given
             when(readerRepository.findById(TEST_SESSION_ID)).thenReturn(Optional.empty());
 
-            // When
-            sessionService.updateLastMessageAt(TEST_SESSION_ID.toString());
-
-            // Then
+            // When & Then
+            assertThatThrownBy(() -> sessionService.updateLastMessageAt(TEST_SESSION_ID.toString()))
+                .isInstanceOf(ConversationSessionNotFoundException.class);
             verify(writerRepository, never()).save(any());
         }
     }
@@ -284,7 +284,7 @@ class ConversationSessionServiceTest {
         @DisplayName("다른 사용자 세션 삭제 시 UnauthorizedException")
         void deleteSession_권한없음() {
             // Given
-            Long otherUserId = 2L;
+            String otherUserId = "2";
             ConversationSessionEntity session = createSessionEntity(TEST_SESSION_ID, TEST_USER_ID);
             when(readerRepository.findById(TEST_SESSION_ID)).thenReturn(Optional.of(session));
 
@@ -351,7 +351,7 @@ class ConversationSessionServiceTest {
         @DisplayName("다른 사용자 세션 타이틀 변경 - UnauthorizedException")
         void updateSessionTitle_권한없음() {
             // Given
-            Long otherUserId = 2L;
+            String otherUserId = "2";
             ConversationSessionEntity session = createSessionEntity(TEST_SESSION_ID, TEST_USER_ID);
             when(readerRepository.findById(TEST_SESSION_ID)).thenReturn(Optional.of(session));
 
@@ -443,7 +443,7 @@ class ConversationSessionServiceTest {
 
     // ========== 헬퍼 메서드 ==========
 
-    private ConversationSessionEntity createSessionEntity(Long id, Long userId) {
+    private ConversationSessionEntity createSessionEntity(Long id, String userId) {
         ConversationSessionEntity entity = new ConversationSessionEntity();
         entity.setId(id);
         entity.setUserId(userId);
@@ -452,7 +452,6 @@ class ConversationSessionServiceTest {
         entity.setIsDeleted(false);
         entity.setLastMessageAt(LocalDateTime.now());
         entity.setCreatedAt(LocalDateTime.now());
-        entity.setCreatedBy(userId);
         return entity;
     }
 }

@@ -1,6 +1,6 @@
-package com.tech.n.ai.domain.mariadb.repository.writer.auth;
+package com.tech.n.ai.domain.aurora.repository.writer.auth;
 
-import com.tech.n.ai.domain.mariadb.entity.auth.RefreshTokenEntity;
+import com.tech.n.ai.domain.aurora.entity.auth.RefreshTokenEntity;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

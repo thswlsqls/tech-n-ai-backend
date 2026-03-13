@@ -1,8 +1,8 @@
-package com.tech.n.ai.domain.mariadb.repository.writer.bookmark;
+package com.tech.n.ai.domain.aurora.repository.writer.bookmark;
 
-import com.tech.n.ai.domain.mariadb.entity.bookmark.BookmarkEntity;
-import com.tech.n.ai.domain.mariadb.repository.writer.BaseWriterRepository;
-import com.tech.n.ai.domain.mariadb.service.history.HistoryService;
+import com.tech.n.ai.domain.aurora.entity.bookmark.BookmarkEntity;
+import com.tech.n.ai.domain.aurora.repository.writer.BaseWriterRepository;
+import com.tech.n.ai.domain.aurora.service.history.HistoryService;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.jpa.repository.JpaRepository;

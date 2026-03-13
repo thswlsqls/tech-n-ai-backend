@@ -1,4 +1,4 @@
-package com.tech.n.ai.domain.mariadb.config;
+package com.tech.n.ai.domain.aurora.config;
 
 import javax.sql.DataSource;
 

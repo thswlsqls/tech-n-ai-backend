@@ -3,7 +3,9 @@ package com.tech.n.ai.api.chatbot.controller;
 import com.tech.n.ai.api.chatbot.dto.request.ChatRequest;
 import com.tech.n.ai.api.chatbot.dto.response.*;
 import com.tech.n.ai.api.chatbot.facade.ChatbotFacade;
-import com.tech.n.ai.api.chatbot.service.ConversationSessionService;
+import com.tech.n.ai.common.conversation.dto.MessageResponse;
+import com.tech.n.ai.common.conversation.dto.SessionResponse;
+import com.tech.n.ai.common.conversation.service.ConversationSessionService;
 import com.tech.n.ai.common.core.dto.PageData;
 import com.tech.n.ai.common.security.principal.UserPrincipal;
 import tools.jackson.databind.ObjectMapper;
@@ -217,7 +219,7 @@ class ChatbotControllerTest {
         void getSession_성공() throws Exception {
             // Given
             SessionResponse session = createSessionResponse("session-123", "테스트 대화");
-            when(sessionService.getSession("session-123", TEST_USER_ID))
+            when(sessionService.getSession("session-123", TEST_USER_ID.toString()))
                 .thenReturn(session);
 
             // When & Then
@@ -287,7 +289,7 @@ class ChatbotControllerTest {
         void updateSessionTitle_성공() throws Exception {
             // Given
             SessionResponse session = createSessionResponse("session-123", "새 타이틀");
-            when(sessionService.updateSessionTitle("session-123", TEST_USER_ID, "새 타이틀"))
+            when(sessionService.updateSessionTitle("session-123", TEST_USER_ID.toString(), "새 타이틀"))
                 .thenReturn(session);
 
             String body = """
@@ -359,14 +361,14 @@ class ChatbotControllerTest {
         @DisplayName("세션 삭제 - 200 OK")
         void deleteSession_성공() throws Exception {
             // Given
-            doNothing().when(sessionService).deleteSession("session-123", TEST_USER_ID);
+            doNothing().when(sessionService).deleteSession("session-123", TEST_USER_ID.toString());
 
             // When & Then
             mockMvc.perform(delete(BASE_URL + "/sessions/session-123"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("2000"));
 
-            verify(sessionService).deleteSession("session-123", TEST_USER_ID);
+            verify(sessionService).deleteSession("session-123", TEST_USER_ID.toString());
         }
     }
 

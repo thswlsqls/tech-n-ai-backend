@@ -1,6 +1,7 @@
 package com.tech.n.ai.api.chatbot.service;
 
-import com.tech.n.ai.api.chatbot.dto.response.SessionResponse;
+import com.tech.n.ai.common.conversation.dto.SessionResponse;
+import com.tech.n.ai.common.conversation.service.ConversationSessionService;
 import dev.langchain4j.model.chat.ChatModel;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -48,7 +49,7 @@ class SessionTitleGenerationServiceTest {
         void generateAndSaveTitle_성공() {
             // Given
             when(chatModel.chat(anyString())).thenReturn("AI 트렌드 대화");
-            when(sessionService.updateSessionTitle(anyString(), anyLong(), anyString()))
+            when(sessionService.updateSessionTitle(anyString(), anyString(), anyString()))
                 .thenReturn(createSessionResponse(TEST_SESSION_ID, "AI 트렌드 대화"));
 
             // When
@@ -57,7 +58,7 @@ class SessionTitleGenerationServiceTest {
 
             // Then
             verify(chatModel).chat(anyString());
-            verify(sessionService).updateSessionTitle(TEST_SESSION_ID, TEST_USER_ID, "AI 트렌드 대화");
+            verify(sessionService).updateSessionTitle(TEST_SESSION_ID, TEST_USER_ID.toString(), "AI 트렌드 대화");
         }
 
         @Test
@@ -66,7 +67,7 @@ class SessionTitleGenerationServiceTest {
             // Given
             ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
             when(chatModel.chat(anyString())).thenReturn("AI 트렌드 분석");
-            when(sessionService.updateSessionTitle(anyString(), anyLong(), anyString()))
+            when(sessionService.updateSessionTitle(anyString(), anyString(), anyString()))
                 .thenReturn(createSessionResponse(TEST_SESSION_ID, "AI 트렌드 분석"));
 
             // When
@@ -94,7 +95,7 @@ class SessionTitleGenerationServiceTest {
         void sanitizeTitle_큰따옴표_제거() {
             // Given
             when(chatModel.chat(anyString())).thenReturn("\"AI 트렌드 대화\"");
-            when(sessionService.updateSessionTitle(anyString(), anyLong(), anyString()))
+            when(sessionService.updateSessionTitle(anyString(), anyString(), anyString()))
                 .thenReturn(createSessionResponse(TEST_SESSION_ID, "AI 트렌드 대화"));
 
             // When
@@ -102,7 +103,7 @@ class SessionTitleGenerationServiceTest {
                 TEST_SESSION_ID, TEST_USER_ID, "메시지", "응답");
 
             // Then
-            verify(sessionService).updateSessionTitle(TEST_SESSION_ID, TEST_USER_ID, "AI 트렌드 대화");
+            verify(sessionService).updateSessionTitle(TEST_SESSION_ID, TEST_USER_ID.toString(), "AI 트렌드 대화");
         }
 
         @Test
@@ -110,7 +111,7 @@ class SessionTitleGenerationServiceTest {
         void sanitizeTitle_작은따옴표_제거() {
             // Given
             when(chatModel.chat(anyString())).thenReturn("'AI 기술 동향'");
-            when(sessionService.updateSessionTitle(anyString(), anyLong(), anyString()))
+            when(sessionService.updateSessionTitle(anyString(), anyString(), anyString()))
                 .thenReturn(createSessionResponse(TEST_SESSION_ID, "AI 기술 동향"));
 
             // When
@@ -118,7 +119,7 @@ class SessionTitleGenerationServiceTest {
                 TEST_SESSION_ID, TEST_USER_ID, "메시지", "응답");
 
             // Then
-            verify(sessionService).updateSessionTitle(TEST_SESSION_ID, TEST_USER_ID, "AI 기술 동향");
+            verify(sessionService).updateSessionTitle(TEST_SESSION_ID, TEST_USER_ID.toString(), "AI 기술 동향");
         }
 
         @Test
@@ -127,7 +128,7 @@ class SessionTitleGenerationServiceTest {
             // Given
             String longTitle = "A".repeat(250);
             when(chatModel.chat(anyString())).thenReturn(longTitle);
-            when(sessionService.updateSessionTitle(anyString(), anyLong(), anyString()))
+            when(sessionService.updateSessionTitle(anyString(), anyString(), anyString()))
                 .thenReturn(createSessionResponse(TEST_SESSION_ID, longTitle.substring(0, 200)));
 
             // When
@@ -136,7 +137,7 @@ class SessionTitleGenerationServiceTest {
 
             // Then
             ArgumentCaptor<String> titleCaptor = ArgumentCaptor.forClass(String.class);
-            verify(sessionService).updateSessionTitle(eq(TEST_SESSION_ID), eq(TEST_USER_ID), titleCaptor.capture());
+            verify(sessionService).updateSessionTitle(eq(TEST_SESSION_ID), eq(TEST_USER_ID.toString()), titleCaptor.capture());
             assertThat(titleCaptor.getValue()).hasSize(200);
         }
 
@@ -151,7 +152,7 @@ class SessionTitleGenerationServiceTest {
                 TEST_SESSION_ID, TEST_USER_ID, "메시지", "응답");
 
             // Then
-            verify(sessionService, never()).updateSessionTitle(anyString(), anyLong(), anyString());
+            verify(sessionService, never()).updateSessionTitle(anyString(), anyString(), anyString());
         }
 
         @Test
@@ -165,7 +166,7 @@ class SessionTitleGenerationServiceTest {
                 TEST_SESSION_ID, TEST_USER_ID, "메시지", "응답");
 
             // Then
-            verify(sessionService, never()).updateSessionTitle(anyString(), anyLong(), anyString());
+            verify(sessionService, never()).updateSessionTitle(anyString(), anyString(), anyString());
         }
 
         @Test
@@ -179,7 +180,7 @@ class SessionTitleGenerationServiceTest {
                 TEST_SESSION_ID, TEST_USER_ID, "메시지", "응답");
 
             // Then
-            verify(sessionService, never()).updateSessionTitle(anyString(), anyLong(), anyString());
+            verify(sessionService, never()).updateSessionTitle(anyString(), anyString(), anyString());
         }
 
         @Test
@@ -193,7 +194,7 @@ class SessionTitleGenerationServiceTest {
                 TEST_SESSION_ID, TEST_USER_ID, "메시지", "응답");
 
             // Then
-            verify(sessionService, never()).updateSessionTitle(anyString(), anyLong(), anyString());
+            verify(sessionService, never()).updateSessionTitle(anyString(), anyString(), anyString());
         }
     }
 
@@ -210,7 +211,7 @@ class SessionTitleGenerationServiceTest {
             String longMessage = "A".repeat(400);
             ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
             when(chatModel.chat(anyString())).thenReturn("테스트 타이틀");
-            when(sessionService.updateSessionTitle(anyString(), anyLong(), anyString()))
+            when(sessionService.updateSessionTitle(anyString(), anyString(), anyString()))
                 .thenReturn(createSessionResponse(TEST_SESSION_ID, "테스트 타이틀"));
 
             // When
@@ -232,7 +233,7 @@ class SessionTitleGenerationServiceTest {
             String longResponse = "B".repeat(400);
             ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
             when(chatModel.chat(anyString())).thenReturn("테스트 타이틀");
-            when(sessionService.updateSessionTitle(anyString(), anyLong(), anyString()))
+            when(sessionService.updateSessionTitle(anyString(), anyString(), anyString()))
                 .thenReturn(createSessionResponse(TEST_SESSION_ID, "테스트 타이틀"));
 
             // When
@@ -252,7 +253,7 @@ class SessionTitleGenerationServiceTest {
             // Given
             ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
             when(chatModel.chat(anyString())).thenReturn("기본 타이틀");
-            when(sessionService.updateSessionTitle(anyString(), anyLong(), anyString()))
+            when(sessionService.updateSessionTitle(anyString(), anyString(), anyString()))
                 .thenReturn(createSessionResponse(TEST_SESSION_ID, "기본 타이틀"));
 
             // When
@@ -283,7 +284,7 @@ class SessionTitleGenerationServiceTest {
                 titleGenerationService.generateAndSaveTitleAsync(
                     TEST_SESSION_ID, TEST_USER_ID, "메시지", "응답"));
 
-            verify(sessionService, never()).updateSessionTitle(anyString(), anyLong(), anyString());
+            verify(sessionService, never()).updateSessionTitle(anyString(), anyString(), anyString());
         }
 
         @Test
@@ -291,7 +292,7 @@ class SessionTitleGenerationServiceTest {
         void updateSessionTitle_예외_흡수() {
             // Given
             when(chatModel.chat(anyString())).thenReturn("타이틀");
-            when(sessionService.updateSessionTitle(anyString(), anyLong(), anyString()))
+            when(sessionService.updateSessionTitle(anyString(), anyString(), anyString()))
                 .thenThrow(new RuntimeException("DB 오류"));
 
             // When & Then

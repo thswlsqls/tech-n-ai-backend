@@ -3,8 +3,10 @@ package com.tech.n.ai.api.chatbot.facade;
 import com.tech.n.ai.api.chatbot.dto.request.ChatRequest;
 import com.tech.n.ai.api.chatbot.dto.response.*;
 import com.tech.n.ai.api.chatbot.service.ChatbotService;
-import com.tech.n.ai.api.chatbot.service.ConversationMessageService;
-import com.tech.n.ai.api.chatbot.service.ConversationSessionService;
+import com.tech.n.ai.common.conversation.dto.MessageResponse;
+import com.tech.n.ai.common.conversation.dto.SessionResponse;
+import com.tech.n.ai.common.conversation.service.ConversationMessageService;
+import com.tech.n.ai.common.conversation.service.ConversationSessionService;
 import com.tech.n.ai.common.core.dto.PageData;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,7 +30,7 @@ public class ChatbotFacade {
     }
 
     public SessionListResponse listSessions(Long userId, int page, int size, Pageable pageable) {
-        Page<SessionResponse> sessionPage = conversationSessionService.listSessions(userId, pageable);
+        Page<SessionResponse> sessionPage = conversationSessionService.listSessions(userId.toString(), pageable);
 
         List<SessionResponse> list = sessionPage.getContent();
 
@@ -43,7 +45,7 @@ public class ChatbotFacade {
     }
 
     public MessageListResponse listMessages(String sessionId, Long userId, int page, int size, Pageable pageable) {
-        conversationSessionService.getSession(sessionId, userId);
+        conversationSessionService.getSession(sessionId, userId.toString());
 
         Page<MessageResponse> messagePage = conversationMessageService.getMessages(sessionId, pageable);
 

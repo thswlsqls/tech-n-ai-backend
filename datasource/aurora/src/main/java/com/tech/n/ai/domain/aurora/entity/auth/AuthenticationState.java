@@ -1,4 +1,4 @@
-package com.tech.n.ai.domain.mariadb.entity.auth;
+package com.tech.n.ai.domain.aurora.entity.auth;
 
 public enum AuthenticationState {
     EMAIL_NOT_VERIFIED,

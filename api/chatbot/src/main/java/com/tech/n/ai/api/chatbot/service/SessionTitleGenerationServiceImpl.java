@@ -1,5 +1,6 @@
 package com.tech.n.ai.api.chatbot.service;
 
+import com.tech.n.ai.common.conversation.service.ConversationSessionService;
 import dev.langchain4j.model.chat.ChatModel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,7 +30,7 @@ public class SessionTitleGenerationServiceImpl implements SessionTitleGeneration
         try {
             String title = generateTitle(userMessage, aiResponse);
             if (title != null) {
-                sessionService.updateSessionTitle(sessionId, userId, title);
+                sessionService.updateSessionTitle(sessionId, userId.toString(), title);
                 log.info("Session title generated: sessionId={}, title={}", sessionId, title);
             }
         } catch (Exception e) {

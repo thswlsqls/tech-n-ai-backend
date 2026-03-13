@@ -429,7 +429,7 @@ public record BookmarkUpdateRequest(
 ```java
 package com.ebson.shrimp.tm.demo.api.bookmark.dto.response;
 
-import com.ebson.shrimp.tm.demo.domain.mariadb.entity.bookmark.BookmarkEntity;
+import com.ebson.shrimp.tm.demo.domain.aurora.entity.bookmark.BookmarkEntity;
 
 import java.time.LocalDateTime;
 import java.util.List;

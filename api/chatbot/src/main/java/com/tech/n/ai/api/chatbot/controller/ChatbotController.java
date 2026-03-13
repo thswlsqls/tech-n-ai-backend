@@ -7,9 +7,9 @@ import com.tech.n.ai.api.chatbot.dto.request.UpdateSessionTitleRequest;
 import com.tech.n.ai.api.chatbot.dto.response.ChatResponse;
 import com.tech.n.ai.api.chatbot.dto.response.MessageListResponse;
 import com.tech.n.ai.api.chatbot.dto.response.SessionListResponse;
-import com.tech.n.ai.api.chatbot.dto.response.SessionResponse;
 import com.tech.n.ai.api.chatbot.facade.ChatbotFacade;
-import com.tech.n.ai.api.chatbot.service.ConversationSessionService;
+import com.tech.n.ai.common.conversation.dto.SessionResponse;
+import com.tech.n.ai.common.conversation.service.ConversationSessionService;
 import com.tech.n.ai.common.core.dto.ApiResponse;
 import com.tech.n.ai.common.security.principal.UserPrincipal;
 import jakarta.validation.Valid;
@@ -52,7 +52,7 @@ public class ChatbotController {
     public ResponseEntity<ApiResponse<SessionResponse>> getSession(
             @PathVariable String sessionId,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
-        SessionResponse response = conversationSessionService.getSession(sessionId, userPrincipal.userId());
+        SessionResponse response = conversationSessionService.getSession(sessionId, userPrincipal.userId().toString());
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -72,7 +72,7 @@ public class ChatbotController {
             @Valid @RequestBody UpdateSessionTitleRequest request,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
         SessionResponse response = conversationSessionService.updateSessionTitle(
-            sessionId, userPrincipal.userId(), request.title());
+            sessionId, userPrincipal.userId().toString(), request.title());
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -80,7 +80,7 @@ public class ChatbotController {
     public ResponseEntity<ApiResponse<Void>> deleteSession(
             @PathVariable String sessionId,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
-        conversationSessionService.deleteSession(sessionId, userPrincipal.userId());
+        conversationSessionService.deleteSession(sessionId, userPrincipal.userId().toString());
         return ResponseEntity.ok(ApiResponse.success());
     }
 

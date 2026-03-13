@@ -11,6 +11,9 @@ dependencies {
     // 프로젝트 모듈 의존성
     implementation project(':common-core')
     implementation project(':common-exception')
+    implementation project(':common-conversation')
+    implementation project(':common-kafka')
+    implementation project(':datasource-aurora')
     implementation project(':datasource-mongodb')
 
     // langchain4j Core + OpenAI (1.10.0: Tool Error Handler 지원)

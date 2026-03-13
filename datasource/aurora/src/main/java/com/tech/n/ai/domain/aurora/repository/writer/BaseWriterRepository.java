@@ -1,8 +1,8 @@
-package com.tech.n.ai.domain.mariadb.repository.writer;
+package com.tech.n.ai.domain.aurora.repository.writer;
 
-import com.tech.n.ai.domain.mariadb.entity.BaseEntity;
-import com.tech.n.ai.domain.mariadb.service.history.HistoryService;
-import com.tech.n.ai.domain.mariadb.service.history.OperationType;
+import com.tech.n.ai.domain.aurora.entity.BaseEntity;
+import com.tech.n.ai.domain.aurora.service.history.HistoryService;
+import com.tech.n.ai.domain.aurora.service.history.OperationType;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.FlushModeType;
 import jakarta.persistence.Query;

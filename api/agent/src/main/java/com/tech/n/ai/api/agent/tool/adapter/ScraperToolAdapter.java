@@ -22,7 +22,7 @@ import java.time.Duration;
 public class ScraperToolAdapter {
 
     private final RobotsTxtChecker robotsTxtChecker;
-    private final WebClient.Builder webClientBuilder;
+    private final WebClient webClient;
 
     private static final int MAX_CONTENT_LENGTH = 2000;
     private static final Duration TIMEOUT = Duration.ofSeconds(10);
@@ -32,7 +32,7 @@ public class ScraperToolAdapter {
             RobotsTxtChecker robotsTxtChecker,
             @Qualifier("scraperWebClientBuilder") WebClient.Builder webClientBuilder) {
         this.robotsTxtChecker = robotsTxtChecker;
-        this.webClientBuilder = webClientBuilder;
+        this.webClient = webClientBuilder.build();
     }
 
     /**
@@ -53,7 +53,6 @@ public class ScraperToolAdapter {
                 return new ScrapedContentDto(null, checkResult.getMessage(), url);
             }
 
-            WebClient webClient = webClientBuilder.build();
             String html = webClient.get()
                 .uri(url)
                 .header("User-Agent", USER_AGENT)

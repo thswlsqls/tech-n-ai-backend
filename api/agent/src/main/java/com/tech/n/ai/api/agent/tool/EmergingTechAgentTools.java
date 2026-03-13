@@ -74,6 +74,21 @@ public class EmergingTechAgentTools {
     }
 
     /**
+     * 검증 결과를 확인하고, 실패 시 메트릭 증가 및 경고 로그를 남긴다.
+     *
+     * @param error 검증 에러 메시지 (null이면 검증 성공)
+     * @return 검증 실패 여부 (true: 실패, false: 성공)
+     */
+    private boolean hasValidationError(String error) {
+        if (error == null) {
+            return false;
+        }
+        metrics().incrementValidationError();
+        log.warn("Tool 입력값 검증 실패: {}", error);
+        return true;
+    }
+
+    /**
      * GitHub 저장소의 최신 릴리스 목록 조회
      */
     @Tool(name = "fetch_github_releases",
@@ -91,10 +106,7 @@ public class EmergingTechAgentTools {
             log.info("Tool 호출: fetch_github_releases(owner={}, repo={})", owner, repo);
         }
 
-        String validationError = ToolInputValidator.validateGitHubRepo(correctedOwner, repo);
-        if (validationError != null) {
-            metrics().incrementValidationError();
-            log.warn("Tool 입력값 검증 실패: {}", validationError);
+        if (hasValidationError(ToolInputValidator.validateGitHubRepo(correctedOwner, repo))) {
             return List.of();
         }
 
@@ -113,9 +125,7 @@ public class EmergingTechAgentTools {
         log.info("Tool 호출: scrape_web_page(url={})", url);
 
         String validationError = ToolInputValidator.validateUrl(url);
-        if (validationError != null) {
-            metrics().incrementValidationError();
-            log.warn("Tool 입력값 검증 실패: {}", validationError);
+        if (hasValidationError(validationError)) {
             return new ScrapedContentDto(null, validationError, url);
         }
 
@@ -134,17 +144,10 @@ public class EmergingTechAgentTools {
         metrics().incrementToolCall();
         log.info("Tool 호출: search_emerging_techs(query={}, provider={})", query, provider);
 
-        String queryError = ToolInputValidator.validateRequired(query, "query");
-        if (queryError != null) {
-            metrics().incrementValidationError();
-            log.warn("Tool 입력값 검증 실패: {}", queryError);
+        if (hasValidationError(ToolInputValidator.validateRequired(query, "query"))) {
             return List.of();
         }
-
-        String providerError = ToolInputValidator.validateProviderOptional(provider);
-        if (providerError != null) {
-            metrics().incrementValidationError();
-            log.warn("Tool 입력값 검증 실패: {}", providerError);
+        if (hasValidationError(ToolInputValidator.validateProviderOptional(provider))) {
             return List.of();
         }
 
@@ -172,46 +175,24 @@ public class EmergingTechAgentTools {
                 startDate, endDate, provider, updateType, sourceType, status, page, size);
 
         // 입력값 검증
-        String startDateError = ToolInputValidator.validateDateOptional(startDate, "startDate");
-        if (startDateError != null) {
-            metrics().incrementValidationError();
-            log.warn("Tool 입력값 검증 실패: {}", startDateError);
-            return EmergingTechListDto.empty(page, size, "전체");
+        EmergingTechListDto emptyResult = EmergingTechListDto.empty(page, size, "전체");
+        if (hasValidationError(ToolInputValidator.validateDateOptional(startDate, "startDate"))) {
+            return emptyResult;
         }
-
-        String endDateError = ToolInputValidator.validateDateOptional(endDate, "endDate");
-        if (endDateError != null) {
-            metrics().incrementValidationError();
-            log.warn("Tool 입력값 검증 실패: {}", endDateError);
-            return EmergingTechListDto.empty(page, size, "전체");
+        if (hasValidationError(ToolInputValidator.validateDateOptional(endDate, "endDate"))) {
+            return emptyResult;
         }
-
-        String providerError = ToolInputValidator.validateProviderOptional(provider);
-        if (providerError != null) {
-            metrics().incrementValidationError();
-            log.warn("Tool 입력값 검증 실패: {}", providerError);
-            return EmergingTechListDto.empty(page, size, "전체");
+        if (hasValidationError(ToolInputValidator.validateProviderOptional(provider))) {
+            return emptyResult;
         }
-
-        String updateTypeError = ToolInputValidator.validateUpdateTypeOptional(updateType);
-        if (updateTypeError != null) {
-            metrics().incrementValidationError();
-            log.warn("Tool 입력값 검증 실패: {}", updateTypeError);
-            return EmergingTechListDto.empty(page, size, "전체");
+        if (hasValidationError(ToolInputValidator.validateUpdateTypeOptional(updateType))) {
+            return emptyResult;
         }
-
-        String sourceTypeError = ToolInputValidator.validateSourceTypeOptional(sourceType);
-        if (sourceTypeError != null) {
-            metrics().incrementValidationError();
-            log.warn("Tool 입력값 검증 실패: {}", sourceTypeError);
-            return EmergingTechListDto.empty(page, size, "전체");
+        if (hasValidationError(ToolInputValidator.validateSourceTypeOptional(sourceType))) {
+            return emptyResult;
         }
-
-        String statusError = ToolInputValidator.validateStatusOptional(status);
-        if (statusError != null) {
-            metrics().incrementValidationError();
-            log.warn("Tool 입력값 검증 실패: {}", statusError);
-            return EmergingTechListDto.empty(page, size, "전체");
+        if (hasValidationError(ToolInputValidator.validateStatusOptional(status))) {
+            return emptyResult;
         }
 
         // 페이지 정규화
@@ -234,10 +215,7 @@ public class EmergingTechAgentTools {
         metrics().incrementToolCall();
         log.info("Tool 호출: get_emerging_tech_detail(id={})", id);
 
-        String validationError = ToolInputValidator.validateObjectId(id);
-        if (validationError != null) {
-            metrics().incrementValidationError();
-            log.warn("Tool 입력값 검증 실패: {}", validationError);
+        if (hasValidationError(ToolInputValidator.validateObjectId(id))) {
             return EmergingTechDetailDto.notFound(id);
         }
 
@@ -261,25 +239,15 @@ public class EmergingTechAgentTools {
                 groupBy, startDate, endDate);
 
         // 입력 검증
-        String groupByError = ToolInputValidator.validateGroupByField(groupBy);
-        if (groupByError != null) {
-            metrics().incrementValidationError();
-            log.warn("Tool 입력값 검증 실패: {}", groupByError);
-            return new StatisticsDto(groupBy, startDate, endDate, 0, List.of());
+        StatisticsDto emptyResult = new StatisticsDto(groupBy, startDate, endDate, 0, List.of());
+        if (hasValidationError(ToolInputValidator.validateGroupByField(groupBy))) {
+            return emptyResult;
         }
-
-        String startDateError = ToolInputValidator.validateDateOptional(startDate, "startDate");
-        if (startDateError != null) {
-            metrics().incrementValidationError();
-            log.warn("Tool 입력값 검증 실패: {}", startDateError);
-            return new StatisticsDto(groupBy, startDate, endDate, 0, List.of());
+        if (hasValidationError(ToolInputValidator.validateDateOptional(startDate, "startDate"))) {
+            return emptyResult;
         }
-
-        String endDateError = ToolInputValidator.validateDateOptional(endDate, "endDate");
-        if (endDateError != null) {
-            metrics().incrementValidationError();
-            log.warn("Tool 입력값 검증 실패: {}", endDateError);
-            return new StatisticsDto(groupBy, startDate, endDate, 0, List.of());
+        if (hasValidationError(ToolInputValidator.validateDateOptional(endDate, "endDate"))) {
+            return emptyResult;
         }
 
         // groupBy를 MongoDB 필드명으로 정규화
@@ -307,39 +275,21 @@ public class EmergingTechAgentTools {
         log.info("Tool 호출: analyze_text_frequency(provider={}, updateType={}, sourceType={}, startDate={}, endDate={}, topN={})",
                 provider, updateType, sourceType, startDate, endDate, topN);
 
-        String providerError = ToolInputValidator.validateProviderOptional(provider);
-        if (providerError != null) {
-            metrics().incrementValidationError();
-            log.warn("Tool 입력값 검증 실패: {}", providerError);
-            return new WordFrequencyDto(0, "", List.of(), List.of());
+        WordFrequencyDto emptyResult = new WordFrequencyDto(0, "", List.of(), List.of());
+        if (hasValidationError(ToolInputValidator.validateProviderOptional(provider))) {
+            return emptyResult;
         }
-
-        String updateTypeError = ToolInputValidator.validateUpdateTypeOptional(updateType);
-        if (updateTypeError != null) {
-            metrics().incrementValidationError();
-            log.warn("Tool 입력값 검증 실패: {}", updateTypeError);
-            return new WordFrequencyDto(0, "", List.of(), List.of());
+        if (hasValidationError(ToolInputValidator.validateUpdateTypeOptional(updateType))) {
+            return emptyResult;
         }
-
-        String sourceTypeError = ToolInputValidator.validateSourceTypeOptional(sourceType);
-        if (sourceTypeError != null) {
-            metrics().incrementValidationError();
-            log.warn("Tool 입력값 검증 실패: {}", sourceTypeError);
-            return new WordFrequencyDto(0, "", List.of(), List.of());
+        if (hasValidationError(ToolInputValidator.validateSourceTypeOptional(sourceType))) {
+            return emptyResult;
         }
-
-        String startDateError = ToolInputValidator.validateDateOptional(startDate, "startDate");
-        if (startDateError != null) {
-            metrics().incrementValidationError();
-            log.warn("Tool 입력값 검증 실패: {}", startDateError);
-            return new WordFrequencyDto(0, "", List.of(), List.of());
+        if (hasValidationError(ToolInputValidator.validateDateOptional(startDate, "startDate"))) {
+            return emptyResult;
         }
-
-        String endDateError = ToolInputValidator.validateDateOptional(endDate, "endDate");
-        if (endDateError != null) {
-            metrics().incrementValidationError();
-            log.warn("Tool 입력값 검증 실패: {}", endDateError);
-            return new WordFrequencyDto(0, "", List.of(), List.of());
+        if (hasValidationError(ToolInputValidator.validateDateOptional(endDate, "endDate"))) {
+            return emptyResult;
         }
 
         int effectiveTopN = (topN > 0 && topN <= 100) ? topN : 20;
@@ -355,12 +305,10 @@ public class EmergingTechAgentTools {
             @P("메시지 내용") String message
     ) {
         metrics().incrementToolCall();
-        log.info("Tool 호출: send_slack_notification(message={})", message);
+        log.info("Tool 호출: send_slack_notification(messageLength={})", message != null ? message.length() : 0);
 
-        String validationError = ToolInputValidator.validateRequired(message, "message");
-        if (validationError != null) {
-            metrics().incrementValidationError();
-            return ToolResult.failure(validationError);
+        if (hasValidationError(ToolInputValidator.validateRequired(message, "message"))) {
+            return ToolResult.failure("message는 필수 입력값입니다.");
         }
 
         return slackAdapter.sendNotification(message);
@@ -387,11 +335,8 @@ public class EmergingTechAgentTools {
             log.info("Tool 호출: collect_github_releases(owner={}, repo={})", owner, repo);
         }
 
-        String validationError = ToolInputValidator.validateGitHubRepo(correctedOwner, repo);
-        if (validationError != null) {
-            metrics().incrementValidationError();
-            log.warn("Tool 입력값 검증 실패: {}", validationError);
-            return DataCollectionResultDto.failure("GITHUB_RELEASES", "", 0, validationError);
+        if (hasValidationError(ToolInputValidator.validateGitHubRepo(correctedOwner, repo))) {
+            return DataCollectionResultDto.failure("GITHUB_RELEASES", "", 0, "GitHub 저장소 입력값이 유효하지 않습니다.");
         }
 
         return dataCollectionAdapter.collectGitHubReleases(correctedOwner, repo);
@@ -409,13 +354,8 @@ public class EmergingTechAgentTools {
         metrics().incrementToolCall();
         log.info("Tool 호출: collect_rss_feeds(provider={})", provider);
 
-        if (provider != null && !provider.isBlank()
-                && !"OPENAI".equalsIgnoreCase(provider)
-                && !"GOOGLE".equalsIgnoreCase(provider)) {
-            metrics().incrementValidationError();
-            String error = "Error: provider는 OPENAI, GOOGLE 또는 빈 문자열이어야 합니다 (입력값: " + provider + ")";
-            log.warn("Tool 입력값 검증 실패: {}", error);
-            return DataCollectionResultDto.failure("RSS_FEEDS", provider, 0, error);
+        if (hasValidationError(ToolInputValidator.validateRssProviderOptional(provider))) {
+            return DataCollectionResultDto.failure("RSS_FEEDS", provider, 0, "RSS provider 값이 유효하지 않습니다.");
         }
 
         return dataCollectionAdapter.collectRssFeeds(provider);
@@ -433,13 +373,8 @@ public class EmergingTechAgentTools {
         metrics().incrementToolCall();
         log.info("Tool 호출: collect_scraped_articles(provider={})", provider);
 
-        if (provider != null && !provider.isBlank()
-                && !"ANTHROPIC".equalsIgnoreCase(provider)
-                && !"META".equalsIgnoreCase(provider)) {
-            metrics().incrementValidationError();
-            String error = "Error: provider는 ANTHROPIC, META 또는 빈 문자열이어야 합니다 (입력값: " + provider + ")";
-            log.warn("Tool 입력값 검증 실패: {}", error);
-            return DataCollectionResultDto.failure("WEB_SCRAPING", provider, 0, error);
+        if (hasValidationError(ToolInputValidator.validateScraperProviderOptional(provider))) {
+            return DataCollectionResultDto.failure("WEB_SCRAPING", provider, 0, "Scraper provider 값이 유효하지 않습니다.");
         }
 
         return dataCollectionAdapter.collectScrapedArticles(provider);

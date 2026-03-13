@@ -1,6 +1,6 @@
-package com.tech.n.ai.domain.mariadb.repository.reader.bookmark;
+package com.tech.n.ai.domain.aurora.repository.reader.bookmark;
 
-import com.tech.n.ai.domain.mariadb.entity.bookmark.BookmarkHistoryEntity;
+import com.tech.n.ai.domain.aurora.entity.bookmark.BookmarkHistoryEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

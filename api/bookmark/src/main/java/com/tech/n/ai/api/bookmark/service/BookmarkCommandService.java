@@ -2,7 +2,7 @@ package com.tech.n.ai.api.bookmark.service;
 
 import com.tech.n.ai.api.bookmark.dto.request.BookmarkCreateRequest;
 import com.tech.n.ai.api.bookmark.dto.request.BookmarkUpdateRequest;
-import com.tech.n.ai.domain.mariadb.entity.bookmark.BookmarkEntity;
+import com.tech.n.ai.domain.aurora.entity.bookmark.BookmarkEntity;
 
 /**
  * Bookmark Command Service 인터페이스

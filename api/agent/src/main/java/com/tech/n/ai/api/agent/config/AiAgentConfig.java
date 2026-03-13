@@ -32,13 +32,20 @@ public class AiAgentConfig {
     @Value("${langchain4j.open-ai.chat-model.timeout:120}")
     private Integer agentTimeout;
 
+    @Value("${langchain4j.open-ai.chat-model.log-requests:false}")
+    private Boolean logRequests;
+
+    @Value("${langchain4j.open-ai.chat-model.log-responses:false}")
+    private Boolean logResponses;
+
     /**
      * Agent용 ChatLanguageModel (OpenAI GPT-4o-mini)
      * Tool 호출을 지원하는 모델 (낮은 temperature로 일관된 Tool 호출 유도)
      */
     @Bean("agentChatModel")
     public ChatModel agentChatLanguageModel() {
-        log.info("Agent ChatLanguageModel 초기화: model={}, temperature={}", agentModelName, agentTemperature);
+        log.info("Agent ChatLanguageModel 초기화: model={}, temperature={}, logRequests={}, logResponses={}",
+                agentModelName, agentTemperature, logRequests, logResponses);
 
         return OpenAiChatModel.builder()
             .apiKey(openAiApiKey)
@@ -46,8 +53,8 @@ public class AiAgentConfig {
             .temperature(agentTemperature)
             .maxTokens(agentMaxTokens)
             .timeout(Duration.ofSeconds(agentTimeout))
-            .logRequests(true)
-            .logResponses(true)
+            .logRequests(logRequests)
+            .logResponses(logResponses)
             .build();
     }
 }
