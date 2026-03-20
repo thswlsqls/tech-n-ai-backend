@@ -3,6 +3,7 @@ package com.tech.n.ai.api.agent.facade;
 import com.tech.n.ai.api.agent.agent.AgentExecutionResult;
 import com.tech.n.ai.api.agent.agent.EmergingTechAgent;
 import com.tech.n.ai.api.agent.dto.request.AgentRunRequest;
+import com.tech.n.ai.api.agent.service.SessionTitleGenerationService;
 import com.tech.n.ai.api.agent.dto.response.AgentMessageListResponse;
 import com.tech.n.ai.api.agent.dto.response.AgentSessionListResponse;
 import com.tech.n.ai.common.conversation.dto.MessageResponse;
@@ -48,6 +49,9 @@ class AgentFacadeTest {
     @Mock
     private ConversationMessageService conversationMessageService;
 
+    @Mock
+    private SessionTitleGenerationService titleGenerationService;
+
     @InjectMocks
     private AgentFacade facade;
 
@@ -82,6 +86,9 @@ class AgentFacadeTest {
             verify(conversationMessageService).saveMessage(eq(sessionId), eq("USER"), eq(goal), any());
             verify(conversationMessageService).saveMessage(eq(sessionId), eq("ASSISTANT"), eq("완료"), any());
             verify(conversationSessionService).updateLastMessageAt(sessionId);
+            // 기존 세션에서는 타이틀 생성 미호출
+            verify(titleGenerationService, never()).generateAndSaveTitleAsync(
+                anyString(), anyString(), anyString(), anyString());
         }
 
         @Test
@@ -103,6 +110,8 @@ class AgentFacadeTest {
             // Then
             assertThat(result).isEqualTo(expectedResult);
             verify(conversationSessionService).createSession(userId, null);
+            verify(titleGenerationService).generateAndSaveTitleAsync(
+                eq(newSessionId), eq(userId), eq(goal), eq("완료"));
         }
 
         @Test
@@ -125,9 +134,9 @@ class AgentFacadeTest {
             // Then
             assertThat(result.success()).isFalse();
             assertThat(result.errors()).contains("에러 메시지");
-            // 실패 시 ASSISTANT 메시지는 저장하지 않음
+            // 실패 시에도 ASSISTANT 메시지를 저장 (관리자가 실행 결과를 세션 재조회 시 확인 가능)
             verify(conversationMessageService).saveMessage(eq(sessionId), eq("USER"), eq("goal"), any());
-            verify(conversationMessageService, never()).saveMessage(eq(sessionId), eq("ASSISTANT"), anyString(), any());
+            verify(conversationMessageService).saveMessage(eq(sessionId), eq("ASSISTANT"), eq("실행 실패"), any());
             // 실패 시에도 lastMessageAt은 업데이트
             verify(conversationSessionService).updateLastMessageAt(sessionId);
         }

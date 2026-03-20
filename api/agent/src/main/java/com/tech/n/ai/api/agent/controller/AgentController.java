@@ -4,6 +4,7 @@ import com.tech.n.ai.api.agent.agent.AgentExecutionResult;
 import com.tech.n.ai.api.agent.dto.request.AgentMessageListRequest;
 import com.tech.n.ai.api.agent.dto.request.AgentRunRequest;
 import com.tech.n.ai.api.agent.dto.request.AgentSessionListRequest;
+import com.tech.n.ai.api.agent.dto.request.UpdateSessionTitleRequest;
 import com.tech.n.ai.api.agent.dto.response.AgentMessageListResponse;
 import com.tech.n.ai.api.agent.dto.response.AgentSessionListResponse;
 import com.tech.n.ai.api.agent.facade.AgentFacade;
@@ -94,6 +95,22 @@ public class AgentController {
         Pageable pageable = PageRequest.of(request.page() - 1, request.size(),
             Sort.by(Sort.Direction.ASC, "sequenceNumber"));
         AgentMessageListResponse response = agentFacade.listMessages(sessionId, userId, request.page(), request.size(), pageable);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    /**
+     * 세션 타이틀 수동 변경
+     *
+     * PATCH /api/v1/agent/sessions/{sessionId}/title
+     */
+    @PatchMapping("/sessions/{sessionId}/title")
+    public ResponseEntity<ApiResponse<SessionResponse>> updateSessionTitle(
+            @PathVariable String sessionId,
+            @Valid @RequestBody UpdateSessionTitleRequest request,
+            @RequestHeader("x-user-id") String userId) {
+
+        SessionResponse response = conversationSessionService.updateSessionTitle(
+            sessionId, userId, request.title());
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 

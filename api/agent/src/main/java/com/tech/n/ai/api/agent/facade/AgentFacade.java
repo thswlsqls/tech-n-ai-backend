@@ -7,6 +7,7 @@ import com.tech.n.ai.api.agent.dto.response.AgentMessageListResponse;
 import com.tech.n.ai.api.agent.dto.response.AgentSessionListResponse;
 import com.tech.n.ai.common.conversation.dto.MessageResponse;
 import com.tech.n.ai.common.conversation.dto.SessionResponse;
+import com.tech.n.ai.api.agent.service.SessionTitleGenerationService;
 import com.tech.n.ai.common.conversation.service.ConversationMessageService;
 import com.tech.n.ai.common.conversation.service.ConversationSessionService;
 import com.tech.n.ai.common.core.dto.PageData;
@@ -30,6 +31,7 @@ public class AgentFacade {
     private final EmergingTechAgent agent;
     private final ConversationSessionService conversationSessionService;
     private final ConversationMessageService conversationMessageService;
+    private final SessionTitleGenerationService titleGenerationService;
 
     /**
      * Agent 실행
@@ -39,6 +41,7 @@ public class AgentFacade {
      * @return 실행 결과
      */
     public AgentExecutionResult runAgent(String userId, AgentRunRequest request) {
+        boolean isNewSession = request.sessionId() == null || request.sessionId().isBlank();
         String sessionId = resolveSessionId(userId, request.sessionId());
 
         log.info("Agent 실행 요청: userId={}, goal={}, sessionId={}",
@@ -50,13 +53,17 @@ public class AgentFacade {
         // Agent 실행
         AgentExecutionResult result = agent.execute(request.goal(), sessionId);
 
-        // 성공 시에만 ASSISTANT 메시지 저장 (실패 시 에러 텍스트가 대화 이력에 혼입되지 않도록)
-        if (result.success()) {
-            conversationMessageService.saveMessage(sessionId, "ASSISTANT", result.summary(), null);
-        }
+        // ASSISTANT 메시지 저장 (성공/실패 무관 — 관리자가 실행 결과를 세션 재조회 시 확인 가능)
+        conversationMessageService.saveMessage(sessionId, "ASSISTANT", result.summary(), null);
 
         // 세션 마지막 메시지 시간 업데이트
         conversationSessionService.updateLastMessageAt(sessionId);
+
+        // 새 세션인 경우 비동기 타이틀 생성
+        if (isNewSession) {
+            titleGenerationService.generateAndSaveTitleAsync(
+                sessionId, userId, request.goal(), result.summary());
+        }
 
         return result;
     }

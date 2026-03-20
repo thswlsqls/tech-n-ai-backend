@@ -6,11 +6,13 @@ import com.tech.n.ai.common.kafka.event.ConversationSessionDeletedEvent;
 import com.tech.n.ai.common.kafka.event.ConversationSessionUpdatedEvent;
 import com.tech.n.ai.domain.mongodb.document.ConversationMessageDocument;
 import com.tech.n.ai.domain.mongodb.document.ConversationSessionDocument;
-import com.tech.n.ai.domain.mongodb.repository.ConversationMessageRepository;
-import com.tech.n.ai.domain.mongodb.repository.ConversationSessionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -25,36 +27,33 @@ import java.util.Map;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@ConditionalOnBean(ConversationSessionRepository.class)
+@ConditionalOnBean(MongoTemplate.class)
 public class ConversationSyncServiceImpl implements ConversationSyncService {
     
-    private final ConversationSessionRepository conversationSessionRepository;
-    private final ConversationMessageRepository conversationMessageRepository;
+    private final MongoTemplate mongoTemplate;
     
     @Override
     public void syncSessionCreated(ConversationSessionCreatedEvent event) {
         try {
             var payload = event.payload();
-            
-            // Upsert 패턴: sessionId로 조회하여 없으면 생성, 있으면 업데이트
-            ConversationSessionDocument document = conversationSessionRepository
-                .findBySessionId(payload.sessionId())
-                .orElse(new ConversationSessionDocument());
-            
-            document.setSessionId(payload.sessionId());
-            document.setUserId(payload.userId());
-            document.setTitle(payload.title());
-            document.setLastMessageAt(convertToLocalDateTime(payload.lastMessageAt()));
-            document.setIsActive(payload.isActive());
-            document.setCreatedAt(LocalDateTime.now());
-            document.setUpdatedAt(LocalDateTime.now());
-            
-            conversationSessionRepository.save(document);
-            
-            log.debug("Successfully synced ConversationSessionCreatedEvent: sessionId={}, userId={}", 
+
+            // MongoDB atomic upsert: 동일 sessionId에 대해 여러 consumer group이 동시 처리해도 중복 생성 방지
+            Query query = new Query(Criteria.where("session_id").is(payload.sessionId()));
+            Update update = new Update()
+                .set("session_id", payload.sessionId())
+                .set("user_id", payload.userId())
+                .set("title", payload.title())
+                .set("last_message_at", convertToLocalDateTime(payload.lastMessageAt()))
+                .set("is_active", payload.isActive())
+                .set("updated_at", LocalDateTime.now())
+                .setOnInsert("created_at", LocalDateTime.now());
+
+            mongoTemplate.upsert(query, update, ConversationSessionDocument.class);
+
+            log.debug("Successfully synced ConversationSessionCreatedEvent: sessionId={}, userId={}",
                 payload.sessionId(), payload.userId());
         } catch (Exception e) {
-            log.error("Failed to sync ConversationSessionCreatedEvent: eventId={}, sessionId={}", 
+            log.error("Failed to sync ConversationSessionCreatedEvent: eventId={}, sessionId={}",
                 event.eventId(), event.payload().sessionId(), e);
             throw new RuntimeException("Failed to sync ConversationSessionCreatedEvent", e);
         }
@@ -65,23 +64,24 @@ public class ConversationSyncServiceImpl implements ConversationSyncService {
         try {
             var payload = event.payload();
             var updatedFields = payload.updatedFields();
-            
-            // sessionId로 Document 조회
-            ConversationSessionDocument document = conversationSessionRepository
-                .findBySessionId(payload.sessionId())
-                .orElseThrow(() -> new RuntimeException(
-                    "ConversationSessionDocument not found: sessionId=" + payload.sessionId()));
-            
-            // updatedFields를 Document 필드에 매핑 (부분 업데이트)
-            updateSessionDocumentFields(document, updatedFields);
-            document.setUpdatedAt(LocalDateTime.now());
-            
-            conversationSessionRepository.save(document);
-            
-            log.debug("Successfully synced ConversationSessionUpdatedEvent: sessionId={}, updatedFields={}", 
+
+            // MongoDB atomic update: sessionId로 직접 업데이트 (중복 문서 문제 회피)
+            Query query = new Query(Criteria.where("session_id").is(payload.sessionId()));
+            Update update = buildSessionUpdate(updatedFields);
+            update.set("updated_at", LocalDateTime.now());
+
+            var result = mongoTemplate.updateFirst(query, update, ConversationSessionDocument.class);
+
+            if (result.getMatchedCount() == 0) {
+                log.warn("ConversationSessionDocument not found for update: sessionId={}, skipping",
+                    payload.sessionId());
+                return;
+            }
+
+            log.debug("Successfully synced ConversationSessionUpdatedEvent: sessionId={}, updatedFields={}",
                 payload.sessionId(), updatedFields.keySet());
         } catch (Exception e) {
-            log.error("Failed to sync ConversationSessionUpdatedEvent: eventId={}, sessionId={}", 
+            log.error("Failed to sync ConversationSessionUpdatedEvent: eventId={}, sessionId={}",
                 event.eventId(), event.payload().sessionId(), e);
             throw new RuntimeException("Failed to sync ConversationSessionUpdatedEvent", e);
         }
@@ -91,15 +91,15 @@ public class ConversationSyncServiceImpl implements ConversationSyncService {
     public void syncSessionDeleted(ConversationSessionDeletedEvent event) {
         try {
             var payload = event.payload();
-            
-            // MongoDB는 Soft Delete를 지원하지 않으므로 물리적 삭제
-            conversationSessionRepository.findBySessionId(payload.sessionId())
-                .ifPresent(conversationSessionRepository::delete);
-            
-            log.debug("Successfully synced ConversationSessionDeletedEvent: sessionId={}, userId={}", 
+
+            // MongoDB는 Soft Delete를 지원하지 않으므로 물리적 삭제 (중복 문서도 모두 제거)
+            Query query = new Query(Criteria.where("session_id").is(payload.sessionId()));
+            mongoTemplate.remove(query, ConversationSessionDocument.class);
+
+            log.debug("Successfully synced ConversationSessionDeletedEvent: sessionId={}, userId={}",
                 payload.sessionId(), payload.userId());
         } catch (Exception e) {
-            log.error("Failed to sync ConversationSessionDeletedEvent: eventId={}, sessionId={}", 
+            log.error("Failed to sync ConversationSessionDeletedEvent: eventId={}, sessionId={}",
                 event.eventId(), event.payload().sessionId(), e);
             throw new RuntimeException("Failed to sync ConversationSessionDeletedEvent", e);
         }
@@ -109,51 +109,50 @@ public class ConversationSyncServiceImpl implements ConversationSyncService {
     public void syncMessageCreated(ConversationMessageCreatedEvent event) {
         try {
             var payload = event.payload();
-            
-            // Upsert 패턴: messageId로 조회하여 없으면 생성, 있으면 업데이트
-            ConversationMessageDocument document = conversationMessageRepository
-                .findByMessageId(payload.messageId())
-                .orElse(new ConversationMessageDocument());
-            
-            document.setMessageId(payload.messageId());
-            document.setSessionId(payload.sessionId());
-            document.setRole(payload.role());
-            document.setContent(payload.content());
-            document.setTokenCount(payload.tokenCount());
-            document.setSequenceNumber(payload.sequenceNumber());
-            document.setCreatedAt(convertToLocalDateTime(payload.createdAt()));
-            
-            conversationMessageRepository.save(document);
-            
-            log.debug("Successfully synced ConversationMessageCreatedEvent: messageId={}, sessionId={}", 
+
+            // MongoDB atomic upsert: 동일 messageId에 대해 여러 consumer group이 동시 처리해도 중복 생성 방지
+            Query query = new Query(Criteria.where("message_id").is(payload.messageId()));
+            Update update = new Update()
+                .set("message_id", payload.messageId())
+                .set("session_id", payload.sessionId())
+                .set("role", payload.role())
+                .set("content", payload.content())
+                .set("token_count", payload.tokenCount())
+                .set("sequence_number", payload.sequenceNumber())
+                .set("created_at", convertToLocalDateTime(payload.createdAt()));
+
+            mongoTemplate.upsert(query, update, ConversationMessageDocument.class);
+
+            log.debug("Successfully synced ConversationMessageCreatedEvent: messageId={}, sessionId={}",
                 payload.messageId(), payload.sessionId());
         } catch (Exception e) {
-            log.error("Failed to sync ConversationMessageCreatedEvent: eventId={}, messageId={}", 
+            log.error("Failed to sync ConversationMessageCreatedEvent: eventId={}, messageId={}",
                 event.eventId(), event.payload().messageId(), e);
             throw new RuntimeException("Failed to sync ConversationMessageCreatedEvent", e);
         }
     }
     
     /**
-     * updatedFields를 Document 필드에 매핑 (부분 업데이트)
+     * updatedFields를 MongoDB Update 객체로 변환
      */
-    private void updateSessionDocumentFields(ConversationSessionDocument document, Map<String, Object> updatedFields) {
+    private Update buildSessionUpdate(Map<String, Object> updatedFields) {
+        Update update = new Update();
         for (Map.Entry<String, Object> entry : updatedFields.entrySet()) {
             String fieldName = entry.getKey();
             Object value = entry.getValue();
-            
+
             try {
                 switch (fieldName) {
                     case "title":
-                        document.setTitle((String) value);
+                        update.set("title", (String) value);
                         break;
                     case "lastMessageAt":
                         if (value instanceof Instant instant) {
-                            document.setLastMessageAt(convertToLocalDateTime(instant));
+                            update.set("last_message_at", convertToLocalDateTime(instant));
                         }
                         break;
                     case "isActive":
-                        document.setIsActive((Boolean) value);
+                        update.set("is_active", (Boolean) value);
                         break;
                     default:
                         log.warn("Unknown field in updatedFields: {}", fieldName);
@@ -162,6 +161,7 @@ public class ConversationSyncServiceImpl implements ConversationSyncService {
                 log.warn("Type mismatch for field {}: {}", fieldName, value.getClass().getName());
             }
         }
+        return update;
     }
     
     /**
