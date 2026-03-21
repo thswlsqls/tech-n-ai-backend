@@ -149,8 +149,6 @@ class ToolErrorHandlersTest {
             ToolExecutionResultMessage result = ToolErrorHandlers.handleHallucinatedToolName(toolExecutionRequest);
 
             // Then
-            assertThat(result.text()).contains("fetch_github_releases");
-            assertThat(result.text()).contains("scrape_web_page");
             assertThat(result.text()).contains("list_emerging_techs");
             assertThat(result.text()).contains("collect_github_releases");
         }

@@ -113,8 +113,8 @@ public class EmergingTechAgentImpl implements EmergingTechAgent {
         } catch (AgentLoopDetectedException e) {
             long elapsed = System.currentTimeMillis() - startTime;
             int toolCallCount = metrics.getToolCallCount();
-            log.warn("Agent 루프 감지로 강제 종료: goal={}, sessionId={}, toolCalls={}, fetchBlocked={}, elapsed={}ms",
-                    goal, sessionId, toolCallCount, metrics.getFetchBlockedCount(), elapsed);
+            log.warn("Agent 루프 감지로 강제 종료: goal={}, sessionId={}, toolCalls={}, collectBlocked={}, elapsed={}ms",
+                    goal, sessionId, toolCallCount, metrics.getCollectBlockedCount(), elapsed);
 
             return AgentExecutionResult.success(
                     "수집 작업이 완료되었습니다. (반복 조회 루프 감지로 자동 종료)",

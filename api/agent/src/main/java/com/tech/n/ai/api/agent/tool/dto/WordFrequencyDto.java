@@ -12,8 +12,17 @@ public record WordFrequencyDto(
     long totalDocuments,
     String period,
     List<WordCount> topWords,
-    List<WordCount> topBigrams
+    List<WordCount> topBigrams,
+    String message
 ) {
+    /**
+     * 메시지 없는 기본 생성자 (정상 응답용)
+     */
+    public WordFrequencyDto(long totalDocuments, String period,
+                            List<WordCount> topWords, List<WordCount> topBigrams) {
+        this(totalDocuments, period, topWords, topBigrams, null);
+    }
+
     public record WordCount(
         String word,
         long count

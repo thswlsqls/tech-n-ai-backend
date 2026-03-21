@@ -11,8 +11,17 @@ public record StatisticsDto(
     String startDate,
     String endDate,
     long totalCount,
-    List<GroupCount> groups
+    List<GroupCount> groups,
+    String message
 ) {
+    /**
+     * 메시지 없는 기본 생성자 (정상 응답용)
+     */
+    public StatisticsDto(String groupBy, String startDate, String endDate,
+                         long totalCount, List<GroupCount> groups) {
+        this(groupBy, startDate, endDate, totalCount, groups, null);
+    }
+
     public record GroupCount(
         String name,
         long count

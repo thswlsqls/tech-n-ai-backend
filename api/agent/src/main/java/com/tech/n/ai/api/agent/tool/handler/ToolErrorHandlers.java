@@ -50,7 +50,7 @@ public final class ToolErrorHandlers {
                 error);
 
         return ToolErrorHandlerResult.text(
-                String.format("Tool '%s' 실행 실패: %s. 다른 방법을 시도해주세요.",
+                String.format("Tool '%s' 실행 실패: %s. 이 Tool을 동일한 인자로 재시도하지 마세요. 해당 작업을 건너뛰고 다음 작업으로 진행하세요.",
                         toolName,
                         error.getMessage()));
     }
@@ -85,7 +85,6 @@ public final class ToolErrorHandlers {
      */
     /** 사용 가능한 Tool 이름 목록 (Tool 추가/삭제 시 이 목록도 갱신) */
     private static final List<String> AVAILABLE_TOOLS = List.of(
-        "fetch_github_releases", "scrape_web_page",
         "list_emerging_techs", "get_emerging_tech_detail", "search_emerging_techs",
         "get_emerging_tech_statistics", "analyze_text_frequency",
         "send_slack_notification",

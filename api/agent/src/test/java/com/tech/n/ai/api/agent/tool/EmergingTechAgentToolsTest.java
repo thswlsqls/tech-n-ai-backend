@@ -1,7 +1,10 @@
 package com.tech.n.ai.api.agent.tool;
 
 import com.tech.n.ai.api.agent.metrics.ToolExecutionMetrics;
-import com.tech.n.ai.api.agent.tool.adapter.*;
+import com.tech.n.ai.api.agent.tool.adapter.AnalyticsToolAdapter;
+import com.tech.n.ai.api.agent.tool.adapter.DataCollectionToolAdapter;
+import com.tech.n.ai.api.agent.tool.adapter.EmergingTechToolAdapter;
+import com.tech.n.ai.api.agent.tool.adapter.SlackToolAdapter;
 import com.tech.n.ai.api.agent.tool.dto.*;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,12 +25,6 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("EmergingTechAgentTools 단위 테스트")
 class EmergingTechAgentToolsTest {
-
-    @Mock
-    private GitHubToolAdapter githubAdapter;
-
-    @Mock
-    private ScraperToolAdapter scraperAdapter;
 
     @Mock
     private SlackToolAdapter slackAdapter;
@@ -55,171 +52,6 @@ class EmergingTechAgentToolsTest {
     @AfterEach
     void tearDown() {
         tools.unbindMetrics();
-    }
-
-    // ========== fetchGitHubReleases 테스트 ==========
-
-    @Nested
-    @DisplayName("fetchGitHubReleases")
-    class FetchGitHubReleases {
-
-        @Test
-        @DisplayName("정상 호출 - 릴리즈 목록 반환")
-        void fetchGitHubReleases_정상호출() {
-            // Given
-            List<GitHubReleaseDto> releases = List.of(
-                    new GitHubReleaseDto("v1.0.0", "Release", "notes", "url", "2024-01-15")
-            );
-            when(githubAdapter.getReleases("openai", "openai-python")).thenReturn(releases);
-
-            // When
-            String result = tools.fetchGitHubReleases("openai", "openai-python");
-
-            // Then
-            assertThat(result).contains("v1.0.0");
-            verify(githubAdapter).getReleases("openai", "openai-python");
-        }
-
-        @Test
-        @DisplayName("owner 교정 (anthropic → anthropics)")
-        void fetchGitHubReleases_owner교정() {
-            // Given
-            when(githubAdapter.getReleases("anthropics", "anthropic-sdk-python")).thenReturn(List.of());
-
-            // When
-            tools.fetchGitHubReleases("anthropic", "anthropic-sdk-python");
-
-            // Then
-            verify(githubAdapter).getReleases("anthropics", "anthropic-sdk-python");
-        }
-
-        @Test
-        @DisplayName("검증 실패 시 에러 메시지 반환")
-        void fetchGitHubReleases_검증실패() {
-            // When - owner가 빈 문자열인 경우 (null은 NullPointerException 발생)
-            String result = tools.fetchGitHubReleases("", "repo");
-
-            // Then
-            assertThat(result).isNotEmpty();
-            verify(githubAdapter, never()).getReleases(any(), any());
-        }
-
-        @Test
-        @DisplayName("메트릭 증가 확인 (toolCallCount)")
-        void fetchGitHubReleases_메트릭증가() {
-            // Given - 화이트리스트에 있는 저장소 사용
-            when(githubAdapter.getReleases("openai", "openai-python")).thenReturn(List.of());
-
-            // When
-            tools.fetchGitHubReleases("openai", "openai-python");
-
-            // Then
-            assertThat(metrics.getToolCallCount()).isEqualTo(1);
-        }
-
-        @Test
-        @DisplayName("collect 후 동일 저장소 fetch 시 BLOCKED 메시지 반환 (중복 조회 차단)")
-        void fetchGitHubReleases_collect후_중복조회차단() {
-            // Given - collect_github_releases로 먼저 수집
-            DataCollectionResultDto collectResult = DataCollectionResultDto.success(
-                    "GITHUB_RELEASES", "OPENAI", 10, 10, 3, 7, 0, List.of());
-            when(dataCollectionAdapter.collectGitHubReleases("openai", "openai-python"))
-                    .thenReturn(collectResult);
-            tools.collectGitHubReleases("openai", "openai-python");
-
-            // When - 동일 저장소를 fetch로 조회 시도
-            String result = tools.fetchGitHubReleases("openai", "openai-python");
-
-            // Then - BLOCKED 메시지 반환, GitHub API 호출하지 않음
-            assertThat(result).startsWith("BLOCKED:");
-            assertThat(result).contains("수집 완료");
-            verify(githubAdapter, never()).getReleases(any(), any());
-        }
-
-        @Test
-        @DisplayName("collect하지 않은 저장소는 fetch 정상 동작")
-        void fetchGitHubReleases_collect하지않은_저장소는_정상동작() {
-            // Given - openai/whisper는 collect하지 않음
-            List<GitHubReleaseDto> releases = List.of(
-                    new GitHubReleaseDto("v1.0.0", "Release", "notes", "url", "2024-01-15"));
-            when(githubAdapter.getReleases("openai", "whisper")).thenReturn(releases);
-
-            // When
-            String result = tools.fetchGitHubReleases("openai", "whisper");
-
-            // Then
-            assertThat(result).contains("v1.0.0");
-            verify(githubAdapter).getReleases("openai", "whisper");
-        }
-
-        @Test
-        @DisplayName("화이트리스트에 없는 저장소는 에러 메시지 반환")
-        void fetchGitHubReleases_화이트리스트외_저장소() {
-            // When
-            String result = tools.fetchGitHubReleases("google", "some-unknown-repo");
-
-            // Then
-            assertThat(result).contains("허용되지 않는 저장소");
-            assertThat(metrics.getValidationErrorCount()).isEqualTo(1);
-            verify(githubAdapter, never()).getReleases(any(), any());
-        }
-
-        @Test
-        @DisplayName("검증 실패 시 validationErrorCount 증가")
-        void fetchGitHubReleases_검증실패_메트릭() {
-            // When
-            tools.fetchGitHubReleases("", "");
-
-            // Then
-            assertThat(metrics.getValidationErrorCount()).isEqualTo(1);
-        }
-    }
-
-    // ========== scrapeWebPage 테스트 ==========
-
-    @Nested
-    @DisplayName("scrapeWebPage")
-    class ScrapeWebPage {
-
-        @Test
-        @DisplayName("정상 크롤링")
-        void scrapeWebPage_정상크롤링() {
-            // Given
-            ScrapedContentDto content = new ScrapedContentDto("Title", "Content", "https://example.com");
-            when(scraperAdapter.scrape("https://example.com")).thenReturn(content);
-
-            // When
-            ScrapedContentDto result = tools.scrapeWebPage("https://example.com");
-
-            // Then
-            assertThat(result.title()).isEqualTo("Title");
-            verify(scraperAdapter).scrape("https://example.com");
-        }
-
-        @Test
-        @DisplayName("URL 검증 실패 시 에러 DTO 반환")
-        void scrapeWebPage_URL검증실패() {
-            // When
-            ScrapedContentDto result = tools.scrapeWebPage("invalid-url");
-
-            // Then
-            assertThat(result.title()).isNull();
-            assertThat(result.content()).contains("Error");
-            verify(scraperAdapter, never()).scrape(any());
-        }
-
-        @Test
-        @DisplayName("메트릭 증가 확인")
-        void scrapeWebPage_메트릭증가() {
-            // Given
-            when(scraperAdapter.scrape(any())).thenReturn(new ScrapedContentDto(null, null, null));
-
-            // When
-            tools.scrapeWebPage("https://example.com");
-
-            // Then
-            assertThat(metrics.getToolCallCount()).isEqualTo(1);
-        }
     }
 
     // ========== searchEmergingTechs 테스트 ==========
@@ -604,11 +436,11 @@ class EmergingTechAgentToolsTest {
         @Test
         @DisplayName("bindMetrics 후 정상 동작")
         void bindMetrics_정상동작() {
-            // Given - setUp에서 이미 바인딩됨, 화이트리스트에 있는 저장소 사용
-            when(githubAdapter.getReleases("openai", "openai-python")).thenReturn(List.of());
+            // Given - setUp에서 이미 바인딩됨
+            when(emergingTechAdapter.search("GPT", "OPENAI")).thenReturn(List.of());
 
             // When
-            tools.fetchGitHubReleases("openai", "openai-python");
+            tools.searchEmergingTechs("GPT", "OPENAI");
 
             // Then
             assertThat(metrics.getToolCallCount()).isEqualTo(1);
@@ -621,7 +453,7 @@ class EmergingTechAgentToolsTest {
             tools.unbindMetrics();
 
             // When & Then
-            assertThatThrownBy(() -> tools.fetchGitHubReleases("owner", "repo"))
+            assertThatThrownBy(() -> tools.searchEmergingTechs("GPT", "OPENAI"))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("바인딩되지 않았습니다");
         }
@@ -631,12 +463,11 @@ class EmergingTechAgentToolsTest {
         void metricsNotBound_예외() {
             // Given
             EmergingTechAgentTools newTools = new EmergingTechAgentTools(
-                    githubAdapter, scraperAdapter, slackAdapter,
-                    emergingTechAdapter, analyticsAdapter, dataCollectionAdapter);
+                    slackAdapter, emergingTechAdapter, analyticsAdapter, dataCollectionAdapter);
             // 메트릭 바인딩 없이 사용
 
             // When & Then
-            assertThatThrownBy(() -> newTools.fetchGitHubReleases("owner", "repo"))
+            assertThatThrownBy(() -> newTools.searchEmergingTechs("GPT", "OPENAI"))
                     .isInstanceOf(IllegalStateException.class);
         }
     }

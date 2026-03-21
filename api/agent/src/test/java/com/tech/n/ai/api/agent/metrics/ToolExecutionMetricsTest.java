@@ -190,4 +190,5 @@ class ToolExecutionMetricsTest {
             assertThat(metrics.getValidationErrorCount()).isZero();
         }
     }
+
 }
