@@ -21,6 +21,7 @@ import com.tech.n.ai.api.bookmark.common.exception.BookmarkValidationException;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.function.Function;
 
 /**
  * Bookmark Facade
@@ -43,19 +44,9 @@ public class BookmarkFacade {
     
     public BookmarkListResponse getBookmarkList(Long userId, BookmarkListRequest request) {
         Page<BookmarkEntity> page = bookmarkQueryService.findBookmarks(userId, request);
-        
-        List<BookmarkDetailResponse> list = page.getContent().stream()
-            .map(BookmarkDetailResponse::from)
-            .toList();
-        
-        PageData<BookmarkDetailResponse> pageData = PageData.of(
-            request.size(),
-            request.page(),
-            (int) page.getTotalElements(),
-            list
-        );
-        
-        return BookmarkListResponse.from(pageData);
+
+        return BookmarkListResponse.from(
+            toPageData(page, request.page(), request.size(), BookmarkDetailResponse::from));
     }
     
     public BookmarkDetailResponse getBookmarkDetail(Long userId, String id) {
@@ -90,19 +81,9 @@ public class BookmarkFacade {
         } else {
             page = bookmarkReaderRepository.findByUserIdAndIsDeletedTrue(userId, pageable);
         }
-        
-        List<BookmarkDetailResponse> list = page.getContent().stream()
-            .map(BookmarkDetailResponse::from)
-            .toList();
-        
-        PageData<BookmarkDetailResponse> pageData = PageData.of(
-            request.size(),
-            request.page(),
-            (int) page.getTotalElements(),
-            list
-        );
-        
-        return BookmarkListResponse.from(pageData);
+
+        return BookmarkListResponse.from(
+            toPageData(page, request.page(), request.size(), BookmarkDetailResponse::from));
     }
     
     public BookmarkDetailResponse restoreBookmark(Long userId, String id) {
@@ -114,36 +95,16 @@ public class BookmarkFacade {
     
     public BookmarkSearchResponse searchBookmarks(Long userId, BookmarkSearchRequest request) {
         Page<BookmarkEntity> page = bookmarkQueryService.searchBookmarks(userId, request);
-        
-        List<BookmarkDetailResponse> list = page.getContent().stream()
-            .map(BookmarkDetailResponse::from)
-            .toList();
-        
-        PageData<BookmarkDetailResponse> pageData = PageData.of(
-            request.size(),
-            request.page(),
-            (int) page.getTotalElements(),
-            list
-        );
-        
-        return BookmarkSearchResponse.from(pageData);
+
+        return BookmarkSearchResponse.from(
+            toPageData(page, request.page(), request.size(), BookmarkDetailResponse::from));
     }
     
     public BookmarkHistoryListResponse getHistory(Long userId, String entityId, BookmarkHistoryListRequest request) {
         Page<BookmarkHistoryEntity> page = bookmarkHistoryService.findHistory(userId.toString(), entityId, request);
-        
-        List<BookmarkHistoryDetailResponse> list = page.getContent().stream()
-            .map(BookmarkHistoryDetailResponse::from)
-            .toList();
-        
-        PageData<BookmarkHistoryDetailResponse> pageData = PageData.of(
-            request.size(),
-            request.page(),
-            (int) page.getTotalElements(),
-            list
-        );
-        
-        return BookmarkHistoryListResponse.from(pageData);
+
+        return BookmarkHistoryListResponse.from(
+            toPageData(page, request.page(), request.size(), BookmarkHistoryDetailResponse::from));
     }
     
     public BookmarkHistoryDetailResponse getHistoryAt(Long userId, String entityId, String timestamp) {
@@ -156,6 +117,13 @@ public class BookmarkFacade {
         Long bookmarkId = parseBookmarkId(entityId);
         BookmarkEntity entity = bookmarkQueryService.findBookmarkById(userId, bookmarkId);
         return BookmarkDetailResponse.from(entity);
+    }
+
+    private <E, D> PageData<D> toPageData(Page<E> page, int pageNumber, int size, Function<E, D> mapper) {
+        List<D> list = page.getContent().stream()
+            .map(mapper)
+            .toList();
+        return PageData.of(size, pageNumber, (int) page.getTotalElements(), list);
     }
 
     private Long parseBookmarkId(String id) {

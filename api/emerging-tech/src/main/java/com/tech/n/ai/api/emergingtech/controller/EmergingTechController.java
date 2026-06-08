@@ -25,6 +25,8 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class EmergingTechController {
 
+    private static final String INTERNAL_API_KEY_HEADER = "X-Internal-Api-Key";
+
     private final EmergingTechFacade emergingTechFacade;
     private final InternalApiKeyValidator apiKeyValidator;
 
@@ -61,7 +63,7 @@ public class EmergingTechController {
     @PostMapping("/internal")
     public ResponseEntity<ApiResponse<EmergingTechDetailResponse>> createEmergingTechInternal(
             @Valid @RequestBody EmergingTechCreateRequest request,
-            @RequestHeader("X-Internal-Api-Key") String apiKey) {
+            @RequestHeader(INTERNAL_API_KEY_HEADER) String apiKey) {
         apiKeyValidator.validate(apiKey);
         return ResponseEntity.ok(ApiResponse.success(emergingTechFacade.createEmergingTech(request)));
     }
@@ -72,7 +74,7 @@ public class EmergingTechController {
     @PostMapping("/internal/batch")
     public ResponseEntity<ApiResponse<EmergingTechBatchResponse>> createEmergingTechBatchInternal(
             @Valid @RequestBody EmergingTechBatchRequest request,
-            @RequestHeader("X-Internal-Api-Key") String apiKey) {
+            @RequestHeader(INTERNAL_API_KEY_HEADER) String apiKey) {
         apiKeyValidator.validate(apiKey);
         return ResponseEntity.ok(ApiResponse.success(emergingTechFacade.createEmergingTechBatch(request)));
     }
@@ -83,7 +85,7 @@ public class EmergingTechController {
     @PostMapping("/{id}/approve")
     public ResponseEntity<ApiResponse<EmergingTechDetailResponse>> approveEmergingTech(
             @PathVariable String id,
-            @RequestHeader("X-Internal-Api-Key") String apiKey) {
+            @RequestHeader(INTERNAL_API_KEY_HEADER) String apiKey) {
         apiKeyValidator.validate(apiKey);
         return ResponseEntity.ok(ApiResponse.success(emergingTechFacade.approveEmergingTech(id)));
     }
@@ -94,7 +96,7 @@ public class EmergingTechController {
     @PostMapping("/{id}/reject")
     public ResponseEntity<ApiResponse<EmergingTechDetailResponse>> rejectEmergingTech(
             @PathVariable String id,
-            @RequestHeader("X-Internal-Api-Key") String apiKey) {
+            @RequestHeader(INTERNAL_API_KEY_HEADER) String apiKey) {
         apiKeyValidator.validate(apiKey);
         return ResponseEntity.ok(ApiResponse.success(emergingTechFacade.rejectEmergingTech(id)));
     }

@@ -1,22 +1,23 @@
 package com.tech.n.ai.api.auth.oauth;
 
 import com.tech.n.ai.api.auth.config.OAuthProperties;
-import com.tech.n.ai.api.auth.dto.OAuthUserInfo;
 import com.tech.n.ai.client.feign.domain.oauth.contract.OAuthProviderContract;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
 
 @Component("GOOGLE")
-@RequiredArgsConstructor
-public class GoogleOAuthProvider implements OAuthProvider {
+public class GoogleOAuthProvider extends AbstractOAuthProvider {
 
     private final OAuthProperties.GoogleOAuthProperties googleProperties;
 
-    @Qualifier("googleOAuthContract")
-    private final OAuthProviderContract googleOAuthApi;
+    public GoogleOAuthProvider(
+            OAuthProperties.GoogleOAuthProperties googleProperties,
+            @Qualifier("googleOAuthContract") OAuthProviderContract googleOAuthApi) {
+        super(googleProperties, googleOAuthApi);
+        this.googleProperties = googleProperties;
+    }
 
     @Override
     public String generateAuthorizationUrl(String clientId, String redirectUri, String state) {
@@ -30,31 +31,5 @@ public class GoogleOAuthProvider implements OAuthProvider {
             .queryParam("access_type", "online")
             .build()
             .toUriString();
-    }
-
-    @Override
-    public String exchangeAccessToken(String code, String clientId, String clientSecret, String redirectUri) {
-        return googleOAuthApi.exchangeAccessToken(
-            code,
-            clientId,
-            clientSecret,
-            redirectUri != null ? redirectUri : googleProperties.getRedirectUri()
-        );
-    }
-
-    @Override
-    public OAuthUserInfo getUserInfo(String accessToken) {
-        com.tech.n.ai.client.feign.domain.oauth.contract.OAuthDto.OAuthUserInfo feignUserInfo =
-            googleOAuthApi.getUserInfo(accessToken);
-        
-        if (feignUserInfo == null) {
-            return null;
-        }
-        
-        return OAuthUserInfo.builder()
-            .providerUserId(feignUserInfo.providerUserId())
-            .email(feignUserInfo.email())
-            .username(feignUserInfo.username())
-            .build();
     }
 }

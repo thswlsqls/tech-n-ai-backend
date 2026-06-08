@@ -53,7 +53,7 @@ public class UserAuthenticationService {
 
         JwtTokenPayload payload = tokenService.getPayloadFromToken(request.refreshToken());
 
-        if ("ADMIN".equals(payload.role())) {
+        if (TokenConstants.ADMIN_ROLE.equals(payload.role())) {
             throw new UnauthorizedException("관리자 토큰은 관리자 전용 갱신 경로를 사용하세요.");
         }
 

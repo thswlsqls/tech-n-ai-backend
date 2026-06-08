@@ -174,7 +174,17 @@ public class ChatbotServiceImpl implements ChatbotService {
 
         String response = answerChain.generate(request.message(), refinedResults);
 
-        List<SourceResponse> sources = refinedResults.stream()
+        List<SourceResponse> sources = toSourceResponses(refinedResults);
+
+        log.info("RAG sources count: {}", sources.size());
+        sources.forEach(s -> log.info("RAG source: title={}, url={}, score={}, type={}",
+            s.title(), s.url(), s.score(), s.collectionType()));
+
+        return new RAGResult(response, sources);
+    }
+
+    private List<SourceResponse> toSourceResponses(List<SearchResult> results) {
+        return results.stream()
             .map(r -> {
                 String title = null;
                 String url = null;
@@ -191,14 +201,8 @@ public class ChatbotServiceImpl implements ChatbotService {
                     .build();
             })
             .collect(Collectors.toList());
-
-        log.info("RAG sources count: {}", sources.size());
-        sources.forEach(s -> log.info("RAG source: title={}, url={}, score={}, type={}",
-            s.title(), s.url(), s.score(), s.collectionType()));
-
-        return new RAGResult(response, sources);
     }
-    
+
     private SearchOptions buildSearchOptions(SearchQuery searchQuery) {
         boolean recency = searchQuery.context().isRecencyDetected();
         LocalDateTime dateFrom = recency ? LocalDateTime.now().minusMonths(recencyMonths) : null;

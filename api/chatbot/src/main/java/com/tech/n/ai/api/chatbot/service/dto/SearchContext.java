@@ -32,9 +32,7 @@ public class SearchContext {
     }
 
     public void addDetectedProvider(String provider) {
-        if (!detectedProviders.contains(provider)) {
-            detectedProviders.add(provider);
-        }
+        addIfAbsent(detectedProviders, provider);
     }
 
     public List<String> getDetectedUpdateTypes() {
@@ -42,8 +40,12 @@ public class SearchContext {
     }
 
     public void addDetectedUpdateType(String updateType) {
-        if (!detectedUpdateTypes.contains(updateType)) {
-            detectedUpdateTypes.add(updateType);
+        addIfAbsent(detectedUpdateTypes, updateType);
+    }
+
+    private static void addIfAbsent(List<String> list, String value) {
+        if (!list.contains(value)) {
+            list.add(value);
         }
     }
 

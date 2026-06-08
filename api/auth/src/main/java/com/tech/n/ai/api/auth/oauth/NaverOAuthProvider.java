@@ -1,57 +1,16 @@
 package com.tech.n.ai.api.auth.oauth;
 
 import com.tech.n.ai.api.auth.config.OAuthProperties;
-import com.tech.n.ai.api.auth.dto.OAuthUserInfo;
 import com.tech.n.ai.client.feign.domain.oauth.contract.OAuthProviderContract;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
-import org.springframework.web.util.UriComponentsBuilder;
 
 @Component("NAVER")
-@RequiredArgsConstructor
-public class NaverOAuthProvider implements OAuthProvider {
+public class NaverOAuthProvider extends AbstractOAuthProvider {
 
-    private final OAuthProperties.NaverOAuthProperties naverProperties;
-    
-    @Qualifier("naverOAuthContract")
-    private final OAuthProviderContract naverOAuthApi;
-
-    @Override
-    public String generateAuthorizationUrl(String clientId, String redirectUri, String state) {
-        return UriComponentsBuilder
-            .fromUriString(naverProperties.getAuthorizationEndpoint())
-            .queryParam("client_id", clientId)
-            .queryParam("redirect_uri", redirectUri != null ? redirectUri : naverProperties.getRedirectUri())
-            .queryParam("response_type", "code")
-            .queryParam("state", state)
-            .build()
-            .toUriString();
-    }
-
-    @Override
-    public String exchangeAccessToken(String code, String clientId, String clientSecret, String redirectUri) {
-        return naverOAuthApi.exchangeAccessToken(
-            code,
-            clientId,
-            clientSecret,
-            redirectUri != null ? redirectUri : naverProperties.getRedirectUri()
-        );
-    }
-
-    @Override
-    public OAuthUserInfo getUserInfo(String accessToken) {
-        com.tech.n.ai.client.feign.domain.oauth.contract.OAuthDto.OAuthUserInfo feignUserInfo =
-            naverOAuthApi.getUserInfo(accessToken);
-        
-        if (feignUserInfo == null) {
-            return null;
-        }
-        
-        return OAuthUserInfo.builder()
-            .providerUserId(feignUserInfo.providerUserId())
-            .email(feignUserInfo.email())
-            .username(feignUserInfo.username())
-            .build();
+    public NaverOAuthProvider(
+            OAuthProperties.NaverOAuthProperties naverProperties,
+            @Qualifier("naverOAuthContract") OAuthProviderContract naverOAuthApi) {
+        super(naverProperties, naverOAuthApi);
     }
 }

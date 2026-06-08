@@ -103,13 +103,19 @@ public class BookmarkCommandServiceImpl implements BookmarkCommandService {
         }
     }
 
-    private BookmarkEntity findAndValidateBookmark(Long userId, Long bookmarkId) {
+    private BookmarkEntity findOwnedBookmark(Long userId, Long bookmarkId) {
         BookmarkEntity bookmark = bookmarkReaderRepository.findById(bookmarkId)
             .orElseThrow(() -> new BookmarkNotFoundException("북마크를 찾을 수 없습니다: " + bookmarkId));
 
         if (!bookmark.isOwnedBy(userId)) {
             throw new UnauthorizedException("본인의 북마크만 접근할 수 있습니다.");
         }
+
+        return bookmark;
+    }
+
+    private BookmarkEntity findAndValidateBookmark(Long userId, Long bookmarkId) {
+        BookmarkEntity bookmark = findOwnedBookmark(userId, bookmarkId);
 
         if (Boolean.TRUE.equals(bookmark.getIsDeleted())) {
             throw new BookmarkNotFoundException("삭제된 북마크입니다.");
@@ -146,12 +152,7 @@ public class BookmarkCommandServiceImpl implements BookmarkCommandService {
     }
 
     private BookmarkEntity findDeletedBookmark(Long userId, Long bookmarkId) {
-        BookmarkEntity bookmark = bookmarkReaderRepository.findById(bookmarkId)
-            .orElseThrow(() -> new BookmarkNotFoundException("북마크를 찾을 수 없습니다: " + bookmarkId));
-
-        if (!bookmark.isOwnedBy(userId)) {
-            throw new UnauthorizedException("본인의 북마크만 접근할 수 있습니다.");
-        }
+        BookmarkEntity bookmark = findOwnedBookmark(userId, bookmarkId);
 
         if (!Boolean.TRUE.equals(bookmark.getIsDeleted())) {
             throw new BookmarkValidationException("삭제되지 않은 북마크입니다.");

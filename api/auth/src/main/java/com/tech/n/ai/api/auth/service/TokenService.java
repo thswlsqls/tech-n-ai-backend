@@ -27,7 +27,7 @@ public class TokenService {
         long accessTokenExpiry;
         long refreshTokenExpiry;
 
-        if ("ADMIN".equals(role)) {
+        if (ADMIN_ROLE.equals(role)) {
             accessToken = jwtTokenProvider.generateAdminAccessToken(payload);
             refreshToken = jwtTokenProvider.generateAdminRefreshToken(payload);
             accessTokenExpiry = ADMIN_ACCESS_TOKEN_EXPIRY_SECONDS;

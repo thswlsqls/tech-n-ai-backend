@@ -128,9 +128,8 @@ public class BookmarkHistoryServiceImpl implements BookmarkHistoryService {
     }
     
     private void validateBookmarkOwnership(Long bookmarkId, Long userId) {
-        BookmarkEntity bookmark = bookmarkReaderRepository.findById(bookmarkId)
-            .orElseThrow(() -> new BookmarkNotFoundException("북마크를 찾을 수 없습니다: " + bookmarkId));
-        
+        BookmarkEntity bookmark = findBookmarkById(bookmarkId);
+
         if (!bookmark.isOwnedBy(userId)) {
             throw new UnauthorizedException("본인의 북마크 히스토리만 조회할 수 있습니다.");
         }
@@ -202,28 +201,24 @@ public class BookmarkHistoryServiceImpl implements BookmarkHistoryService {
         }
     }
 
-    private Long parseEntityId(String entityId) {
+    private Long parseLongId(String value, String label) {
         try {
-            return Long.parseLong(entityId);
+            return Long.parseLong(value);
         } catch (NumberFormatException e) {
-            throw new BookmarkValidationException("유효하지 않은 엔티티 ID 형식입니다: " + entityId);
+            throw new BookmarkValidationException("유효하지 않은 " + label + " 형식입니다: " + value);
         }
+    }
+
+    private Long parseEntityId(String entityId) {
+        return parseLongId(entityId, "엔티티 ID");
     }
 
     private Long parseUserId(String userId) {
-        try {
-            return Long.parseLong(userId);
-        } catch (NumberFormatException e) {
-            throw new BookmarkValidationException("유효하지 않은 사용자 ID 형식입니다: " + userId);
-        }
+        return parseLongId(userId, "사용자 ID");
     }
 
     private Long parseHistoryId(String historyId) {
-        try {
-            return Long.parseLong(historyId);
-        } catch (NumberFormatException e) {
-            throw new BookmarkValidationException("유효하지 않은 히스토리 ID 형식입니다: " + historyId);
-        }
+        return parseLongId(historyId, "히스토리 ID");
     }
 
     private LocalDateTime parseDateTime(String dateTimeStr, String fieldName) {

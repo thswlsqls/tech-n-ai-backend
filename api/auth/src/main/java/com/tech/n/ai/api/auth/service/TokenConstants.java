@@ -3,6 +3,7 @@ package com.tech.n.ai.api.auth.service;
 public final class TokenConstants {
     
     public static final String USER_ROLE = "USER";
+    public static final String ADMIN_ROLE = "ADMIN";
     public static final String TOKEN_TYPE = "Bearer";
     public static final long ACCESS_TOKEN_EXPIRY_SECONDS = 3600L;
     public static final long REFRESH_TOKEN_EXPIRY_SECONDS = 604800L;

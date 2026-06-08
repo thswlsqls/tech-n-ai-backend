@@ -178,46 +178,44 @@ public class JwtAuthenticationGatewayFilter implements GatewayFilter {
      * 권한 부족 시 403 Forbidden 응답 반환
      */
     private Mono<Void> handleForbidden(ServerWebExchange exchange) {
-        ServerHttpResponse response = exchange.getResponse();
-        response.setStatusCode(HttpStatus.FORBIDDEN);
-        response.getHeaders().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
-
-        MessageCode messageCode = new MessageCode(
+        return writeErrorResponse(
+            exchange,
+            HttpStatus.FORBIDDEN,
+            ErrorCodeConstants.FORBIDDEN,
             ErrorCodeConstants.MESSAGE_CODE_FORBIDDEN,
             "권한이 없습니다."
         );
-        ApiResponse<Void> errorResponse = ApiResponse.error(
-            ErrorCodeConstants.FORBIDDEN,
-            messageCode
-        );
-
-        DataBufferFactory bufferFactory = response.bufferFactory();
-        try {
-            String jsonResponse = objectMapper.writeValueAsString(errorResponse);
-            DataBuffer buffer = bufferFactory.wrap(jsonResponse.getBytes(StandardCharsets.UTF_8));
-            return response.writeWith(Mono.just(buffer));
-        } catch (Exception e) {
-            log.error("Error writing forbidden response", e);
-            return response.setComplete();
-        }
     }
 
     /**
      * 인증 실패 시 401 Unauthorized 응답 반환
      */
     private Mono<Void> handleUnauthorized(ServerWebExchange exchange) {
-        ServerHttpResponse response = exchange.getResponse();
-        response.setStatusCode(HttpStatus.UNAUTHORIZED);
-        response.getHeaders().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
-
-        MessageCode messageCode = new MessageCode(
+        return writeErrorResponse(
+            exchange,
+            HttpStatus.UNAUTHORIZED,
+            ErrorCodeConstants.AUTH_FAILED,
             ErrorCodeConstants.MESSAGE_CODE_AUTH_FAILED,
             "인증에 실패했습니다."
         );
-        ApiResponse<Void> errorResponse = ApiResponse.error(
-            ErrorCodeConstants.AUTH_FAILED,
-            messageCode
-        );
+    }
+
+    /**
+     * ApiResponse 형식의 에러 응답을 JSON으로 작성해 반환
+     */
+    private Mono<Void> writeErrorResponse(
+        ServerWebExchange exchange,
+        HttpStatus status,
+        String errorCode,
+        String messageCodeValue,
+        String messageText
+    ) {
+        ServerHttpResponse response = exchange.getResponse();
+        response.setStatusCode(status);
+        response.getHeaders().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
+
+        MessageCode messageCode = new MessageCode(messageCodeValue, messageText);
+        ApiResponse<Void> errorResponse = ApiResponse.error(errorCode, messageCode);
 
         DataBufferFactory bufferFactory = response.bufferFactory();
         try {
@@ -225,7 +223,7 @@ public class JwtAuthenticationGatewayFilter implements GatewayFilter {
             DataBuffer buffer = bufferFactory.wrap(jsonResponse.getBytes(StandardCharsets.UTF_8));
             return response.writeWith(Mono.just(buffer));
         } catch (Exception e) {
-            log.error("Error writing unauthorized response", e);
+            log.error("Error writing error response", e);
             return response.setComplete();
         }
     }

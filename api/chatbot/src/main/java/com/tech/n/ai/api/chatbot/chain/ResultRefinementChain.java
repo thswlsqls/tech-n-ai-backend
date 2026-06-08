@@ -69,10 +69,7 @@ public class ResultRefinementChain {
             List<SearchResult> reranked = reRankingService.rerank(query, deduplicated, maxSearchResults * 2);
             if (scoreFusionApplied) {
                 log.info("Score Fusion already applied, skipping Java-level Recency Boost");
-                return reranked.stream()
-                    .sorted(Comparator.comparing(SearchResult::score).reversed())
-                    .limit(maxSearchResults)
-                    .collect(Collectors.toList());
+                return sortByScoreDescAndLimit(reranked);
             }
             return applyRecencyBoost(reranked, recencyDetected);
         }
@@ -80,10 +77,7 @@ public class ResultRefinementChain {
         // 3. Score Fusion 이미 적용된 경우 Recency Boost 생략
         if (scoreFusionApplied) {
             log.info("Score Fusion already applied, skipping Java-level Recency Boost");
-            return deduplicated.stream()
-                .sorted(Comparator.comparing(SearchResult::score).reversed())
-                .limit(maxSearchResults)
-                .collect(Collectors.toList());
+            return sortByScoreDescAndLimit(deduplicated);
         }
 
         // 4. Recency Boost 적용 후 정렬
@@ -104,7 +98,7 @@ public class ResultRefinementChain {
         log.info("Applying recency boost: recencyDetected={}, similarityWeight={}, recencyWeight={}",
             recencyDetected, similarityWeight, recencyWeight);
 
-        return results.stream()
+        List<SearchResult> boosted = results.stream()
             .map(result -> {
                 double recencyScore = calculateRecencyScore(result);
                 double hybridScore = (result.score() * similarityWeight) + (recencyScore * recencyWeight);
@@ -122,6 +116,16 @@ public class ResultRefinementChain {
                     .metadata(result.metadata())
                     .build();
             })
+            .collect(Collectors.toList());
+
+        return sortByScoreDescAndLimit(boosted);
+    }
+
+    /**
+     * score 내림차순 정렬 후 maxSearchResults 개수로 제한
+     */
+    private List<SearchResult> sortByScoreDescAndLimit(List<SearchResult> results) {
+        return results.stream()
             .sorted(Comparator.comparing(SearchResult::score).reversed())
             .limit(maxSearchResults)
             .collect(Collectors.toList());

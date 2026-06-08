@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.function.Supplier;
 
 import static com.tech.n.ai.api.auth.service.VerificationConstants.*;
 
@@ -153,40 +154,43 @@ public class EmailVerificationService {
     }
     
     private void sendVerificationEmail(String email, String token) {
-        try {
+        sendEmailSafely("인증 이메일", email, () -> {
             String verifyUrl = mailProperties.getBaseUrl() + "/verify-email?token=" + token;
             String htmlContent = emailTemplateService.renderVerificationEmail(email, token, verifyUrl);
-            
-            EmailMessage message = EmailMessage.builder()
+            return EmailMessage.builder()
                 .to(email)
                 .subject(mailProperties.getTemplate().getVerificationSubject())
                 .htmlContent(htmlContent)
                 .build();
-            
-            emailSender.sendAsync(message);
-            log.info("인증 이메일 발송 요청: to={}", email);
-        } catch (Exception e) {
-            // Fail-Safe: 이메일 발송 실패해도 회원가입은 정상 완료
-            log.error("인증 이메일 발송 실패: to={}", email, e);
-        }
+        });
     }
-    
+
     private void sendPasswordResetEmail(String email, String token) {
-        try {
+        sendEmailSafely("비밀번호 재설정 이메일", email, () -> {
             String resetUrl = mailProperties.getBaseUrl() + "/reset-password?token=" + token;
             String htmlContent = emailTemplateService.renderPasswordResetEmail(email, token, resetUrl);
-            
-            EmailMessage message = EmailMessage.builder()
+            return EmailMessage.builder()
                 .to(email)
                 .subject(mailProperties.getTemplate().getPasswordResetSubject())
                 .htmlContent(htmlContent)
                 .build();
-            
-            emailSender.sendAsync(message);
-            log.info("비밀번호 재설정 이메일 발송 요청: to={}", email);
+        });
+    }
+
+    /**
+     * 이메일 메시지를 만들고 비동기 발송한다.
+     * 메시지 생성(렌더 포함)과 발송이 실패해도 예외를 삼켜 호출한 트랜잭션이 롤백되지 않게 한다(Fail-Safe).
+     *
+     * @param emailKind      로그에 남길 이메일 종류 (예: "인증 이메일")
+     * @param email          수신자
+     * @param messageBuilder 메시지 생성 로직 (try 안에서 실행되어 렌더 실패도 함께 보호)
+     */
+    private void sendEmailSafely(String emailKind, String email, Supplier<EmailMessage> messageBuilder) {
+        try {
+            emailSender.sendAsync(messageBuilder.get());
+            log.info("{} 발송 요청: to={}", emailKind, email);
         } catch (Exception e) {
-            // Fail-Safe: 이메일 발송 실패해도 토큰 생성은 정상 완료
-            log.error("비밀번호 재설정 이메일 발송 실패: to={}", email, e);
+            log.error("{} 발송 실패: to={}", emailKind, email, e);
         }
     }
 }

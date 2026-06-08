@@ -25,12 +25,13 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static com.tech.n.ai.api.auth.service.TokenConstants.ADMIN_ROLE;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AdminService {
 
-    private static final String ADMIN_ROLE = "ADMIN";
     private static final int LOCK_THRESHOLD_FIRST = 5;
     private static final int LOCK_THRESHOLD_SECOND = 10;
     private static final Duration LOCK_DURATION_FIRST = Duration.ofMinutes(15);

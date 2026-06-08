@@ -33,9 +33,7 @@ public class BookmarkQueryServiceImpl implements BookmarkQueryService {
             parseSort(request.sort())
         );
         
-        Specification<BookmarkEntity> spec = Specification.<BookmarkEntity>unrestricted()
-            .and((root, query, cb) -> cb.equal(root.get("userId"), userId))
-            .and((root, query, cb) -> cb.equal(root.get("isDeleted"), false));
+        Specification<BookmarkEntity> spec = ownedAndNotDeleted(userId);
 
         if (request.provider() != null && !request.provider().isBlank()) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("provider"), request.provider()));
@@ -68,10 +66,8 @@ public class BookmarkQueryServiceImpl implements BookmarkQueryService {
             Sort.by(Sort.Direction.DESC, "createdAt")
         );
         
-        Specification<BookmarkEntity> spec = Specification.<BookmarkEntity>unrestricted()
-            .and((root, query, cb) -> cb.equal(root.get("userId"), userId))
-            .and((root, query, cb) -> cb.equal(root.get("isDeleted"), false));
-        
+        Specification<BookmarkEntity> spec = ownedAndNotDeleted(userId);
+
         String searchTerm = request.q();
         String searchField = request.searchField();
         
@@ -95,6 +91,12 @@ public class BookmarkQueryServiceImpl implements BookmarkQueryService {
         return bookmarkReaderRepository.findAll(spec, pageable);
     }
     
+    private Specification<BookmarkEntity> ownedAndNotDeleted(Long userId) {
+        return Specification.<BookmarkEntity>unrestricted()
+            .and((root, query, cb) -> cb.equal(root.get("userId"), userId))
+            .and((root, query, cb) -> cb.equal(root.get("isDeleted"), false));
+    }
+
     private Sort parseSort(String sort) {
         if (sort == null || sort.isBlank()) {
             return Sort.by(Sort.Direction.DESC, "createdAt");

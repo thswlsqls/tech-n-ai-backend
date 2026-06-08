@@ -78,8 +78,7 @@ public class ApiGatewayExceptionHandler implements WebExceptionHandler {
      * @return HTTP 상태 코드
      */
     private HttpStatus determineHttpStatus(Throwable ex) {
-        if (ex instanceof ResponseStatusException) {
-            ResponseStatusException statusException = (ResponseStatusException) ex;
+        if (ex instanceof ResponseStatusException statusException) {
             var statusCode = statusException.getStatusCode();
             if (statusCode instanceof HttpStatus) {
                 return (HttpStatus) statusCode;

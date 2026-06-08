@@ -20,6 +20,14 @@ import java.util.List;
 @Service
 public class TokenServiceImpl implements TokenService {
 
+    // 한글 음절 영역 (가 ~ 힣)
+    private static final int HANGUL_SYLLABLE_START = 0xAC00;
+    private static final int HANGUL_SYLLABLE_END = 0xD7A3;
+    // 휴리스틱 토큰 가중치
+    private static final double KOREAN_TOKENS_PER_CHAR = 2;
+    private static final double ENGLISH_TOKENS_PER_WORD = 1.3;
+    private static final int CHARS_PER_TOKEN = 4;
+
     private final OpenAiTokenCountEstimator tokenCountEstimator;
 
     @Value("${chatbot.token.max-input-tokens:4000}")
@@ -60,12 +68,13 @@ public class TokenServiceImpl implements TokenService {
     private int estimateTokensHeuristic(String text) {
         int wordCount = text.split("\\s+").length;
         int koreanCharCount = (int) text.chars()
-            .filter(c -> c >= 0xAC00 && c <= 0xD7A3)
+            .filter(c -> c >= HANGUL_SYLLABLE_START && c <= HANGUL_SYLLABLE_END)
             .count();
 
         // 한국어 문자는 약 2 토큰, 영어 단어는 약 1.3 토큰
-        int estimatedTokens = (int) (koreanCharCount * 2 + (wordCount - koreanCharCount) * 1.3);
-        return Math.max(estimatedTokens, text.length() / 4);
+        int estimatedTokens = (int) (koreanCharCount * KOREAN_TOKENS_PER_CHAR
+            + (wordCount - koreanCharCount) * ENGLISH_TOKENS_PER_WORD);
+        return Math.max(estimatedTokens, text.length() / CHARS_PER_TOKEN);
     }
     
     @Override

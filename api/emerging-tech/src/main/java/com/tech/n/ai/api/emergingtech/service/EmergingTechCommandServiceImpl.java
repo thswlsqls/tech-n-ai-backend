@@ -109,8 +109,9 @@ public class EmergingTechCommandServiceImpl implements EmergingTechCommandServic
      */
     private void generateEmbedding(EmergingTechDocument document) {
         try {
-            List<String> tags = document.getMetadata() != null ? document.getMetadata().getTags() : null;
-            String githubRepo = document.getMetadata() != null ? document.getMetadata().getGithubRepo() : null;
+            EmergingTechDocument.EmergingTechMetadata metadata = document.getMetadata();
+            List<String> tags = metadata != null ? metadata.getTags() : null;
+            String githubRepo = metadata != null ? metadata.getGithubRepo() : null;
             String embeddingText = buildEmbeddingText(
                 document.getProvider(), githubRepo,
                 document.getTitle(), document.getSummary(), tags);

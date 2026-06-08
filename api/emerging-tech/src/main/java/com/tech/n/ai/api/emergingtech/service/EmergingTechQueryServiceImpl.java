@@ -43,15 +43,16 @@ public class EmergingTechQueryServiceImpl implements EmergingTechQueryService {
 
     @Override
     public EmergingTechDocument findEmergingTechById(String id) {
+        String notFoundMessage = "Emerging Tech를 찾을 수 없습니다: " + id;
         ObjectId objectId;
         try {
             objectId = new ObjectId(id);
         } catch (IllegalArgumentException e) {
-            throw new ResourceNotFoundException("Emerging Tech를 찾을 수 없습니다: " + id);
+            throw new ResourceNotFoundException(notFoundMessage);
         }
 
         return emergingTechRepository.findById(objectId)
-                .orElseThrow(() -> new ResourceNotFoundException("Emerging Tech를 찾을 수 없습니다: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException(notFoundMessage));
     }
 
     @Override
