@@ -5,6 +5,7 @@ import com.tech.n.ai.client.feign.domain.oauth.contract.OAuthDto.GoogleTokenResp
 import com.tech.n.ai.client.feign.domain.oauth.contract.OAuthDto.GoogleUserInfoResponse;
 import com.tech.n.ai.client.feign.domain.oauth.contract.OAuthDto.OAuthUserInfo;
 import com.tech.n.ai.client.feign.domain.oauth.contract.OAuthProviderContract;
+import com.tech.n.ai.common.core.util.StringUtils;
 import com.tech.n.ai.common.exception.exception.UnauthorizedException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,7 +48,7 @@ public class GoogleOAuthApi implements OAuthProviderContract {
         }
         
         String username = response.name();
-        if (username == null || username.isEmpty()) {
+        if (StringUtils.isEmpty(username)) {
             username = response.email();
         }
         

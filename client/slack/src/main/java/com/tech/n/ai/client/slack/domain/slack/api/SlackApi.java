@@ -58,46 +58,32 @@ public class SlackApi implements SlackContract {
             builder.addContext(contextText);
         }
         
-        SlackDto.SlackMessage message = builder.build();
-        slackClient.sendMessage(message);
+        send(builder);
     }
-    
+
     @Override
     public void sendErrorNotification(String message, Throwable error) {
         SlackMessageBuilder builder = new SlackMessageBuilder();
         builder.addSection("*❌ 에러 발생*")
             .addDivider()
             .addSection("메시지: " + message);
-        
+
         if (error != null) {
             builder.addSection("에러 타입: `" + error.getClass().getSimpleName() + "`")
                 .addSection("에러 메시지: " + error.getMessage());
         }
-        
-        SlackDto.SlackMessage slackMessage = builder.build();
-        slackClient.sendMessage(slackMessage);
+
+        send(builder);
     }
-    
+
     @Override
     public void sendSuccessNotification(String message) {
-        SlackMessageBuilder builder = new SlackMessageBuilder();
-        builder.addSection("*✅ 성공*")
-            .addDivider()
-            .addSection(message);
-        
-        SlackDto.SlackMessage slackMessage = builder.build();
-        slackClient.sendMessage(slackMessage);
+        sendSimpleNotification("*✅ 성공*", message);
     }
-    
+
     @Override
     public void sendInfoNotification(String message) {
-        SlackMessageBuilder builder = new SlackMessageBuilder();
-        builder.addSection("*ℹ️ 정보*")
-            .addDivider()
-            .addSection(message);
-        
-        SlackDto.SlackMessage slackMessage = builder.build();
-        slackClient.sendMessage(slackMessage);
+        sendSimpleNotification("*ℹ️ 정보*", message);
     }
     
     @Override
@@ -123,8 +109,20 @@ public class SlackApi implements SlackContract {
             long durationSeconds = java.time.Duration.between(result.startTime(), result.endTime()).getSeconds();
             builder.addContext("실행 시간: " + durationSeconds + "초");
         }
-        
-        SlackDto.SlackMessage slackMessage = builder.build();
-        slackClient.sendMessage(slackMessage);
+
+        send(builder);
+    }
+
+    private void sendSimpleNotification(String header, String message) {
+        SlackMessageBuilder builder = new SlackMessageBuilder();
+        builder.addSection(header)
+            .addDivider()
+            .addSection(message);
+
+        send(builder);
+    }
+
+    private void send(SlackMessageBuilder builder) {
+        slackClient.sendMessage(builder.build());
     }
 }

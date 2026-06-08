@@ -5,6 +5,7 @@ import com.tech.n.ai.client.scraper.dto.ScrapedTechArticle;
 import com.tech.n.ai.client.scraper.exception.ScrapingException;
 import com.tech.n.ai.client.scraper.util.DateParsingUtils;
 import com.tech.n.ai.client.scraper.util.RobotsTxtChecker;
+import com.tech.n.ai.client.scraper.util.ScraperDomUtils;
 import com.tech.n.ai.client.scraper.util.StructuredDataDateExtractor;
 import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.retry.RetryRegistry;
@@ -198,17 +199,17 @@ public class AnthropicNewsScraper implements TechBlogScraper {
 
         // fallback: DOM에서 제목 추출
         if (title == null || title.isEmpty()) {
-            title = extractText(element, "h2, h3, h4");
+            title = ScraperDomUtils.extractText(element, "h2, h3, h4");
         }
         if (title == null || title.isEmpty()) return null;
 
         // fallback: DOM에서 요약/날짜 추출
         Element parent = element.parent();
         if (summary == null || summary.isEmpty()) {
-            summary = extractText(parent, "p");
+            summary = ScraperDomUtils.extractText(parent, "p");
         }
         if (publishedDate == null) {
-            String dateText = extractText(parent, "time, span, div");
+            String dateText = ScraperDomUtils.extractText(parent, "time, span, div");
             publishedDate = DateParsingUtils.parseDateText(dateText);
         }
 
@@ -226,12 +227,6 @@ public class AnthropicNewsScraper implements TechBlogScraper {
             .category(null)
             .providerName(PROVIDER_NAME)
             .build();
-    }
-
-    private String extractText(Element parent, String selector) {
-        if (parent == null) return null;
-        Element el = parent.select(selector).first();
-        return el != null ? el.text() : null;
     }
 
     @Override

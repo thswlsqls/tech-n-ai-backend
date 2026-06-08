@@ -6,6 +6,7 @@ import com.tech.n.ai.client.feign.domain.oauth.contract.OAuthDto.KakaoTokenRespo
 import com.tech.n.ai.client.feign.domain.oauth.contract.OAuthDto.KakaoUserInfoResponse;
 import com.tech.n.ai.client.feign.domain.oauth.contract.OAuthDto.OAuthUserInfo;
 import com.tech.n.ai.client.feign.domain.oauth.contract.OAuthProviderContract;
+import com.tech.n.ai.common.core.util.StringUtils;
 import com.tech.n.ai.common.exception.exception.UnauthorizedException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,7 +27,7 @@ public class KakaoOAuthApi implements OAuthProviderContract {
         params.add("client_id", clientId);
         params.add("redirect_uri", redirectUri);
         params.add("code", code);
-        if (clientSecret != null && !clientSecret.isEmpty()) {
+        if (StringUtils.isNotEmpty(clientSecret)) {
             params.add("client_secret", clientSecret);
         }
         
@@ -60,13 +61,13 @@ public class KakaoOAuthApi implements OAuthProviderContract {
             }
         }
         
-        if (username == null || username.isEmpty()) {
+        if (StringUtils.isEmpty(username)) {
             if (response.properties() != null) {
                 username = response.properties().nickname();
             }
         }
         
-        if (username == null || username.isEmpty()) {
+        if (StringUtils.isEmpty(username)) {
             username = email != null ? email : "KakaoUser_" + response.id();
         }
         

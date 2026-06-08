@@ -8,6 +8,7 @@ import com.tech.n.ai.client.feign.domain.github.contract.GitHubDto.Event;
 import com.tech.n.ai.client.feign.domain.github.contract.GitHubDto.ReleasesRequest;
 import com.tech.n.ai.client.feign.domain.github.contract.GitHubDto.ReleasesResponse;
 import com.tech.n.ai.client.feign.domain.github.contract.GitHubDto.Release;
+import com.tech.n.ai.common.core.util.StringUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,9 +26,8 @@ public class GitHubApi implements GitHubContract {
 
     @Override
     public EventsResponse getEvents(EventsRequest request) {
-        String authorization = token != null && !token.isEmpty() ? "Bearer " + token : null;
         List<Event> events = githubFeign.getEvents(
-                authorization,
+                bearerAuthorization(),
                 request.perPage(),
                 request.page()
         );
@@ -38,9 +38,8 @@ public class GitHubApi implements GitHubContract {
 
     @Override
     public ReleasesResponse getReleases(ReleasesRequest request) {
-        String authorization = token != null && !token.isEmpty() ? "Bearer " + token : null;
         List<Release> releases = githubFeign.getReleases(
-                authorization,
+                bearerAuthorization(),
                 request.owner(),
                 request.repo(),
                 request.perPage(),
@@ -49,6 +48,10 @@ public class GitHubApi implements GitHubContract {
         return ReleasesResponse.builder()
                 .releases(releases != null ? releases : List.of())
                 .build();
+    }
+
+    private String bearerAuthorization() {
+        return StringUtils.isNotEmpty(token) ? "Bearer " + token : null;
     }
 
 }

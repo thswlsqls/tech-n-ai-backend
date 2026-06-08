@@ -4,6 +4,7 @@ import com.tech.n.ai.client.scraper.config.ScraperProperties;
 import com.tech.n.ai.client.scraper.dto.ScrapedTechArticle;
 import com.tech.n.ai.client.scraper.exception.ScrapingException;
 import com.tech.n.ai.client.scraper.util.RobotsTxtChecker;
+import com.tech.n.ai.client.scraper.util.ScraperDomUtils;
 import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.retry.RetryRegistry;
 import lombok.extern.slf4j.Slf4j;
@@ -135,15 +136,15 @@ public class XaiNewsScraper implements TechBlogScraper {
         String url = href.startsWith("http") ? href : baseUrl + href;
 
         // Tailwind CSS 기반 구조에서 타이틀 추출
-        String title = extractText(element, "h3, h4");
+        String title = ScraperDomUtils.extractText(element, "h3, h4");
         if (title == null || title.isEmpty()) {
             title = element.text();
         }
         if (title == null || title.isEmpty()) return null;
 
         Element parent = element.parent();
-        String summary = extractText(parent, "p.text-secondary");
-        String dateText = extractText(parent, "p.mono-tag, span.mono-tag");
+        String summary = ScraperDomUtils.extractText(parent, "p.text-secondary");
+        String dateText = ScraperDomUtils.extractText(parent, "p.mono-tag, span.mono-tag");
         LocalDateTime publishedDate = DateParsingUtils.parseDateText(dateText);
 
         // 최종 fallback: 기사 상세 페이지에서 구조화 데이터 추출
@@ -166,12 +167,6 @@ public class XaiNewsScraper implements TechBlogScraper {
             .category(category)
             .providerName(PROVIDER_NAME)
             .build();
-    }
-
-    private String extractText(Element parent, String selector) {
-        if (parent == null) return null;
-        Element el = parent.select(selector).first();
-        return el != null ? el.text() : null;
     }
 
     @Override

@@ -3,9 +3,11 @@ package com.tech.n.ai.client.feign.domain.oauth.api;
 import com.tech.n.ai.client.feign.domain.oauth.client.NaverOAuthFeignClient;
 import com.tech.n.ai.client.feign.domain.oauth.client.NaverOAuthUserInfoFeignClient;
 import com.tech.n.ai.client.feign.domain.oauth.contract.OAuthDto.NaverTokenResponse;
+import com.tech.n.ai.client.feign.domain.oauth.contract.OAuthDto.NaverUserInfo;
 import com.tech.n.ai.client.feign.domain.oauth.contract.OAuthDto.NaverUserInfoResponse;
 import com.tech.n.ai.client.feign.domain.oauth.contract.OAuthDto.OAuthUserInfo;
 import com.tech.n.ai.client.feign.domain.oauth.contract.OAuthProviderContract;
+import com.tech.n.ai.common.core.util.StringUtils;
 import com.tech.n.ai.common.exception.exception.UnauthorizedException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -58,18 +60,19 @@ public class NaverOAuthApi implements OAuthProviderContract {
             log.error("Naver 사용자 정보 응답이 null입니다: response={}", response);
             throw new UnauthorizedException("Naver 사용자 정보 조회에 실패했습니다.");
         }
-        
-        String username = response.response().name();
-        if (username == null || username.isEmpty()) {
-            username = response.response().nickname();
+
+        NaverUserInfo userInfo = response.response();
+        String username = userInfo.name();
+        if (StringUtils.isEmpty(username)) {
+            username = userInfo.nickname();
         }
-        if (username == null || username.isEmpty()) {
-            username = response.response().email();
+        if (StringUtils.isEmpty(username)) {
+            username = userInfo.email();
         }
-        
+
         return OAuthUserInfo.builder()
-            .providerUserId(response.response().id())
-            .email(response.response().email())
+            .providerUserId(userInfo.id())
+            .email(userInfo.email())
             .username(username)
             .build();
     }

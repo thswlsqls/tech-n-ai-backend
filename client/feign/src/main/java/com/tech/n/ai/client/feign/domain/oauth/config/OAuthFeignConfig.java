@@ -34,37 +34,37 @@ public class OAuthFeignConfig {
     
     private static final String CLIENT_MODE = "feign-clients.oauth.mode";
 
-    @Bean(name = "googleOAuthMock")
+    @Bean(name = "googleOAuthContract")
     @ConditionalOnProperty(name = CLIENT_MODE, havingValue = "mock")
     public OAuthProviderContract googleOAuthMock() {
         return new GoogleOAuthMock();
     }
-    
-    @Bean(name = "googleOAuthApi")
+
+    @Bean(name = "googleOAuthContract")
     @ConditionalOnProperty(name = CLIENT_MODE, havingValue = "rest")
     public OAuthProviderContract googleOAuthApi(GoogleOAuthFeignClient feignClient) {
         return new GoogleOAuthApi(feignClient);
     }
-    
-    @Bean(name = "naverOAuthMock")
+
+    @Bean(name = "naverOAuthContract")
     @ConditionalOnProperty(name = CLIENT_MODE, havingValue = "mock")
     public OAuthProviderContract naverOAuthMock() {
         return new NaverOAuthMock();
     }
-    
-    @Bean(name = "naverOAuthApi")
+
+    @Bean(name = "naverOAuthContract")
     @ConditionalOnProperty(name = CLIENT_MODE, havingValue = "rest")
     public OAuthProviderContract naverOAuthApi(NaverOAuthFeignClient feignClient, NaverOAuthUserInfoFeignClient userInfoFeignClient) {
         return new NaverOAuthApi(feignClient, userInfoFeignClient);
     }
-    
-    @Bean(name = "kakaoOAuthMock")
+
+    @Bean(name = "kakaoOAuthContract")
     @ConditionalOnProperty(name = CLIENT_MODE, havingValue = "mock")
     public OAuthProviderContract kakaoOAuthMock() {
         return new KakaoOAuthMock();
     }
-    
-    @Bean(name = "kakaoOAuthApi")
+
+    @Bean(name = "kakaoOAuthContract")
     @ConditionalOnProperty(name = CLIENT_MODE, havingValue = "rest")
     public OAuthProviderContract kakaoOAuthApi(KakaoOAuthFeignClient feignClient, KakaoOAuthUserInfoFeignClient userInfoFeignClient) {
         return new KakaoOAuthApi(feignClient, userInfoFeignClient);

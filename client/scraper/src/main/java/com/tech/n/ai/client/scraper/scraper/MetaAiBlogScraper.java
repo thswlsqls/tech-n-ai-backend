@@ -4,6 +4,7 @@ import com.tech.n.ai.client.scraper.config.ScraperProperties;
 import com.tech.n.ai.client.scraper.dto.ScrapedTechArticle;
 import com.tech.n.ai.client.scraper.exception.ScrapingException;
 import com.tech.n.ai.client.scraper.util.RobotsTxtChecker;
+import com.tech.n.ai.client.scraper.util.ScraperDomUtils;
 import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.retry.RetryRegistry;
 import lombok.extern.slf4j.Slf4j;
@@ -161,13 +162,13 @@ public class MetaAiBlogScraper implements TechBlogScraper {
         String url = href.startsWith("http") ? href : baseUrl + href;
 
         Element parent = element.parent();
-        String title = extractText(element, "h2, h3, h4");
+        String title = ScraperDomUtils.extractText(element, "h2, h3, h4");
         if (title == null || title.isEmpty()) {
             title = element.text();
         }
         if (title == null || title.isEmpty()) return null;
 
-        String summary = extractText(parent, "p, div:not(:has(*))");
+        String summary = ScraperDomUtils.extractText(parent, "p, div:not(:has(*))");
 
         // 날짜 추출: CSS 셀렉터 → 부모 요소 텍스트에서 정규식 매칭 순으로 시도
         LocalDateTime publishedDate = extractPublishedDate(parent);
@@ -195,7 +196,7 @@ public class MetaAiBlogScraper implements TechBlogScraper {
         if (context == null) return null;
 
         // 1차: CSS 셀렉터로 시도 (time, span, div)
-        String dateText = extractText(context, "time, span, div");
+        String dateText = ScraperDomUtils.extractText(context, "time, span, div");
         LocalDateTime result = DateParsingUtils.parseDateText(dateText);
         if (result != null) return result;
 
@@ -212,12 +213,6 @@ public class MetaAiBlogScraper implements TechBlogScraper {
         }
 
         return null;
-    }
-
-    private String extractText(Element parent, String selector) {
-        if (parent == null) return null;
-        Element el = parent.select(selector).first();
-        return el != null ? el.text() : null;
     }
 
     @Override
