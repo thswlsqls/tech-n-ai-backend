@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+이 파일은 Claude Code(claude.ai/code)가 이 저장소에서 작업할 때 참고하는 지침이다.
 
 > Cursor IDE 사용자도 이 파일을 참고합니다 (별도 `.cursorrules` 없음).
 
@@ -80,23 +80,23 @@ Tradeoff: 이 지침은 속도보다 신중함에 무게를 둔다. 사소한 �
 - 외부 자료는 신뢰할 수 있는 공식 출처(공식 문서·공식 저장소)를 최우선으로 참고한다.
 - 판단이 서지 않으면 업계 표준 베스트 프랙티스를 참고한다.
 
-## Build and Test Commands
+## 빌드·테스트 명령어
 
 ```bash
-# Build entire project
+# 전체 프로젝트 빌드
 ./gradlew clean build
 
-# Build a specific module (module name = {parentDir}-{moduleDir}, e.g. api/auth → api-auth)
+# 특정 모듈 빌드 (모듈 이름 = {parentDir}-{moduleDir}, 예: api/auth → api-auth)
 ./gradlew :api-auth:build
 
-# Run tests
-./gradlew test                    # All modules
-./gradlew :api-auth:test          # Single module
+# 테스트 실행
+./gradlew test                    # 전체 모듈
+./gradlew :api-auth:test          # 단일 모듈
 
-# Run a single test class
+# 단일 테스트 클래스 실행
 ./gradlew :api-auth:test --tests "com.tech.n.ai.api.auth.service.AuthServiceTest"
 
-# Run applications (each defaults to the `local` profile via build.gradle)
+# 애플리케이션 실행 (각각 build.gradle을 통해 기본 `local` 프로필 사용)
 ./gradlew :api-gateway:bootRun        # 8081
 ./gradlew :api-emerging-tech:bootRun  # 8082
 ./gradlew :api-auth:bootRun           # 8083
@@ -104,67 +104,67 @@ Tradeoff: 이 지침은 속도보다 신중함에 무게를 둔다. 사소한 �
 ./gradlew :api-bookmark:bootRun       # 8085
 ./gradlew :api-agent:bootRun          # 8086
 
-# Generate API documentation (Spring REST Docs → Asciidoctor)
+# API 문서 생성 (Spring REST Docs → Asciidoctor)
 ./gradlew asciidoctor
 ```
 
-`bootRun` and `test` are pre-configured in the root `build.gradle` with
-`-Dspring.profiles.active=local`, `-Duser.timezone=Asia/Seoul`, and UTF-8 encoding —
-no manual flags needed for local development.
+`bootRun`과 `test`는 루트 `build.gradle`에 `-Dspring.profiles.active=local`,
+`-Duser.timezone=Asia/Seoul`, UTF-8 인코딩이 미리 설정돼 있다 —
+로컬 개발에서는 따로 플래그를 줄 필요가 없다.
 
-## Architecture Overview
+## 아키텍처 개요
 
-### CQRS Pattern (split across two datastores)
-- **Command / Write**: Aurora MySQL via `datasource-aurora` (package `com.tech.n.ai.domain.aurora`)
-- **Query / Read**: MongoDB Atlas via `datasource-mongodb` (package `com.tech.n.ai.domain.mongodb`)
-- **Sync**: Kafka events propagate writes from Aurora to MongoDB (target latency < 1s)
+### CQRS 패턴 (두 개의 데이터 저장소로 분리)
+- **Command / 쓰기**: `datasource-aurora`를 통한 Aurora MySQL (패키지 `com.tech.n.ai.domain.aurora`)
+- **Query / 읽기**: `datasource-mongodb`를 통한 MongoDB Atlas (패키지 `com.tech.n.ai.domain.mongodb`)
+- **동기화**: Kafka 이벤트가 Aurora의 쓰기 내용을 MongoDB로 전파한다 (목표 지연 시간 < 1초)
 
-This physical write/read split is the key mental model. Within `datasource-aurora`:
-- `repository/writer/` — JPA + QueryDSL (write side)
-- `repository/reader/` — MyBatis (read side, also used for complex Aurora queries)
+이 물리적 쓰기/읽기 분리가 핵심 개념이다. `datasource-aurora` 안에서는:
+- `repository/writer/` — JPA + QueryDSL (쓰기 쪽)
+- `repository/reader/` — MyBatis (읽기 쪽, 복잡한 Aurora 쿼리에도 사용)
 
-### Multi-Module Structure
-`settings.gradle` recursively scans `api/`, `batch/`, `common/`, `client/`, `datasource/`
-and registers every directory containing `src/` as a module. The module name is derived
-from its path: `api/auth` → `api-auth`, `common/security` → `common-security`. **Adding a
-module requires no `settings.gradle` edit** — just create the directory with a `src/`.
+### 멀티모듈 구조
+`settings.gradle`이 `api/`, `batch/`, `common/`, `client/`, `datasource/`를 재귀적으로 훑어서
+`src/`가 들어있는 모든 디렉터리를 모듈로 등록한다. 모듈 이름은 경로에서 만들어진다:
+`api/auth` → `api-auth`, `common/security` → `common-security`. **모듈을 추가할 때
+`settings.gradle`을 수정할 필요가 없다** — `src/`가 있는 디렉터리만 만들면 된다.
 
 ```
-api/          REST API servers: agent, auth, bookmark, chatbot, emerging-tech, gateway
-batch/        Batch jobs (batch/source)
-client/       External integrations: feign, mail, rss, scraper, slack
-common/       Shared libraries: conversation, core, exception, kafka, security
-datasource/   Data access: aurora (command), mongodb (query)
+api/          REST API 서버: agent, auth, bookmark, chatbot, emerging-tech, gateway
+batch/        배치 잡 (batch/source)
+client/       외부 연동: feign, mail, rss, scraper, slack
+common/       공유 라이브러리: conversation, core, exception, kafka, security
+datasource/   데이터 접근: aurora (command), mongodb (query)
 ```
 
-**Dependency direction**: `api → datasource → common → client`. API modules wire together
-the relevant `common-*`, `datasource-*`, and `client-*` projects (see each module's `build.gradle`).
+**의존 방향**: `api → datasource → common → client`. API 모듈은 필요한 `common-*`,
+`datasource-*`, `client-*` 프로젝트를 엮어서 쓴다 (각 모듈의 `build.gradle` 참고).
 
-### Key Conventions
-- **Entity / Document naming**: Aurora `*Entity` in `domain/aurora/entity/`; MongoDB `*Document` in `domain/mongodb/document/`.
-- **Primary key**: TSID (Time-Sorted Unique Identifier) via `@Tsid` + `TsidGenerator` (in `domain/aurora/generator`).
-- **History tracking**: `*HistoryEntity` populated by `HistoryEntityListener`.
-- **Gradle DSL**: Groovy (not Kotlin DSL). Shared dependency config lives in root `build.gradle`; JPA/QueryDSL extras in `jpa.gradle`; REST Docs in `docs.gradle` — applied per-module via `apply from:`.
+### 핵심 규칙
+- **Entity / Document 이름**: Aurora는 `domain/aurora/entity/`의 `*Entity`, MongoDB는 `domain/mongodb/document/`의 `*Document`.
+- **기본키**: `@Tsid` + `TsidGenerator`(`domain/aurora/generator`에 위치)를 통한 TSID (Time-Sorted Unique Identifier).
+- **이력 추적**: `HistoryEntityListener`가 채우는 `*HistoryEntity`.
+- **Gradle DSL**: Groovy (Kotlin DSL 아님). 공유 의존성 설정은 루트 `build.gradle`에, JPA/QueryDSL 추가분은 `jpa.gradle`에, REST Docs는 `docs.gradle`에 두고 모듈마다 `apply from:`으로 적용한다.
 
 ### API Gateway
-`api-gateway` is the central entry point: JWT validation, CORS, and routing to backend
-services. JWT handling comes from `common-security` (`JwtTokenProvider`).
+`api-gateway`가 중앙 진입점이다: JWT 검증, CORS, 백엔드 서비스로의 라우팅을 맡는다.
+JWT 처리는 `common-security`(`JwtTokenProvider`)에서 온다.
 
-### RAG Chatbot (`api-chatbot`)
-langchain4j 1.10.0 with MongoDB Atlas Vector Search for retrieval, OpenAI as the default
-LLM provider, and Cohere for re-ranking.
+### RAG 챗봇 (`api-chatbot`)
+langchain4j 1.10.0을 사용하며, 검색에는 MongoDB Atlas Vector Search를, 기본 LLM
+제공자로는 OpenAI를, 재순위(re-ranking)에는 Cohere를 쓴다.
 
-## Technology Stack
+## 기술 스택
 - Java 21, Spring Boot 4.0.2 (`spring-boot-starter-classic`), Spring Cloud 2025.1.0
 - Aurora MySQL (command) + MongoDB Atlas (query), Apache Kafka, Redis
-- JPA/Hibernate 7.2 + QueryDSL 5.1 (writers), MyBatis 4.0.1 (readers)
+- JPA/Hibernate 7.2 + QueryDSL 5.1 (writer), MyBatis 4.0.1 (reader)
 - langchain4j 1.10.0 (OpenAI + Cohere), Spring REST Docs + Asciidoctor
-- Observability: OpenTelemetry, Micrometer (Prometheus / Dynatrace); see `monitoring/` and `docker-compose.yml`
+- 관측(observability): OpenTelemetry, Micrometer (Prometheus / Dynatrace); `monitoring/`과 `docker-compose.yml` 참고
 
-## Configuration
-- Profiles: `local`, `dev`, `beta`, `prod`. Tests and `bootRun` use `local` by default.
-- Local infra (Kafka, Redis, MongoDB, monitoring stack) is provided via `docker-compose.yml`.
+## 설정
+- 프로필: `local`, `dev`, `beta`, `prod`. 테스트와 `bootRun`은 기본적으로 `local`을 쓴다.
+- 로컬 인프라(Kafka, Redis, MongoDB, 모니터링 스택)는 `docker-compose.yml`로 제공된다.
 
-## tmux Development Environment
-`./scripts/tmux-backend.sh` launches a 3-window session (project, module, test).
-See `scripts/tmux-dev-guide.md`, `scripts/tmux-recommended-layouts.md`, `scripts/tmux-overview.md`.
+## tmux 개발 환경
+`./scripts/tmux-backend.sh`가 3창 세션(project, module, test)을 띄운다.
+`scripts/tmux-dev-guide.md`, `scripts/tmux-recommended-layouts.md`, `scripts/tmux-overview.md` 참고.
