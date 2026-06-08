@@ -2,7 +2,7 @@ package com.tech.n.ai.batch.source.domain.emergingtech.rss.jobconfig;
 
 import com.tech.n.ai.batch.source.common.Constants;
 import com.tech.n.ai.batch.source.domain.emergingtech.dto.request.EmergingTechCreateRequest;
-import com.tech.n.ai.batch.source.domain.emergingtech.rss.incrementer.EmergingTechRssIncrementer;
+import com.tech.n.ai.batch.source.domain.emergingtech.incrementer.EmergingTechJobIncrementer;
 import com.tech.n.ai.batch.source.domain.emergingtech.rss.jobparameter.EmergingTechRssJobParameter;
 import com.tech.n.ai.batch.source.domain.emergingtech.rss.listener.EmergingTechRssJobListener;
 import com.tech.n.ai.batch.source.domain.emergingtech.rss.processor.EmergingTechRssProcessor;
@@ -56,7 +56,7 @@ public class EmergingTechRssJobConfig {
                    @Qualifier(JOB_NAME + ".listener") EmergingTechRssJobListener listener) {
         return new JobBuilder(JOB_NAME, jobRepository)
             .start(step1)
-            .incrementer(new EmergingTechRssIncrementer(baseDate))
+            .incrementer(new EmergingTechJobIncrementer(baseDate))
             .listener(listener)
             .build();
     }

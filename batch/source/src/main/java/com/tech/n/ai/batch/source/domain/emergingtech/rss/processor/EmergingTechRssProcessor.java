@@ -1,5 +1,6 @@
 package com.tech.n.ai.batch.source.domain.emergingtech.rss.processor;
 
+import com.tech.n.ai.batch.source.domain.emergingtech.EmergingTechProcessorUtils;
 import com.tech.n.ai.batch.source.domain.emergingtech.dto.request.EmergingTechCreateRequest;
 import com.tech.n.ai.client.rss.dto.RssFeedItem;
 import com.tech.n.ai.domain.mongodb.enums.EmergingTechType;
@@ -11,11 +12,7 @@ import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.infrastructure.item.ItemProcessor;
 import org.springframework.lang.Nullable;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.time.LocalDateTime;
-import java.util.HexFormat;
-import java.util.List;
 import java.util.Objects;
 
 /**
@@ -48,9 +45,9 @@ public class EmergingTechRssProcessor implements ItemProcessor<RssFeedItem, Emer
             .publishedAt(item.publishedDate())
             .sourceType(SourceType.RSS.name())
             .status(PostStatus.PUBLISHED.name())
-            .externalId("rss:" + generateHash(item.guid() != null ? item.guid() : item.link()))
+            .externalId("rss:" + EmergingTechProcessorUtils.generateHash(item.guid() != null ? item.guid() : item.link()))
             .metadata(EmergingTechCreateRequest.EmergingTechMetadataRequest.builder()
-                .tags(extractTags(item.category()))
+                .tags(EmergingTechProcessorUtils.extractTags(item.category()))
                 .author(Objects.requireNonNullElse(item.author(), ""))
                 .build())
             .build();
@@ -82,23 +79,5 @@ public class EmergingTechRssProcessor implements ItemProcessor<RssFeedItem, Emer
         String cleaned = text.replaceAll("<[^>]+>", "").trim();
         if (cleaned.length() <= maxLength) return cleaned;
         return cleaned.substring(0, maxLength) + "...";
-    }
-
-    private String generateHash(String input) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash).substring(0, 16);
-        } catch (Exception e) {
-            return String.valueOf(input.hashCode());
-        }
-    }
-
-    private List<String> extractTags(String category) {
-        if (category == null || category.isBlank()) return List.of();
-        return List.of(category.split(",")).stream()
-            .map(String::trim)
-            .filter(s -> !s.isEmpty())
-            .toList();
     }
 }

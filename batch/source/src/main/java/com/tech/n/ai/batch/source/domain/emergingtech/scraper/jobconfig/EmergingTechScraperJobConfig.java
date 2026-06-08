@@ -2,7 +2,7 @@ package com.tech.n.ai.batch.source.domain.emergingtech.scraper.jobconfig;
 
 import com.tech.n.ai.batch.source.common.Constants;
 import com.tech.n.ai.batch.source.domain.emergingtech.dto.request.EmergingTechCreateRequest;
-import com.tech.n.ai.batch.source.domain.emergingtech.scraper.incrementer.EmergingTechScraperIncrementer;
+import com.tech.n.ai.batch.source.domain.emergingtech.incrementer.EmergingTechJobIncrementer;
 import com.tech.n.ai.batch.source.domain.emergingtech.scraper.jobparameter.EmergingTechScraperJobParameter;
 import com.tech.n.ai.batch.source.domain.emergingtech.scraper.listener.EmergingTechScraperJobListener;
 import com.tech.n.ai.batch.source.domain.emergingtech.scraper.processor.EmergingTechScraperProcessor;
@@ -56,7 +56,7 @@ public class EmergingTechScraperJobConfig {
                    @Qualifier(JOB_NAME + ".listener") EmergingTechScraperJobListener listener) {
         return new JobBuilder(JOB_NAME, jobRepository)
             .start(step1)
-            .incrementer(new EmergingTechScraperIncrementer(baseDate))
+            .incrementer(new EmergingTechJobIncrementer(baseDate))
             .listener(listener)
             .build();
     }

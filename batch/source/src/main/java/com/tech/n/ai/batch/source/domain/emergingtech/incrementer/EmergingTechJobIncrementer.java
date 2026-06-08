@@ -1,4 +1,4 @@
-package com.tech.n.ai.batch.source.domain.emergingtech.scraper.incrementer;
+package com.tech.n.ai.batch.source.domain.emergingtech.incrementer;
 
 import com.tech.n.ai.batch.source.common.incrementer.UniqueRunIdIncrementer;
 import org.springframework.batch.core.job.parameters.JobParameters;
@@ -6,16 +6,16 @@ import org.springframework.batch.core.job.parameters.JobParametersBuilder;
 import org.springframework.batch.core.job.parameters.RunIdIncrementer;
 
 /**
- * Emerging Tech Scraper Job Incrementer
+ * Emerging Tech 수집 Job 공용 Incrementer (GitHub·RSS·스크래퍼 공유)
  */
-public class EmergingTechScraperIncrementer extends RunIdIncrementer {
+public class EmergingTechJobIncrementer extends RunIdIncrementer {
 
     private static final String RUN_ID_KEY = "run.id";
     private static final String BASE_DATE_KEY = "baseDate";
 
     private final String baseDate;
 
-    public EmergingTechScraperIncrementer(String baseDate) {
+    public EmergingTechJobIncrementer(String baseDate) {
         this.baseDate = baseDate;
     }
 

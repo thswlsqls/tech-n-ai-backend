@@ -2,7 +2,7 @@ package com.tech.n.ai.batch.source.domain.emergingtech.github.jobconfig;
 
 import com.tech.n.ai.batch.source.common.Constants;
 import com.tech.n.ai.batch.source.domain.emergingtech.dto.request.EmergingTechCreateRequest;
-import com.tech.n.ai.batch.source.domain.emergingtech.github.incrementer.EmergingTechGitHubIncrementer;
+import com.tech.n.ai.batch.source.domain.emergingtech.incrementer.EmergingTechJobIncrementer;
 import com.tech.n.ai.batch.source.domain.emergingtech.github.jobparameter.EmergingTechGitHubJobParameter;
 import com.tech.n.ai.batch.source.domain.emergingtech.github.listener.EmergingTechGitHubJobListener;
 import com.tech.n.ai.batch.source.domain.emergingtech.github.processor.GitHubReleasesProcessor;
@@ -73,7 +73,7 @@ public class EmergingTechGitHubJobConfig {
                    @Qualifier(JOB_NAME + ".listener") EmergingTechGitHubJobListener listener) {
         return new JobBuilder(JOB_NAME, jobRepository)
             .start(step1)
-            .incrementer(new EmergingTechGitHubIncrementer(baseDate))
+            .incrementer(new EmergingTechJobIncrementer(baseDate))
             .listener(listener)
             .build();
     }

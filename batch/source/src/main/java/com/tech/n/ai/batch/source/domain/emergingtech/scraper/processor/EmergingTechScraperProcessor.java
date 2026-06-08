@@ -1,5 +1,6 @@
 package com.tech.n.ai.batch.source.domain.emergingtech.scraper.processor;
 
+import com.tech.n.ai.batch.source.domain.emergingtech.EmergingTechProcessorUtils;
 import com.tech.n.ai.batch.source.domain.emergingtech.dto.request.EmergingTechCreateRequest;
 import com.tech.n.ai.client.scraper.dto.ScrapedTechArticle;
 import com.tech.n.ai.domain.mongodb.enums.EmergingTechType;
@@ -11,10 +12,6 @@ import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.infrastructure.item.ItemProcessor;
 import org.springframework.lang.Nullable;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.util.HexFormat;
-import java.util.List;
 import java.util.Objects;
 
 /**
@@ -40,10 +37,10 @@ public class EmergingTechScraperProcessor implements ItemProcessor<ScrapedTechAr
             .publishedAt(article.publishedDate())
             .sourceType(SourceType.WEB_SCRAPING.name())
             .status(PostStatus.PUBLISHED.name())
-            .externalId("scraper:" + generateHash(article.url()))
+            .externalId("scraper:" + EmergingTechProcessorUtils.generateHash(article.url()))
             .metadata(EmergingTechCreateRequest.EmergingTechMetadataRequest.builder()
                 .author(Objects.requireNonNullElse(article.author(), ""))
-                .tags(extractTags(article.category()))
+                .tags(EmergingTechProcessorUtils.extractTags(article.category()))
                 .build())
             .build();
     }
@@ -60,23 +57,5 @@ public class EmergingTechScraperProcessor implements ItemProcessor<ScrapedTechAr
         if (title.contains("platform") || title.contains("cloud") || title.contains("infrastructure")
                 || title.contains("update") || category.contains("platform")) return EmergingTechType.PLATFORM_UPDATE;
         return EmergingTechType.BLOG_POST;
-    }
-
-    private String generateHash(String input) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash).substring(0, 16);
-        } catch (Exception e) {
-            return String.valueOf(input.hashCode());
-        }
-    }
-
-    private List<String> extractTags(String category) {
-        if (category == null || category.isBlank()) return List.of();
-        return List.of(category.split(",")).stream()
-            .map(String::trim)
-            .filter(s -> !s.isEmpty())
-            .toList();
     }
 }
