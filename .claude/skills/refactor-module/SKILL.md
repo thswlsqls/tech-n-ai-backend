@@ -56,8 +56,10 @@ find api batch common client datasource -maxdepth 2 -name src -type d | sed 's|/
 먼저 손대기 전에 현재 상태가 그린인지 확인한다. 베이스라인이 깨져 있으면 리팩토링의 전후 비교가 무의미하다.
 
 ```bash
-./gradlew :<모듈>:build      # 컴파일 + 테스트. 예: ./gradlew :api-auth:build
+./gradlew :<모듈>:clean :<모듈>:build      # 깨끗이 컴파일 + 테스트. 예: ./gradlew :api-auth:clean :api-auth:build
 ```
+
+베이스라인부터 `clean`을 붙여 낡은 산출물 위에서 그린이 나오는 일을 막는다. 이 레포는 QueryDSL이 `src/main/generated`에 `Q*Entity`를 생성하는데, 증분 빌드는 옛 생성물을 재사용할 수 있어 "사실은 깨졌는데 통과"가 일어난다.
 
 - 그린이면 진행한다.
 - 레드면 멈추고 사용자에게 알린다. 내가 만들지 않은 실패를 떠안고 리팩토링하지 않는다.
@@ -99,13 +101,19 @@ find api batch common client datasource -maxdepth 2 -name src -type d | sed 's|/
 
 ### 5. 재검증 (Goal-Driven Execution)
 
+**최종 그린 판정은 반드시 `clean build`로 한다.** 증분 빌드는 이전 컴파일 산출물이나 캐시(특히 QueryDSL이 만든 `Q*Entity`)를 재사용해 깨진 변경을 통과시킬 수 있다. 처음부터 다시 컴파일·테스트해야 믿을 수 있다.
+
 ```bash
-./gradlew :<모듈>:build
+./gradlew :<모듈>:clean :<모듈>:build      # 모듈만 깨끗이 다시 빌드
 ```
 
 - 그린이면 완료. 변경 요약과 (있다면) 미적용 후보·발견한 버그를 보고한다.
 - 레드면 내 변경이 원인이다. 되돌리거나 고쳐서 다시 그린으로 만든다. 레드인 채로 끝내지 않는다.
-- 이 모듈을 다른 모듈이 의존하면(예: `common-*`, `datasource-*`) 영향 범위를 알리고, 필요하면 의존 모듈 빌드도 확인한다.
+- 이 모듈을 다른 모듈이 의존하면(예: `common-*`, `datasource-*`) 모듈만 빌드해선 영향이 안 드러난다. 의존 모듈까지 한 번에 보도록 저장소 전체를 깨끗이 다시 빌드한다.
+
+```bash
+./gradlew clean build      # 의존 모듈 포함 전체 검증
+```
 
 ### 6. 보고
 
