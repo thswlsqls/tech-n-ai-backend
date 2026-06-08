@@ -39,10 +39,7 @@ public final class DateUtils {
      * @return 포맷된 문자열 (yyyy-MM-dd)
      */
     public static String format(LocalDate date) {
-        if (date == null) {
-            return null;
-        }
-        return date.format(DATE_FORMATTER);
+        return format(date, DATE_FORMATTER);
     }
     
     /**
@@ -66,10 +63,7 @@ public final class DateUtils {
      * @return 포맷된 문자열 (yyyy-MM-dd'T'HH:mm:ss)
      */
     public static String format(LocalDateTime dateTime) {
-        if (dateTime == null) {
-            return null;
-        }
-        return dateTime.format(DATETIME_FORMATTER);
+        return format(dateTime, DATETIME_FORMATTER);
     }
     
     /**
@@ -94,10 +88,7 @@ public final class DateUtils {
      * @throws DateTimeParseException 파싱 실패 시
      */
     public static LocalDate parseDate(String dateStr) {
-        if (dateStr == null || dateStr.isBlank()) {
-            return null;
-        }
-        return LocalDate.parse(dateStr, DATE_FORMATTER);
+        return parseDate(dateStr, DATE_FORMATTER);
     }
     
     /**
@@ -123,10 +114,7 @@ public final class DateUtils {
      * @throws DateTimeParseException 파싱 실패 시
      */
     public static LocalDateTime parseDateTime(String dateTimeStr) {
-        if (dateTimeStr == null || dateTimeStr.isBlank()) {
-            return null;
-        }
-        return LocalDateTime.parse(dateTimeStr, DATETIME_FORMATTER);
+        return parseDateTime(dateTimeStr, DATETIME_FORMATTER);
     }
     
     /**

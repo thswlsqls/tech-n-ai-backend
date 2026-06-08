@@ -1,15 +1,13 @@
 package com.tech.n.ai.common.security.handler;
 
 import com.tech.n.ai.common.core.constants.ErrorCodeConstants;
-import com.tech.n.ai.common.core.dto.ApiResponse;
-import com.tech.n.ai.common.core.dto.MessageCode;
+import com.tech.n.ai.common.security.support.SecurityErrorResponseWriter;
 import tools.jackson.databind.ObjectMapper;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.MediaType;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
@@ -35,15 +33,12 @@ public class SecurityAuthenticationEntryPoint implements AuthenticationEntryPoin
     ) throws IOException, ServletException {
         log.warn("인증되지 않은 접근 시도: {} {}", request.getMethod(), request.getRequestURI());
 
-        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.setCharacterEncoding("UTF-8");
-
-        var messageCode = new MessageCode(
+        SecurityErrorResponseWriter.writeError(
+            objectMapper, response,
+            HttpServletResponse.SC_UNAUTHORIZED,
+            ErrorCodeConstants.AUTH_REQUIRED,
             ErrorCodeConstants.MESSAGE_CODE_AUTH_REQUIRED,
             "인증이 필요합니다."
         );
-        var errorResponse = ApiResponse.error(ErrorCodeConstants.AUTH_REQUIRED, messageCode);
-        objectMapper.writeValue(response.getWriter(), errorResponse);
     }
 }

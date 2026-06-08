@@ -16,12 +16,14 @@ public class IdempotencyService {
     private final RedisTemplate<String, String> redisTemplate;
     
     public boolean isEventProcessed(String eventId) {
-        String key = PROCESSED_EVENT_PREFIX + eventId;
-        return Boolean.TRUE.equals(redisTemplate.hasKey(key));
+        return Boolean.TRUE.equals(redisTemplate.hasKey(keyFor(eventId)));
     }
-    
+
     public void markEventAsProcessed(String eventId) {
-        String key = PROCESSED_EVENT_PREFIX + eventId;
-        redisTemplate.opsForValue().set(key, "processed", PROCESSED_EVENT_TTL);
+        redisTemplate.opsForValue().set(keyFor(eventId), "processed", PROCESSED_EVENT_TTL);
+    }
+
+    private String keyFor(String eventId) {
+        return PROCESSED_EVENT_PREFIX + eventId;
     }
 }

@@ -1,11 +1,10 @@
 package com.tech.n.ai.common.security.filter;
 
 import com.tech.n.ai.common.core.constants.ErrorCodeConstants;
-import com.tech.n.ai.common.core.dto.ApiResponse;
-import com.tech.n.ai.common.core.dto.MessageCode;
 import com.tech.n.ai.common.security.jwt.JwtTokenPayload;
 import com.tech.n.ai.common.security.jwt.JwtTokenProvider;
 import com.tech.n.ai.common.security.principal.UserPrincipal;
+import com.tech.n.ai.common.security.support.SecurityErrorResponseWriter;
 import tools.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -13,7 +12,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -88,15 +86,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private void writeUnauthorizedResponse(HttpServletResponse response) throws IOException {
-        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.setCharacterEncoding("UTF-8");
-
-        var messageCode = new MessageCode(
+        SecurityErrorResponseWriter.writeError(
+            objectMapper, response,
+            HttpServletResponse.SC_UNAUTHORIZED,
+            ErrorCodeConstants.AUTH_FAILED,
             ErrorCodeConstants.MESSAGE_CODE_AUTH_FAILED,
             "인증에 실패했습니다."
         );
-        var errorResponse = ApiResponse.error(ErrorCodeConstants.AUTH_FAILED, messageCode);
-        objectMapper.writeValue(response.getWriter(), errorResponse);
     }
 }

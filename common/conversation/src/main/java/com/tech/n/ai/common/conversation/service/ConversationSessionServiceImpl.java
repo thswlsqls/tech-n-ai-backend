@@ -80,9 +80,7 @@ public class ConversationSessionServiceImpl implements ConversationSessionServic
     @Override
     @Transactional
     public void updateLastMessageAt(String sessionId) {
-        Long sessionIdLong = parseSessionId(sessionId);
-        ConversationSessionEntity session = conversationSessionReaderRepository.findById(sessionIdLong)
-            .orElseThrow(() -> new ConversationSessionNotFoundException("세션을 찾을 수 없습니다: " + sessionId));
+        ConversationSessionEntity session = findSessionOrThrow(sessionId);
 
         LocalDateTime now = LocalDateTime.now();
         session.setLastMessageAt(now);
@@ -153,14 +151,7 @@ public class ConversationSessionServiceImpl implements ConversationSessionServic
             session.setUpdatedAt(LocalDateTime.now());
             conversationSessionWriterRepository.save(session);
 
-            ConversationSessionDeletedEvent.ConversationSessionDeletedPayload payload =
-                new ConversationSessionDeletedEvent.ConversationSessionDeletedPayload(
-                    session.getId().toString(),
-                    session.getUserId(),
-                    LocalDateTime.now().atZone(java.time.ZoneId.systemDefault()).toInstant()
-                );
-            ConversationSessionDeletedEvent event = new ConversationSessionDeletedEvent(payload);
-            eventPublisher.publish(TOPIC_SESSION_DELETED, event, session.getId().toString());
+            publishSessionDeletedEvent(session.getId().toString(), session.getUserId());
         });
 
         log.info("Expired {} inactive sessions (expiration: {} days)",
@@ -194,24 +185,20 @@ public class ConversationSessionServiceImpl implements ConversationSessionServic
         session.setUpdatedAt(LocalDateTime.now());
         conversationSessionWriterRepository.save(session);
 
-        ConversationSessionDeletedEvent.ConversationSessionDeletedPayload payload =
-            new ConversationSessionDeletedEvent.ConversationSessionDeletedPayload(
-                sessionId,
-                userId,
-                LocalDateTime.now().atZone(java.time.ZoneId.systemDefault()).toInstant()
-            );
-
-        ConversationSessionDeletedEvent event = new ConversationSessionDeletedEvent(payload);
-        eventPublisher.publish(TOPIC_SESSION_DELETED, event, sessionId);
+        publishSessionDeletedEvent(sessionId, userId);
 
         log.info("Session deleted: sessionId={}, userId={}", sessionId, userId);
     }
 
-    private ConversationSessionEntity validateSessionAccess(String sessionId, String userId) {
+    private ConversationSessionEntity findSessionOrThrow(String sessionId) {
         Long sessionIdLong = parseSessionId(sessionId);
-        ConversationSessionEntity session = conversationSessionReaderRepository.findById(sessionIdLong)
+        return conversationSessionReaderRepository.findById(sessionIdLong)
             .orElseThrow(() -> new ConversationSessionNotFoundException(
                 "세션을 찾을 수 없습니다: " + sessionId));
+    }
+
+    private ConversationSessionEntity validateSessionAccess(String sessionId, String userId) {
+        ConversationSessionEntity session = findSessionOrThrow(sessionId);
 
         if (!session.getUserId().equals(userId)) {
             log.warn("Unauthorized session access: sessionId={}, requestedUserId={}, actualUserId={}",
@@ -233,6 +220,17 @@ public class ConversationSessionServiceImpl implements ConversationSessionServic
                 sessionId, userId, updatedFields);
         ConversationSessionUpdatedEvent event = new ConversationSessionUpdatedEvent(payload);
         eventPublisher.publish(TOPIC_SESSION_UPDATED, event, sessionId);
+    }
+
+    private void publishSessionDeletedEvent(String sessionId, String userId) {
+        ConversationSessionDeletedEvent.ConversationSessionDeletedPayload payload =
+            new ConversationSessionDeletedEvent.ConversationSessionDeletedPayload(
+                sessionId,
+                userId,
+                LocalDateTime.now().atZone(java.time.ZoneId.systemDefault()).toInstant()
+            );
+        ConversationSessionDeletedEvent event = new ConversationSessionDeletedEvent(payload);
+        eventPublisher.publish(TOPIC_SESSION_DELETED, event, sessionId);
     }
 
     private SessionResponse toResponse(ConversationSessionEntity entity) {

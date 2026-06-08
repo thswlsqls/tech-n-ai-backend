@@ -1,15 +1,13 @@
 package com.tech.n.ai.common.security.handler;
 
 import com.tech.n.ai.common.core.constants.ErrorCodeConstants;
-import com.tech.n.ai.common.core.dto.ApiResponse;
-import com.tech.n.ai.common.core.dto.MessageCode;
+import com.tech.n.ai.common.security.support.SecurityErrorResponseWriter;
 import tools.jackson.databind.ObjectMapper;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.stereotype.Component;
@@ -35,15 +33,12 @@ public class SecurityAccessDeniedHandler implements AccessDeniedHandler {
     ) throws IOException, ServletException {
         log.warn("접근 권한 없는 요청: {} {}", request.getMethod(), request.getRequestURI());
 
-        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.setCharacterEncoding("UTF-8");
-
-        var messageCode = new MessageCode(
+        SecurityErrorResponseWriter.writeError(
+            objectMapper, response,
+            HttpServletResponse.SC_FORBIDDEN,
+            ErrorCodeConstants.FORBIDDEN,
             ErrorCodeConstants.MESSAGE_CODE_FORBIDDEN,
             "권한이 없습니다."
         );
-        var errorResponse = ApiResponse.error(ErrorCodeConstants.FORBIDDEN, messageCode);
-        objectMapper.writeValue(response.getWriter(), errorResponse);
     }
 }

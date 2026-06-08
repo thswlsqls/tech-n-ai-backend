@@ -58,11 +58,8 @@ public class GlobalExceptionHandler {
         String text = (e.getMessage() != null && !e.getMessage().isBlank())
             ? e.getMessage()
             : getMessageText(e.getMessageCode());
-        MessageCode messageCode = new MessageCode(e.getMessageCode(), text);
-        ApiResponse<Void> response = ApiResponse.error(e.getErrorCode(), messageCode);
-        
         HttpStatus httpStatus = mapErrorCodeToHttpStatus(e.getErrorCode());
-        return ResponseEntity.status(httpStatus).body(response);
+        return errorResponse(httpStatus, e.getErrorCode(), e.getMessageCode(), text);
     }
     
     /**
@@ -120,20 +117,8 @@ public class GlobalExceptionHandler {
         
         Map<String, String> errors = new HashMap<>();
         errors.put(e.getFieldName(), e.getMessage());
-        
-        MessageCode messageCode = new MessageCode(
-            ErrorCodeConstants.MESSAGE_CODE_VALIDATION_ERROR,
-            "유효성 검증에 실패했습니다."
-        );
-        
-        ApiResponse<Map<String, String>> response = new ApiResponse<>(
-            ErrorCodeConstants.VALIDATION_ERROR,
-            messageCode,
-            null,
-            errors
-        );
-        
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+
+        return validationErrorResponse(errors);
     }
     
     /**
@@ -150,19 +135,8 @@ public class GlobalExceptionHandler {
                 fieldError -> fieldError.getDefaultMessage() != null ? fieldError.getDefaultMessage() : "유효성 검증 실패",
                 (existing, replacement) -> existing
             ));
-        
-        MessageCode messageCode = new MessageCode(
-            ErrorCodeConstants.MESSAGE_CODE_VALIDATION_ERROR,
-            "유효성 검증에 실패했습니다."
-        );
-        ApiResponse<Map<String, String>> response = new ApiResponse<>(
-            ErrorCodeConstants.VALIDATION_ERROR,
-            messageCode,
-            null,
-            errors
-        );
-        
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+
+        return validationErrorResponse(errors);
     }
     
     /**
@@ -183,18 +157,7 @@ public class GlobalExceptionHandler {
             })
         );
 
-        MessageCode messageCode = new MessageCode(
-            ErrorCodeConstants.MESSAGE_CODE_VALIDATION_ERROR,
-            "유효성 검증에 실패했습니다."
-        );
-        ApiResponse<Map<String, String>> response = new ApiResponse<>(
-            ErrorCodeConstants.VALIDATION_ERROR,
-            messageCode,
-            null,
-            errors
-        );
-
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        return validationErrorResponse(errors);
     }
 
     /**
@@ -210,18 +173,7 @@ public class GlobalExceptionHandler {
         String requiredType = e.getRequiredType() != null ? e.getRequiredType().getSimpleName() : "알 수 없음";
         errors.put(paramName, String.format("'%s' 값은 %s 타입이어야 합니다.", e.getValue(), requiredType));
 
-        MessageCode messageCode = new MessageCode(
-            ErrorCodeConstants.MESSAGE_CODE_VALIDATION_ERROR,
-            "유효성 검증에 실패했습니다."
-        );
-        ApiResponse<Map<String, String>> response = new ApiResponse<>(
-            ErrorCodeConstants.VALIDATION_ERROR,
-            messageCode,
-            null,
-            errors
-        );
-
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        return validationErrorResponse(errors);
     }
 
     /**
@@ -235,18 +187,7 @@ public class GlobalExceptionHandler {
         Map<String, String> errors = new HashMap<>();
         errors.put(e.getParameterName(), String.format("'%s' 파라미터는 필수입니다.", e.getParameterName()));
 
-        MessageCode messageCode = new MessageCode(
-            ErrorCodeConstants.MESSAGE_CODE_VALIDATION_ERROR,
-            "유효성 검증에 실패했습니다."
-        );
-        ApiResponse<Map<String, String>> response = new ApiResponse<>(
-            ErrorCodeConstants.VALIDATION_ERROR,
-            messageCode,
-            null,
-            errors
-        );
-
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        return validationErrorResponse(errors);
     }
 
     /**
@@ -257,16 +198,8 @@ public class GlobalExceptionHandler {
         NoResourceFoundException e, HttpServletRequest request) {
         log.warn("Resource not found: {} {}", e.getHttpMethod(), e.getResourcePath());
 
-        MessageCode messageCode = new MessageCode(
-            ErrorCodeConstants.MESSAGE_CODE_NOT_FOUND,
-            "요청한 리소스를 찾을 수 없습니다."
-        );
-        ApiResponse<Void> response = ApiResponse.error(
-            ErrorCodeConstants.NOT_FOUND,
-            messageCode
-        );
-
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        return errorResponse(HttpStatus.NOT_FOUND, ErrorCodeConstants.NOT_FOUND,
+            ErrorCodeConstants.MESSAGE_CODE_NOT_FOUND, "요청한 리소스를 찾을 수 없습니다.");
     }
 
     /**
@@ -277,16 +210,8 @@ public class GlobalExceptionHandler {
         HttpRequestMethodNotSupportedException e, HttpServletRequest request) {
         log.warn("Method not allowed: {} {}", request.getMethod(), request.getRequestURI());
 
-        MessageCode messageCode = new MessageCode(
-            ErrorCodeConstants.MESSAGE_CODE_METHOD_NOT_ALLOWED,
-            "허용되지 않는 HTTP 메서드입니다."
-        );
-        ApiResponse<Void> response = ApiResponse.error(
-            ErrorCodeConstants.METHOD_NOT_ALLOWED,
-            messageCode
-        );
-
-        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(response);
+        return errorResponse(HttpStatus.METHOD_NOT_ALLOWED, ErrorCodeConstants.METHOD_NOT_ALLOWED,
+            ErrorCodeConstants.MESSAGE_CODE_METHOD_NOT_ALLOWED, "허용되지 않는 HTTP 메서드입니다.");
     }
 
     /**
@@ -297,16 +222,8 @@ public class GlobalExceptionHandler {
         HttpMediaTypeNotSupportedException e, HttpServletRequest request) {
         log.warn("Unsupported media type: {} for {} {}", e.getContentType(), request.getMethod(), request.getRequestURI());
 
-        MessageCode messageCode = new MessageCode(
-            ErrorCodeConstants.MESSAGE_CODE_UNSUPPORTED_MEDIA_TYPE,
-            "지원하지 않는 Content-Type입니다."
-        );
-        ApiResponse<Void> response = ApiResponse.error(
-            ErrorCodeConstants.UNSUPPORTED_MEDIA_TYPE,
-            messageCode
-        );
-
-        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body(response);
+        return errorResponse(HttpStatus.UNSUPPORTED_MEDIA_TYPE, ErrorCodeConstants.UNSUPPORTED_MEDIA_TYPE,
+            ErrorCodeConstants.MESSAGE_CODE_UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 Content-Type입니다.");
     }
 
     /**
@@ -317,16 +234,8 @@ public class GlobalExceptionHandler {
         HttpMessageNotReadableException e, HttpServletRequest request) {
         log.warn("Message not readable: {} {}", request.getMethod(), request.getRequestURI());
 
-        MessageCode messageCode = new MessageCode(
-            ErrorCodeConstants.MESSAGE_CODE_BAD_REQUEST,
-            "요청 본문을 읽을 수 없습니다."
-        );
-        ApiResponse<Void> response = ApiResponse.error(
-            ErrorCodeConstants.BAD_REQUEST,
-            messageCode
-        );
-
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        return errorResponse(HttpStatus.BAD_REQUEST, ErrorCodeConstants.BAD_REQUEST,
+            ErrorCodeConstants.MESSAGE_CODE_BAD_REQUEST, "요청 본문을 읽을 수 없습니다.");
     }
 
     /**
@@ -337,16 +246,9 @@ public class GlobalExceptionHandler {
         MissingRequestHeaderException e, HttpServletRequest request) {
         log.warn("Missing required header '{}': {} {}", e.getHeaderName(), request.getMethod(), request.getRequestURI());
 
-        MessageCode messageCode = new MessageCode(
+        return errorResponse(HttpStatus.BAD_REQUEST, ErrorCodeConstants.BAD_REQUEST,
             ErrorCodeConstants.MESSAGE_CODE_BAD_REQUEST,
-            String.format("필수 헤더 '%s'가 누락되었습니다.", e.getHeaderName())
-        );
-        ApiResponse<Void> response = ApiResponse.error(
-            ErrorCodeConstants.BAD_REQUEST,
-            messageCode
-        );
-
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+            String.format("필수 헤더 '%s'가 누락되었습니다.", e.getHeaderName()));
     }
 
     /**
@@ -361,6 +263,34 @@ public class GlobalExceptionHandler {
         Map<String, String> errors = new HashMap<>();
         errors.put("field", "데이터 무결성 제약 조건을 위반했습니다.");
 
+        return validationErrorResponse(errors);
+    }
+
+    /**
+     * 예상치 못한 예외 처리
+     */
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiResponse<Void>> handleException(Exception e, HttpServletRequest request) {
+        log.error("Unexpected error occurred", e);
+        logException(e, request, "READ");
+
+        return errorResponse(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCodeConstants.INTERNAL_SERVER_ERROR,
+            ErrorCodeConstants.MESSAGE_CODE_INTERNAL_SERVER_ERROR, "내부 서버 오류가 발생했습니다.");
+    }
+    
+    /**
+     * Void 데이터 에러 응답 생성
+     */
+    private ResponseEntity<ApiResponse<Void>> errorResponse(
+        HttpStatus status, String errorCode, String messageCode, String text) {
+        ApiResponse<Void> response = ApiResponse.error(errorCode, new MessageCode(messageCode, text));
+        return ResponseEntity.status(status).body(response);
+    }
+
+    /**
+     * 유효성 검증 에러 응답 생성 (필드별 오류 맵 포함, HTTP 400)
+     */
+    private ResponseEntity<ApiResponse<Map<String, String>>> validationErrorResponse(Map<String, String> errors) {
         MessageCode messageCode = new MessageCode(
             ErrorCodeConstants.MESSAGE_CODE_VALIDATION_ERROR,
             "유효성 검증에 실패했습니다."
@@ -371,30 +301,9 @@ public class GlobalExceptionHandler {
             null,
             errors
         );
-
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
-    /**
-     * 예상치 못한 예외 처리
-     */
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiResponse<Void>> handleException(Exception e, HttpServletRequest request) {
-        log.error("Unexpected error occurred", e);
-        logException(e, request, "READ");
-        
-        MessageCode messageCode = new MessageCode(
-            ErrorCodeConstants.MESSAGE_CODE_INTERNAL_SERVER_ERROR,
-            "내부 서버 오류가 발생했습니다."
-        );
-        ApiResponse<Void> response = ApiResponse.error(
-            ErrorCodeConstants.INTERNAL_SERVER_ERROR,
-            messageCode
-        );
-        
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-    }
-    
     /**
      * 예외 로깅
      */
