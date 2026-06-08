@@ -94,6 +94,9 @@ subprojects {
 		implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:4.0.1'
 		implementation 'org.springframework.cloud:spring-cloud-starter-openfeign'
 
+		// .env 파일을 Spring 프로퍼티로 읽어들임 (Boot 4 전용 아티팩트)
+		implementation 'me.paulschwarz:springboot4-dotenv:5.1.0'
+
 		compileOnly 'org.projectlombok:lombok'
 
 		runtimeOnly 'io.micrometer:micrometer-registry-dynatrace'
@@ -129,7 +132,9 @@ subprojects {
 				'-Xshare:off',
 				'-Dfile.encoding=UTF-8',
 				'-Duser.timezone=Asia/Seoul',
-				'-Dspring.profiles.active=local'
+				'-Dspring.profiles.active=local',
+				// 테스트 작업 디렉터리도 모듈 폴더라서, 루트의 .env 위치를 절대경로로 지정
+				"-Dspringdotenv.directory=${rootProject.projectDir}"
 		)
 		useJUnitPlatform() // JUnit Platform을 사용하도록 설정
 		outputs.dir snippetsDir
@@ -139,7 +144,9 @@ subprojects {
 		jvmArgs(
 				'-Dfile.encoding=UTF-8',
 				'-Duser.timezone=Asia/Seoul',
-				'-Dspring.profiles.active=local'
+				'-Dspring.profiles.active=local',
+				// bootRun 작업 디렉터리가 모듈 폴더라서, 루트의 .env 위치를 절대경로로 지정
+				"-Dspringdotenv.directory=${rootProject.projectDir}"
 		)
 	}
 

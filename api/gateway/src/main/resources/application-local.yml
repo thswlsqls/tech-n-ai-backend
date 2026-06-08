@@ -38,7 +38,7 @@ gateway:
       uri: http://localhost:8082
 
 jwt:
-  secret-key: ${JWT_SECRET_KEY:default-secret-key-change-in-production-minimum-256-bits}
+  secret-key: ${JWT_SECRET_KEY}
   access-token-validity-minutes: ${JWT_ACCESS_TOKEN_VALIDITY_MINUTES:60}
   refresh-token-validity-days: ${JWT_REFRESH_TOKEN_VALIDITY_DAYS:7}
 
