@@ -38,12 +38,7 @@ public abstract class BaseWriterRepository<E extends BaseEntity> {
         Map<String, Object> beforeSnapshot = isNew ? null : getBeforeDataSnapshot(entity.getId());
 
         E saved = getJpaRepository().save(entity);
-
-        if (isNew) {
-            getHistoryService().saveHistory(saved, OperationType.INSERT, null, saved);
-        } else {
-            getHistoryService().saveHistory(saved, OperationType.UPDATE, beforeSnapshot, saved);
-        }
+        recordInsertOrUpdateHistory(saved, isNew, beforeSnapshot);
 
         return saved;
     }
@@ -59,14 +54,20 @@ public abstract class BaseWriterRepository<E extends BaseEntity> {
         Map<String, Object> beforeSnapshot = isNew ? null : getBeforeDataSnapshot(entity.getId());
 
         E saved = getJpaRepository().saveAndFlush(entity);
+        recordInsertOrUpdateHistory(saved, isNew, beforeSnapshot);
 
+        return saved;
+    }
+
+    /**
+     * 저장 결과에 대해 INSERT(신규) 또는 UPDATE(기존) History를 기록합니다.
+     */
+    private void recordInsertOrUpdateHistory(E saved, boolean isNew, Map<String, Object> beforeSnapshot) {
         if (isNew) {
             getHistoryService().saveHistory(saved, OperationType.INSERT, null, saved);
         } else {
             getHistoryService().saveHistory(saved, OperationType.UPDATE, beforeSnapshot, saved);
         }
-
-        return saved;
     }
 
     /**
@@ -75,19 +76,7 @@ public abstract class BaseWriterRepository<E extends BaseEntity> {
      * @param entity 삭제할 엔티티
      */
     public void delete(E entity) {
-        boolean wasDeleted = Boolean.TRUE.equals(entity.getIsDeleted());
-
-        // 변경 전 데이터를 DB에서 직접 조회 (1차 캐시 우회)
-        Map<String, Object> beforeSnapshot = wasDeleted ? null : getBeforeDataSnapshot(entity.getId());
-
-        entity.setIsDeleted(true);
-        entity.setDeletedAt(LocalDateTime.now());
-
-        E saved = getJpaRepository().save(entity);
-
-        if (!wasDeleted) {
-            getHistoryService().saveHistory(saved, OperationType.DELETE, beforeSnapshot, saved);
-        }
+        softDeleteWithHistory(entity);
     }
 
     /**
@@ -100,10 +89,17 @@ public abstract class BaseWriterRepository<E extends BaseEntity> {
                 .orElseThrow(() -> new IllegalArgumentException(
                         getEntityName() + " with id " + id + " does not exist"));
 
+        softDeleteWithHistory(entity);
+    }
+
+    /**
+     * 엔티티를 soft delete 처리하고, 아직 삭제되지 않았던 경우에만 DELETE History를 기록합니다.
+     */
+    private void softDeleteWithHistory(E entity) {
         boolean wasDeleted = Boolean.TRUE.equals(entity.getIsDeleted());
 
         // 변경 전 데이터를 DB에서 직접 조회 (1차 캐시 우회)
-        Map<String, Object> beforeSnapshot = wasDeleted ? null : getBeforeDataSnapshot(id);
+        Map<String, Object> beforeSnapshot = wasDeleted ? null : getBeforeDataSnapshot(entity.getId());
 
         entity.setIsDeleted(true);
         entity.setDeletedAt(LocalDateTime.now());

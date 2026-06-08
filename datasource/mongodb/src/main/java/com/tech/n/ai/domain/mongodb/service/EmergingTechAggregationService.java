@@ -65,16 +65,8 @@ public class EmergingTechAggregationService {
             LocalDateTime startDate, LocalDateTime endDate,
             List<String> stopWords, int topN) {
 
-        Criteria criteria = buildDateCriteria(startDate, endDate);
-        if (provider != null && !provider.isBlank()) {
-            criteria = criteria.and("provider").is(provider);
-        }
-        if (updateType != null && !updateType.isBlank()) {
-            criteria = criteria.and("update_type").is(updateType);
-        }
-        if (sourceType != null && !sourceType.isBlank()) {
-            criteria = criteria.and("source_type").is(sourceType);
-        }
+        Criteria criteria = applyOptionalFilters(
+            buildDateCriteria(startDate, endDate), provider, updateType, sourceType);
 
         Aggregation aggregation = Aggregation.newAggregation(
             Aggregation.match(criteria),
@@ -116,7 +108,17 @@ public class EmergingTechAggregationService {
      */
     public long countDocuments(String provider, String updateType, String sourceType,
                                LocalDateTime startDate, LocalDateTime endDate) {
-        Criteria criteria = buildDateCriteria(startDate, endDate);
+        Criteria criteria = applyOptionalFilters(
+            buildDateCriteria(startDate, endDate), provider, updateType, sourceType);
+        Query query = new Query(criteria);
+        return mongoTemplate.count(query, COLLECTION);
+    }
+
+    /**
+     * provider / update_type / source_type 선택적 필터를 Criteria에 적용한다.
+     * 값이 null이거나 빈 문자열이면 해당 필터는 건너뛴다.
+     */
+    private Criteria applyOptionalFilters(Criteria criteria, String provider, String updateType, String sourceType) {
         if (provider != null && !provider.isBlank()) {
             criteria = criteria.and("provider").is(provider);
         }
@@ -126,8 +128,7 @@ public class EmergingTechAggregationService {
         if (sourceType != null && !sourceType.isBlank()) {
             criteria = criteria.and("source_type").is(sourceType);
         }
-        Query query = new Query(criteria);
-        return mongoTemplate.count(query, COLLECTION);
+        return criteria;
     }
 
     /**

@@ -6,7 +6,7 @@ spring:
       # 형식: mongodb+srv://{username}:{password}@{cluster-endpoint}/{database}?retryWrites=true&w=majority&readPreference=secondaryPreferred&ssl=true
       # 또는 Standard Connection String: mongodb://{username}:{password}@{cluster-endpoint}:27017/{database}?ssl=true&replicaSet=...&readPreference=secondaryPreferred
       # Current IP: 1.235.228.45
-      uri: ${MONGODB_ATLAS_CONNECTION_STRING:mongodb+srv://thsdmsqlsspdlqj_db_user:LG59uFupKT76tyv2@tech-n-ai-cluster.srnzqco.mongodb.net/tech_n_ai?retryWrites=true&w=majority&readPreference=secondaryPreferred&ssl=true&appName=tech-n-ai-cluster}
+      uri: ${MONGODB_ATLAS_CONNECTION_STRING}
 
       # 데이터베이스 이름 (URI에 포함되어 있으면 생략 가능)
       database: ${MONGODB_ATLAS_DATABASE:tech_n_ai}
@@ -39,7 +39,7 @@ spring:
     mongodb:
       # local 프로파일에서도 MongoDB Atlas 사용 (Docker 없이 개발 가능)
       # 로컬 MongoDB를 사용하려면 Docker로 MongoDB 실행 후 mongodb://localhost:27017/tech_n_ai 로 변경
-      uri: ${MONGODB_ATLAS_CONNECTION_STRING:mongodb+srv://thsdmsqlsspdlqj_db_user:LG59uFupKT76tyv2@tech-n-ai-cluster.srnzqco.mongodb.net/tech_n_ai?retryWrites=true&w=majority&readPreference=secondaryPreferred&ssl=true&appName=tech-n-ai-cluster}
+      uri: ${MONGODB_ATLAS_CONNECTION_STRING}
       database: ${MONGODB_ATLAS_DATABASE:tech_n_ai}
 
 ---

@@ -137,6 +137,36 @@ public final class VectorSearchUtil {
     }
     
     /**
+     * 기본 필터(예: status, user_id)를 기존 options.filter와 $and로 병합하고,
+     * 인덱스명이 비어 있으면 기본 인덱스를 채워 VectorSearchOptions를 다시 만든다.
+     *
+     * @param options 원본 검색 옵션
+     * @param baseFilter 항상 적용할 기본 필터
+     * @param defaultIndex options에 인덱스명이 없을 때 사용할 기본 인덱스
+     * @return filter와 indexName이 채워진 VectorSearchOptions
+     */
+    private static VectorSearchOptions withBaseFilter(
+            VectorSearchOptions options, Document baseFilter, String defaultIndex) {
+
+        Document combinedFilter;
+        if (options.getFilter() != null && !options.getFilter().isEmpty()) {
+            combinedFilter = new Document("$and", List.of(baseFilter, options.getFilter()));
+        } else {
+            combinedFilter = baseFilter;
+        }
+
+        return VectorSearchOptions.builder()
+            .indexName(options.getIndexName() != null ? options.getIndexName() : defaultIndex)
+            .path(options.getPath())
+            .numCandidates(options.getNumCandidates())
+            .limit(options.getLimit())
+            .minScore(options.getMinScore())
+            .filter(combinedFilter)
+            .exact(options.isExact())
+            .build();
+    }
+
+    /**
      * Emerging Tech 컬렉션 Vector Search 파이프라인 생성
      * status: "PUBLISHED" pre-filter 기본 적용
      *
@@ -150,26 +180,9 @@ public final class VectorSearchUtil {
 
         List<Document> pipeline = new ArrayList<>();
 
-        // status: "PUBLISHED" pre-filter 생성
-        Document statusFilter = new Document("status", "PUBLISHED");
-        Document combinedFilter;
-
-        if (options.getFilter() != null && !options.getFilter().isEmpty()) {
-            combinedFilter = new Document("$and", List.of(statusFilter, options.getFilter()));
-        } else {
-            combinedFilter = statusFilter;
-        }
-
-        // VectorSearchOptions에 filter 적용
-        VectorSearchOptions emergingTechOptions = VectorSearchOptions.builder()
-            .indexName(options.getIndexName() != null ? options.getIndexName() : INDEX_EMERGING_TECHS)
-            .path(options.getPath())
-            .numCandidates(options.getNumCandidates())
-            .limit(options.getLimit())
-            .minScore(options.getMinScore())
-            .filter(combinedFilter)
-            .exact(options.isExact())
-            .build();
+        // status: "PUBLISHED" pre-filter를 기존 filter와 병합하여 옵션 재구성
+        VectorSearchOptions emergingTechOptions = withBaseFilter(
+            options, new Document("status", "PUBLISHED"), INDEX_EMERGING_TECHS);
 
         // 1. $vectorSearch stage
         pipeline.add(createVectorSearchStage(queryVector, emergingTechOptions));
@@ -283,25 +296,9 @@ public final class VectorSearchUtil {
 
         List<Document> pipeline = new ArrayList<>();
 
-        // status: "PUBLISHED" pre-filter 생성 (기존 로직 재사용)
-        Document statusFilter = new Document("status", "PUBLISHED");
-        Document combinedFilter;
-
-        if (options.getFilter() != null && !options.getFilter().isEmpty()) {
-            combinedFilter = new Document("$and", List.of(statusFilter, options.getFilter()));
-        } else {
-            combinedFilter = statusFilter;
-        }
-
-        VectorSearchOptions fusionOptions = VectorSearchOptions.builder()
-            .indexName(options.getIndexName() != null ? options.getIndexName() : INDEX_EMERGING_TECHS)
-            .path(options.getPath())
-            .numCandidates(options.getNumCandidates())
-            .limit(options.getLimit())
-            .minScore(options.getMinScore())
-            .filter(combinedFilter)
-            .exact(options.isExact())
-            .build();
+        // status: "PUBLISHED" pre-filter를 기존 filter와 병합하여 옵션 재구성
+        VectorSearchOptions fusionOptions = withBaseFilter(
+            options, new Document("status", "PUBLISHED"), INDEX_EMERGING_TECHS);
 
         // 1. $vectorSearch stage
         pipeline.add(createVectorSearchStage(queryVector, fusionOptions));
@@ -343,28 +340,12 @@ public final class VectorSearchUtil {
             VectorSearchOptions options) {
         
         List<Document> pipeline = new ArrayList<>();
-        
-        // userId 필터 생성 (기존 filter와 병합)
-        Document userFilter = new Document("user_id", userId);
-        Document combinedFilter;
-        
-        if (options.getFilter() != null && !options.getFilter().isEmpty()) {
-            combinedFilter = new Document("$and", List.of(userFilter, options.getFilter()));
-        } else {
-            combinedFilter = userFilter;
-        }
-        
+
+        // userId 필터를 기존 filter와 병합하여 옵션 재구성
+        VectorSearchOptions bookmarkOptions = withBaseFilter(
+            options, new Document("user_id", userId), INDEX_BOOKMARKS);
+
         // 1. $vectorSearch stage
-        VectorSearchOptions bookmarkOptions = VectorSearchOptions.builder()
-            .indexName(options.getIndexName() != null ? options.getIndexName() : INDEX_BOOKMARKS)
-            .path(options.getPath())
-            .numCandidates(options.getNumCandidates())
-            .limit(options.getLimit())
-            .minScore(options.getMinScore())
-            .filter(combinedFilter)
-            .exact(options.isExact())
-            .build();
-        
         pipeline.add(createVectorSearchStage(queryVector, bookmarkOptions));
         
         // 2. $addFields stage (score 추가)
