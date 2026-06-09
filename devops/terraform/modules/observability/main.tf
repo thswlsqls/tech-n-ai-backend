@@ -14,6 +14,9 @@ locals {
     },
     var.tags,
   )
+
+  # SNS 토픽이 없으면 알람만 만들고 알림은 연결하지 않음
+  alarm_actions = var.alarm_sns_topic_arn == null ? [] : [var.alarm_sns_topic_arn]
 }
 
 # ----------------------------------------------------------------------------
@@ -55,8 +58,8 @@ resource "aws_cloudwatch_metric_alarm" "ecs_cpu" {
     ServiceName = each.value.service_name
   }
 
-  alarm_actions = var.alarm_sns_topic_arn == null ? [] : [var.alarm_sns_topic_arn]
-  ok_actions    = var.alarm_sns_topic_arn == null ? [] : [var.alarm_sns_topic_arn]
+  alarm_actions = local.alarm_actions
+  ok_actions    = local.alarm_actions
 
   tags = local.common_tags
 }
@@ -79,7 +82,7 @@ resource "aws_cloudwatch_metric_alarm" "ecs_memory" {
     ServiceName = each.value.service_name
   }
 
-  alarm_actions = var.alarm_sns_topic_arn == null ? [] : [var.alarm_sns_topic_arn]
+  alarm_actions = local.alarm_actions
 
   tags = local.common_tags
 }
@@ -102,7 +105,7 @@ resource "aws_cloudwatch_metric_alarm" "ecs_running_count" {
     ServiceName = each.value.service_name
   }
 
-  alarm_actions = var.alarm_sns_topic_arn == null ? [] : [var.alarm_sns_topic_arn]
+  alarm_actions = local.alarm_actions
 
   tags = local.common_tags
 }

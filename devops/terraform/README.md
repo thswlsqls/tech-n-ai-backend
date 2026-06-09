@@ -20,10 +20,11 @@ devops/terraform/
 │   ├── elasticache-valkey/       # Valkey (Multi-AZ + auth_token/RBAC)
 │   ├── msk-serverless/           # MSK Serverless (dev/beta, IAM SASL only)
 │   ├── msk-provisioned/          # MSK Provisioned (prod, KRaft + IAM SASL + TLS)
+│   ├── amplify-app/              # Amplify Hosting (Next.js SSR app·admin, GitHub 연동 + SSM 환경변수)
 │   ├── cloudfront-spa/           # CloudFront + OAC + 보안 헤더 정책 (SPA 라우팅)
 │   └── observability/            # CloudWatch Log Groups + 표준 알람 + 대시보드 (configs: ADOT/FireLens)
 └── envs/
-    ├── dev/                      # 완성 (network + 6 ECS Service + 6 Task Role + 데이터 SG cross-ref)
+    ├── dev/                      # 완성 (network·s3·IAM·Aurora·Valkey·MSK·6 ECS Service·Amplify·observability + 데이터 SG cross-ref)
     ├── beta/                     # 완성 (dev 동일 구조 + tfvars 차이만)
     └── prod/                     # 완성 (Aurora Provisioned 3 instance + MSK Provisioned + AZ별 NAT)
 ```
@@ -41,6 +42,7 @@ devops/terraform/
 | `modules/elasticache-valkey` | ✅ 완료 | 2b |
 | `modules/msk-{serverless,provisioned}` | ✅ 완료 | 2b |
 | `modules/ecs-service` (워크로드 SG 포함) | ✅ 완료 | 2c |
+| `modules/amplify-app` | ✅ 완료 | 2c |
 | `modules/cloudfront-spa` | ✅ 완료 | 2c |
 | `modules/observability` | ✅ 완료 | 2c |
 | `envs/beta`·`envs/prod` 완성 | ✅ 완료 | 2c |
@@ -62,11 +64,11 @@ devops/terraform/
 ## 컨벤션
 
 - **언어**: 본 README·주석은 한국어, 식별자·리소스 이름·변수는 영어.
-- **태그**: 모든 리소스에 `local.common_tags` 적용 (Project, Environment, ManagedBy=Terraform, CostCenter).
+- **태그**: 모든 리소스에 `local.common_tags` 적용 (Project, Environment, ManagedBy=Terraform, Module — 모듈에 따라 AppName·Service 등 추가).
 - **명명**: `{project}-{env}-{resource}` (예: `techai-dev-vpc`).
 - **CIDR**: dev `10.10.0.0/16`, beta `10.20.0.0/16`, prod `10.30.0.0/16` (02 §1.1.1).
 - **AZ**: 서울 리전 3 AZ (`ap-northeast-2a/b/c`).
-- **Provider 버전 고정**: Terraform `~> 1.9.5`, AWS Provider `~> 5.60`.
+- **Provider 버전 고정**: Terraform `~> 1.9.5`, AWS Provider `~> 5.60`, random `~> 3.6` (aurora-mysql·elasticache-valkey·bootstrap).
 
 ## 외부 참조
 

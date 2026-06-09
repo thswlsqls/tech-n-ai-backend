@@ -1,6 +1,6 @@
 # Terraform state 전용 KMS CMK
 # - state 버킷 SSE-KMS, DynamoDB Lock 테이블 SSE-KMS 모두에 사용
-# - 매트릭스 §1 의 `{env}-terraform-state` 키와 대응 (단, bootstrap은 환경 무관 단일 키)
+# - 매트릭스 §1 의 `tfstate` 키 — 환경 무관 단일 공유 키 (bootstrap 에서만 정의)
 
 resource "aws_kms_key" "tfstate" {
   description             = "Terraform state encryption (state S3 + DynamoDB Lock)"
@@ -24,7 +24,7 @@ data "aws_iam_policy_document" "tfstate_kms" {
     effect = "Allow"
     principals {
       type        = "AWS"
-      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
+      identifiers = ["arn:aws:iam::${local.account_id}:root"]
     }
     actions   = ["kms:*"]
     resources = ["*"]

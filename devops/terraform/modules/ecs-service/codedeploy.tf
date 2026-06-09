@@ -2,6 +2,11 @@
 # - Hook 람다 미사용 (D-2)
 # - 자동 롤백: 배포 실패 + 알람 트리거 (5xx, latency)
 
+locals {
+  # 알람의 CloudWatch LoadBalancer 디멘션 값 — listener ARN 에서 추출
+  load_balancer_dimension = split("/", var.alb_listener_arn)[1]
+}
+
 resource "aws_codedeploy_app" "this" {
   count = var.enable_blue_green ? 1 : 0
 
@@ -41,7 +46,7 @@ resource "aws_cloudwatch_metric_alarm" "alb_5xx_rate" {
       stat        = "Sum"
       dimensions = {
         TargetGroup  = aws_lb_target_group.blue.arn_suffix
-        LoadBalancer = split("/", var.alb_listener_arn)[1]
+        LoadBalancer = local.load_balancer_dimension
       }
     }
   }
@@ -55,7 +60,7 @@ resource "aws_cloudwatch_metric_alarm" "alb_5xx_rate" {
       stat        = "Sum"
       dimensions = {
         TargetGroup  = aws_lb_target_group.blue.arn_suffix
-        LoadBalancer = split("/", var.alb_listener_arn)[1]
+        LoadBalancer = local.load_balancer_dimension
       }
     }
   }
@@ -79,7 +84,7 @@ resource "aws_cloudwatch_metric_alarm" "target_response_time" {
 
   dimensions = {
     TargetGroup  = aws_lb_target_group.blue.arn_suffix
-    LoadBalancer = split("/", var.alb_listener_arn)[1]
+    LoadBalancer = local.load_balancer_dimension
   }
 
   tags = local.common_tags
@@ -129,7 +134,7 @@ resource "aws_codedeploy_deployment_group" "this" {
   }
 
   ecs_service {
-    cluster_name = split("/", var.cluster_arn)[1]
+    cluster_name = local.ecs_cluster_name
     service_name = aws_ecs_service.this.name
   }
 

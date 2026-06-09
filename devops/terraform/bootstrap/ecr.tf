@@ -151,7 +151,7 @@ resource "aws_ecr_repository_policy" "this" {
         ]
         Condition = {
           StringNotEquals = {
-            "aws:PrincipalArn" = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.project}-bootstrap-admin"
+            "aws:PrincipalArn" = "arn:aws:iam::${local.account_id}:role/${var.project}-bootstrap-admin"
           }
         }
       },
@@ -166,7 +166,7 @@ data "aws_iam_policy_document" "ecr_kms" {
     effect = "Allow"
     principals {
       type        = "AWS"
-      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
+      identifiers = ["arn:aws:iam::${local.account_id}:root"]
     }
     actions   = ["kms:*"]
     resources = ["*"]
@@ -195,7 +195,7 @@ data "aws_iam_policy_document" "ecr_kms" {
       type = "AWS"
       identifiers = concat(
         [for env, role in aws_iam_role.gha_deploy : role.arn],
-        ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"], # ECS Task Execution Role 들
+        ["arn:aws:iam::${local.account_id}:root"], # ECS Task Execution Role 들
       )
     }
     actions = [

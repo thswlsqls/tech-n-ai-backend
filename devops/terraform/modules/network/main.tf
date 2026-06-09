@@ -25,7 +25,7 @@ locals {
   #   private-app /20  : newbits=4,  netnum 1..3  → x.x.16.0/20, x.x.32.0/20, x.x.48.0/20
   #                                                 (netnum 0 은 public 과 겹치므로 1 부터 시작)
   #   private-data /24 : newbits=8,  netnum 64..66 → x.x.64.0/24, x.x.65.0/24, x.x.66.0/24
-  #   private-tgw  /26 : newbits=10, netnum 256..258 → x.x.64.0/26 영역 회피하기 위해 별도 영역
+  #   private-tgw  /26 : newbits=10, netnum 280..282 → x.x.70.0/26, x.x.70.64/26, x.x.70.128/26 (private-data /24 대역과 충돌 회피)
   public_subnet_cidrs       = [for i in range(length(var.azs)) : cidrsubnet(var.cidr_block, 8, i)]            # /24
   private_app_subnet_cidrs  = [for i in range(length(var.azs)) : cidrsubnet(var.cidr_block, 4, i + 1)]        # /20
   private_data_subnet_cidrs = [for i in range(length(var.azs)) : cidrsubnet(var.cidr_block, 8, i + 64)]       # /24

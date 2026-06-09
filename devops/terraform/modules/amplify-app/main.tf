@@ -6,6 +6,9 @@
 locals {
   app_full_name = "${var.project}-${var.environment}-${var.app_name}"
 
+  # 서비스 Role ARN 을 안 받으면 모듈이 IAM Role 을 직접 만든다 (아래 IAM 리소스 3개의 count 조건)
+  create_iam_role = var.iam_service_role_arn == null
+
   common_tags = merge(
     {
       Project     = var.project
@@ -50,7 +53,7 @@ locals {
 # ----------------------------------------------------------------------------
 
 resource "aws_iam_role" "amplify" {
-  count = var.iam_service_role_arn == null ? 1 : 0
+  count = local.create_iam_role ? 1 : 0
 
   name = "${local.app_full_name}-amplify"
 
@@ -67,7 +70,7 @@ resource "aws_iam_role" "amplify" {
 }
 
 resource "aws_iam_role_policy_attachment" "amplify_managed" {
-  count = var.iam_service_role_arn == null ? 1 : 0
+  count = local.create_iam_role ? 1 : 0
 
   role       = aws_iam_role.amplify[0].name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AdministratorAccess-Amplify"
@@ -75,7 +78,7 @@ resource "aws_iam_role_policy_attachment" "amplify_managed" {
 
 # SSM Parameter Store 읽기 (환경변수 주입용)
 resource "aws_iam_role_policy" "amplify_ssm" {
-  count = var.iam_service_role_arn == null ? 1 : 0
+  count = local.create_iam_role ? 1 : 0
 
   name = "ssm-read"
   role = aws_iam_role.amplify[0].id

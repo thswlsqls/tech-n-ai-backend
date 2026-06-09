@@ -6,6 +6,9 @@
 locals {
   name = "${var.project}-${var.environment}-${var.service_name}"
 
+  # cluster ARN(arn:...:cluster/{name})에서 클러스터 이름만 추출
+  ecs_cluster_name = split("/", var.cluster_arn)[1]
+
   log_group_name = coalesce(
     var.log_group_name,
     "/aws/ecs/${var.environment}/${var.service_name}",
@@ -380,7 +383,7 @@ resource "aws_ecs_service" "this" {
 resource "aws_appautoscaling_target" "this" {
   max_capacity       = var.autoscaling_max_count
   min_capacity       = var.autoscaling_min_count
-  resource_id        = "service/${split("/", var.cluster_arn)[1]}/${aws_ecs_service.this.name}"
+  resource_id        = "service/${local.ecs_cluster_name}/${aws_ecs_service.this.name}"
   scalable_dimension = "ecs:service:DesiredCount"
   service_namespace  = "ecs"
 }

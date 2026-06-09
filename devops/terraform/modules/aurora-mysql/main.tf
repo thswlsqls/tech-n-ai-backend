@@ -10,6 +10,7 @@ locals {
   )
 
   is_serverless = var.engine_mode == "serverlessv2"
+  is_prod       = var.environment == "prod"
 
   common_tags = merge(
     {
@@ -109,7 +110,7 @@ resource "aws_rds_cluster" "this" {
     }
   }
 
-  apply_immediately = var.environment == "prod" ? false : true
+  apply_immediately = !local.is_prod
 
   tags = local.common_tags
 
@@ -145,10 +146,10 @@ resource "aws_rds_cluster_instance" "this" {
   performance_insights_retention_period = var.performance_insights_enabled ? var.performance_insights_retention_period : null
   performance_insights_kms_key_id       = var.performance_insights_enabled ? var.kms_key_arn : null
 
-  monitoring_interval = var.environment == "prod" ? 60 : 0
+  monitoring_interval = local.is_prod ? 60 : 0
 
   auto_minor_version_upgrade = true
-  apply_immediately          = var.environment == "prod" ? false : true
+  apply_immediately          = !local.is_prod
 
   tags = merge(local.common_tags, {
     Name = "${local.cluster_name}-${count.index + 1}"

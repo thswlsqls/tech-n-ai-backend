@@ -17,6 +17,9 @@ locals {
 
   is_amplify = var.origin_type == "amplify"
   is_s3      = var.origin_type == "s3"
+
+  # 커스텀 ACM 인증서가 연결됐는지 — 미연결 시 CloudFront 기본 인증서 사용
+  has_custom_cert = var.acm_certificate_arn != null
 }
 
 # ----------------------------------------------------------------------------
@@ -139,9 +142,9 @@ resource "aws_cloudfront_distribution" "this" {
 
   viewer_certificate {
     acm_certificate_arn            = var.acm_certificate_arn
-    cloudfront_default_certificate = var.acm_certificate_arn == null
-    minimum_protocol_version       = var.acm_certificate_arn == null ? "TLSv1" : "TLSv1.2_2021"
-    ssl_support_method             = var.acm_certificate_arn == null ? null : "sni-only"
+    cloudfront_default_certificate = !local.has_custom_cert
+    minimum_protocol_version       = local.has_custom_cert ? "TLSv1.2_2021" : "TLSv1"
+    ssl_support_method             = local.has_custom_cert ? "sni-only" : null
   }
 
   tags = local.common_tags

@@ -54,7 +54,7 @@ output "gha_security_scan_role_arn" {
 
 output "ecr_registry_url" {
   description = "ECR 레지스트리 URL. GitHub Variables `ECR_REGISTRY` 에 등록 (`<account>.dkr.ecr.<region>.amazonaws.com`)."
-  value       = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.region}.amazonaws.com"
+  value       = "${local.account_id}.dkr.ecr.${var.region}.amazonaws.com"
 }
 
 output "ecr_repository_urls" {

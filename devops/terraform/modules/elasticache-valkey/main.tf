@@ -81,8 +81,8 @@ resource "random_password" "auth_token" {
   numeric = true
 }
 
-# Secrets Manager 시크릿은 매트릭스 정의처가 06 이라 본 모듈은 토큰만 생성하고
-# 시크릿 저장은 envs/* 에서 명시적으로. 다만 편의를 위해 본 모듈도 옵션 제공.
+# Secrets Manager 시크릿은 매트릭스 정의처가 06 이라 본 모듈은 토큰만 생성하고,
+# 시크릿 저장(GetSecretValue 대상)은 envs/* 에서 명시적으로 한다.
 
 # ----------------------------------------------------------------------------
 # Replication Group
