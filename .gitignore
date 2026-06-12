@@ -50,3 +50,6 @@ out/
 
 ### Decompiled classes ###
 org/
+
+### AWS 강의자료 제외 
+contents/AWS/*
