@@ -9,7 +9,7 @@
 ```
 backend-session
 ├── project  [0]  ← 인프라/프로젝트 상태 모니터링 (3-pane)
-├── module   [1]  ← Claude Code + 모듈별 Gradle 실행 (7-pane)
+├── module   [1]  ← Claude Code 모듈 작업 (1-pane)
 └── test     [2]  ← 단위/통합 테스트 (2-pane)
 ```
 
@@ -24,27 +24,19 @@ backend-session
 └──────────────────┴──────────────────┘
 ```
 
-### module-window (claude + 모듈별 gradle)
+### module-window (claude)
 
 ```
-┌──────────────┬──────────────────────┐
-│              │ gradle-gateway-pane  │
-│              ├──────────────────────┤
-│              │ gradle-emerging-     │
-│              │ tech-pane            │
-│              ├──────────────────────┤
-│ claude-pane  │ gradle-auth-pane     │
-│ (35%)        ├──────────────────────┤ (65%)
-│              │ gradle-chatbot-pane  │
-│              ├──────────────────────┤
-│              │ gradle-bookmark-pane │
-│              ├──────────────────────┤
-│              │ gradle-agent-pane    │
-└──────────────┴──────────────────────┘
+┌─────────────────────────────────────┐
+│                                     │
+│ claude-pane                         │
+│                                     │
+└─────────────────────────────────────┘
 ```
 
-각 gradle-*-pane에서 해당 모듈의 `bootRun`이 자동 실행되어 로그를 실시간으로 확인할 수 있다.
-특정 pane을 전체화면으로 확대하려면 `Ctrl-b z`를 사용한다.
+Claude Code로 코드를 작업하는 단일 pane이다.
+모듈 실행은 Jenkins deploy 파이프라인(`scripts/jenkins/api/Jenkinsfile-deploy`)이 담당하므로,
+이 윈도우에서 모듈별 서버를 띄우지 않는다.
 
 ### test-window (좌우 분할)
 
@@ -114,17 +106,17 @@ git status                     # 작업 상태 확인
 ./gradlew clean build          # 전체 프로젝트 빌드
 ```
 
-### Step 3. API 서버 실행 (module-window, Ctrl-b 1)
+### Step 3. API 서버 실행 (Jenkins deploy)
 
-스크립트 실행 시 각 gradle-*-pane에서 `bootRun`이 자동 실행된다.
-수동으로 개별 모듈을 재시작하려면 해당 pane에서 `Ctrl-c` 후 다시 실행한다.
+API 서버 실행은 Jenkins deploy 파이프라인(`scripts/jenkins/api/Jenkinsfile-deploy`)이 담당한다.
+CI/CD로 빌드한 JAR을 받아 백그라운드로 실행하고, PID 관리와 헬스체크까지 처리한다.
+
+로컬에서 특정 모듈만 직접 띄워 확인하고 싶을 때는 별도 셸에서 `bootRun`을 실행한다.
 
 ```bash
-# 개별 모듈 재시작 예시 (해당 pane에서)
+# 로컬에서 개별 모듈 직접 실행 (필요 시)
 ./gradlew :api-auth:bootRun
 ```
-
-> **참고**: 특정 모듈만 실행하지 않으려면 해당 pane에서 `Ctrl-c`로 종료한다.
 
 ## 활용 예시
 
@@ -143,16 +135,10 @@ git status                     # 작업 상태 확인
 
 ```bash
 # module 윈도우 (Ctrl-b 1)
-[claude-pane]              Claude Code로 코드 수정
-[gradle-gateway-pane]      gateway 실시간 로그 (자동 실행)
-[gradle-emerging-tech-pane] emerging-tech 실시간 로그 (자동 실행)
-[gradle-auth-pane]         auth 실시간 로그 (자동 실행)
-[gradle-chatbot-pane]      chatbot 실시간 로그 (자동 실행)
-[gradle-bookmark-pane]     bookmark 실시간 로그 (자동 실행)
-[gradle-agent-pane]        agent 실시간 로그 (자동 실행)
+[claude-pane]  Claude Code로 코드 수정
 
-# 특정 모듈 로그를 전체화면으로 보기: 해당 pane에서 Ctrl-b z
-# 모듈 재시작: 해당 pane에서 Ctrl-c → ./gradlew :api-auth:bootRun
+# 모듈 실행은 Jenkins deploy 파이프라인이 담당한다.
+# 로컬에서 직접 확인이 필요하면 별도 셸에서 ./gradlew :api-auth:bootRun
 ```
 
 ### 3. 테스트 실행 (test-window)

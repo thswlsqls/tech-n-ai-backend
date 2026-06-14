@@ -5,7 +5,7 @@
 # 세션: backend-session
 # 윈도우:
 #   [0] project  — 인프라/프로젝트 상태 모니터링 (3-pane)
-#   [1] module   — Claude Code + 모듈별 Gradle 실행 (1+6 pane)
+#   [1] module   — Claude Code 모듈 작업 (1-pane)
 #   [2] test     — 단위/통합 테스트 (좌우, 2-pane)
 #
 # 사용법:
@@ -35,19 +35,12 @@ fi
 #   └─────────────────┴─────────────────┘
 #
 # module-window:
-#   ┌──────────────┬──────────────────────┐
-#   │              │ 1 gradle-gateway     │
-#   │              ├──────────────────────┤
-#   │              │ 2 gradle-emerging    │
-#   │              ├──────────────────────┤
-#   │ 0 claude     │ 3 gradle-auth       │
-#   │              ├──────────────────────┤
-#   │              │ 4 gradle-chatbot     │
-#   │              ├──────────────────────┤
-#   │              │ 5 gradle-bookmark    │
-#   │              ├──────────────────────┤
-#   │              │ 6 gradle-agent       │
-#   └──────────────┴──────────────────────┘
+#   ┌─────────────────────────────────────┐
+#   │                                     │
+#   │ 0 claude                            │
+#   │                                     │
+#   └─────────────────────────────────────┘
+#   ※ 모듈 실행은 Jenkins deploy 파이프라인이 담당한다.
 #
 # test-window:    unit-pane(0, 50%)   | integration-pane(1, 50%)
 # -----------------------------------------------------------------------------
@@ -71,36 +64,9 @@ tmux send-keys -t "$SESSION:project.2" "git status" C-m
 # 포커스를 docker-compose-pane으로
 tmux select-pane -t "$SESSION:project.0"
 
-# --- module-window: claude-pane(좌 35%) + gradle-*-pane 6개(우 65%) ---
+# --- module-window: claude-pane 단일 구성 (모듈 실행은 Jenkins deploy가 담당) ---
 tmux new-window -t "$SESSION" -n "module" -c "$BASE_DIR"
-tmux split-window -h -p 65 -t "$SESSION:module" -c "$BASE_DIR"
-
-# 우측(pane 1)을 6등분으로 수직 분할
-tmux split-window -v -p 83 -t "$SESSION:module.1" -c "$BASE_DIR"
-tmux split-window -v -p 80 -t "$SESSION:module.2" -c "$BASE_DIR"
-tmux split-window -v -p 75 -t "$SESSION:module.3" -c "$BASE_DIR"
-tmux split-window -v -p 67 -t "$SESSION:module.4" -c "$BASE_DIR"
-tmux split-window -v -p 50 -t "$SESSION:module.5" -c "$BASE_DIR"
-
-# pane 타이틀 설정
 tmux select-pane -t "$SESSION:module.0" -T "claude-pane"
-tmux select-pane -t "$SESSION:module.1" -T "gradle-gateway-pane"
-tmux select-pane -t "$SESSION:module.2" -T "gradle-emerging-tech-pane"
-tmux select-pane -t "$SESSION:module.3" -T "gradle-auth-pane"
-tmux select-pane -t "$SESSION:module.4" -T "gradle-chatbot-pane"
-tmux select-pane -t "$SESSION:module.5" -T "gradle-bookmark-pane"
-tmux select-pane -t "$SESSION:module.6" -T "gradle-agent-pane"
-
-# 각 pane에 bootRun 명령 전송
-tmux send-keys -t "$SESSION:module.1" "./gradlew :api-gateway:bootRun" C-m
-tmux send-keys -t "$SESSION:module.2" "./gradlew :api-emerging-tech:bootRun" C-m
-tmux send-keys -t "$SESSION:module.3" "./gradlew :api-auth:bootRun" C-m
-tmux send-keys -t "$SESSION:module.4" "./gradlew :api-chatbot:bootRun" C-m
-tmux send-keys -t "$SESSION:module.5" "./gradlew :api-bookmark:bootRun" C-m
-tmux send-keys -t "$SESSION:module.6" "./gradlew :api-agent:bootRun" C-m
-
-# 포커스를 claude-pane으로
-tmux select-pane -t "$SESSION:module.0"
 
 # --- test-window: 좌우 분할 ---
 tmux new-window -t "$SESSION" -n "test" -c "$BASE_DIR"
