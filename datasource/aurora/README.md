@@ -1,304 +1,154 @@
-# Domain Aurora Module
+# datasource-aurora 모듈
 
-## 개요
+CQRS에서 **쓰기(Command) 쪽**을 맡는 데이터 접근 모듈입니다. Aurora MySQL에 연결하며 도메인 엔티티, 리포지토리, 데이터소스/트랜잭션 설정, 변경 이력 추적을 모아 둡니다.
 
-`domain-aurora` 모듈은 **CQRS 패턴의 Command Side (쓰기 전용)**를 담당하는 도메인 모듈입니다. Amazon Aurora MySQL 3.x를 데이터베이스로 사용하며, 모든 쓰기 작업(CREATE, UPDATE, DELETE)을 처리합니다.
+라이브러리 모듈(`jar`)이며, `api-auth`·`api-bookmark`·`api-chatbot`·`batch-source` 등이 의존성으로 씁니다. 자바 패키지 루트는 `com.tech.n.ai.domain.aurora` 입니다.
 
-이 모듈은 프로젝트의 핵심 도메인 엔티티와 JPA Repository를 제공하며, TSID(Time-Sorted Unique Identifier) Primary Key 전략, Soft Delete, 히스토리 추적 등의 기능을 지원합니다.
+## 두 가지 실행 모드 (Spring 프로필)
 
-## 주요 특징
+켜지는 프로필에 따라 다른 설정 묶음이 활성화됩니다. 설정 클래스는 모두 `config/`에 있고 `@Profile`로 구분됩니다.
 
-### 1. CQRS Command Side
-- **역할**: 모든 쓰기 작업 전용
-- **데이터베이스**: Amazon Aurora MySQL 3.x
-- **정규화 수준**: 높은 정규화 (최소 3NF)
-- **인덱스 전략**: 쓰기 성능 최적화를 위한 최소 인덱스
+- **`api-domain`**: API 서비스용. writer/reader 두 HikariCP 풀, JPA 리포지토리, QueryDSL `JPAQueryFactory`, MyBatis `SqlSessionTemplate`.
+- **`batch-domain`**: 배치용. 메타 데이터소스와 업무(business) 데이터소스를 분리하고, EntityManagerFactory 두 개(primary/secondary)와 트랜잭션 매니저를 둠.
 
-### 2. TSID Primary Key 전략
-- 모든 엔티티는 TSID를 Primary Key로 사용
-- `TsidGenerator`를 통한 자동 생성
-- 시간 기반 정렬 가능한 고유 식별자
-
-### 3. Soft Delete 지원
-- 모든 메인 엔티티는 `BaseEntity`를 상속받아 Soft Delete 기능 제공
-- `is_deleted`, `deleted_at`, `deleted_by` 필드 자동 관리
-
-### 4. 히스토리 추적
-- `HistoryEntityListener`를 통한 자동 히스토리 저장
-- 모든 쓰기 작업(INSERT, UPDATE, DELETE)에 대한 변경 이력 추적
-- JSON 형식으로 변경 전/후 데이터 저장
-
-### 5. 모듈별 스키마 분리
-- API 모듈별로 독립적인 스키마 사용
-- `module.aurora.schema` 환경변수를 통한 동적 스키마 매핑
+| 클래스 | 프로필 | 역할 |
+|--------|--------|------|
+| `ApiDataSourceConfig` | `api-domain` | writer/reader HikariCP 풀 |
+| `ApiDomainConfig` | `api-domain` | JPA 리포지토리·엔티티 스캔, `JPAQueryFactory` 빈 |
+| `ApiMybatisConfig` | `api-domain` | writer/reader MyBatis 세션 |
+| `BatchMetaDataSourceConfig` | `batch-domain` | Spring Batch 메타 데이터소스 |
+| `BatchBusinessDataSourceConfig` | `batch-domain` | 업무 데이터 writer/reader 데이터소스 |
+| `BatchEntityManagerConfig` | `batch-domain` | `primaryEMF`/`secondaryEMF` |
+| `BatchJpaTransactionConfig` | `batch-domain` | JPA 트랜잭션 매니저 |
+| `BatchMyBatisConfig` | `batch-domain` | 배치용 MyBatis 세션 |
+| `BatchDomainConfig` | `batch-domain` | 위 배치 설정들을 묶는 진입점 |
 
 ## 모듈 구조
 
 ```
-domain/aurora/
-├── src/main/java/com/tech/n/ai/domain/mariadb/
-│   ├── annotation/
-│   │   └── Tsid.java                    # TSID 어노테이션
-│   ├── config/
-│   │   ├── ApiDataSourceConfig.java    # API 모듈용 DataSource 설정
-│   │   ├── ApiDomainConfig.java        # API 모듈용 Domain 설정
-│   │   ├── ApiMybatisConfig.java       # API 모듈용 MyBatis 설정
-│   │   ├── BatchBusinessDataSourceConfig.java  # Batch 모듈용 Business DataSource
-│   │   ├── BatchDomainConfig.java      # Batch 모듈용 Domain 설정
-│   │   ├── BatchEntityManagerConfig.java       # Batch 모듈용 EntityManager 설정
-│   │   ├── BatchJpaTransactionConfig.java     # Batch 모듈용 JPA Transaction 설정
-│   │   ├── BatchMetaDataSourceConfig.java      # Batch 모듈용 Meta DataSource
-│   │   └── BatchMyBatisConfig.java     # Batch 모듈용 MyBatis 설정
+datasource/aurora/src/main/
+├── java/com/tech/n/ai/domain/aurora/
+│   ├── annotation/Tsid.java            # @IdGeneratorType(TsidGenerator) 커스텀 어노테이션
+│   ├── config/                         # 위 표의 설정 클래스들
 │   ├── entity/
-│   │   ├── BaseEntity.java             # 기본 엔티티 (공통 필드)
-│   │   ├── archive/
-│   │   │   ├── ArchiveEntity.java       # 아카이브 엔티티
-│   │   │   └── ArchiveHistoryEntity.java # 아카이브 히스토리 엔티티
-│   │   ├── auth/
-│   │   │   ├── AdminEntity.java        # 관리자 엔티티
-│   │   │   ├── AdminHistoryEntity.java  # 관리자 히스토리 엔티티
-│   │   │   ├── EmailVerificationEntity.java # 이메일 인증 엔티티
-│   │   │   ├── ProviderEntity.java     # OAuth 제공자 엔티티
-│   │   │   ├── RefreshTokenEntity.java # Refresh Token 엔티티
-│   │   │   ├── UserEntity.java         # 사용자 엔티티
-│   │   │   └── UserHistoryEntity.java  # 사용자 히스토리 엔티티
-│   │   └── chatbot/
-│   │       ├── ConversationMessageEntity.java  # 대화 메시지 엔티티
-│   │       └── ConversationSessionEntity.java  # 대화 세션 엔티티
-│   ├── generator/
-│   │   └── TsidGenerator.java         # TSID 생성기
-│   ├── listener/
-│   │   └── HistoryEntityListener.java  # 히스토리 자동 저장 리스너
+│   │   ├── BaseEntity.java             # 공통 필드 + soft delete + 감사 타임스탬프
+│   │   ├── auth/                       # User, Admin, Provider, RefreshToken, EmailVerification,
+│   │   │                               #   AuthenticationState(enum), UserHistory, AdminHistory
+│   │   ├── bookmark/                   # Bookmark, BookmarkHistory
+│   │   └── conversation/               # ConversationSession, ConversationMessage
+│   ├── generator/TsidGenerator.java    # Tsid.fast().toLong() 로 PK 생성
 │   ├── repository/
-│   │   ├── reader/                     # 읽기 전용 Repository
-│   │   │   ├── archive/
-│   │   │   ├── auth/
-│   │   │   └── chatbot/
-│   │   └── writer/                     # 쓰기 전용 Repository
-│   │       ├── archive/
-│   │       ├── auth/
-│   │       └── chatbot/
-│   └── utils/
-│       ├── JpaImplicitNamingStrategyCustom.java  # JPA 명명 전략
-│       └── JpaPhysicalNamingStrategyCustom.java  # JPA 물리 명명 전략
-└── src/main/resources/
-    ├── application-api-domain.yml      # API 모듈용 설정
-    ├── application-batch-domain.yml    # Batch 모듈용 설정
-    └── db/migration/                   # Flyway 마이그레이션 스크립트
+│   │   ├── reader/                     # 읽기용 Spring Data JPA 인터페이스
+│   │   └── writer/                     # BaseWriterRepository + 도메인별 Writer + 히스토리 Writer
+│   ├── service/history/                # 변경 이력 추적 (HistoryService + Factory들)
+│   └── utils/                          # CamelCase → snake_case 등 JPA 네이밍 전략
+└── resources/
+    ├── application-api-domain.yml      # api-domain 데이터소스/JPA 설정
+    ├── application-batch-domain.yml    # batch-domain 데이터소스/JPA 설정
+    ├── mapper-config.xml               # MyBatis 전역 설정
+    └── db/migration/                   # Flyway 위치 (현재 비어 있음)
 ```
 
-## API 모듈별 스키마 매핑
+## TSID 기본키
 
-각 API 모듈은 독립적인 스키마를 사용합니다:
+메인 엔티티는 TSID(Time-Sorted Unique Identifier)를 64비트 `Long` PK로 씁니다. `@Tsid`는 Hibernate 6.5+ 방식인 `@IdGeneratorType(TsidGenerator.class)`로 동작하고, `TsidGenerator`는 `Tsid.fast().toLong()`으로 값을 만듭니다. TSID는 JS `Number.MAX_SAFE_INTEGER`를 넘으므로 API 경계에서는 문자열로 직렬화합니다(전역 Jackson 설정, 루트 `CLAUDE.md` 참고).
 
-| API 모듈 | 스키마명 | 관리 테이블 |
-|---------|---------|------------|
-| `api-auth` | `auth` | providers, users, admins, refresh_tokens, email_verifications, user_history, admin_history |
-| `api-bookmark` | `bookmark` | bookmarks, bookmark_history |
-| `api-chatbot` | `chatbot` | conversation_sessions, conversation_messages |
+## BaseEntity와 Soft Delete
 
-### 스키마 설정 방법
+`BaseEntity`(`@MappedSuperclass`)가 제공하는 컬럼:
 
-각 API 모듈의 `application.yml` 파일에서 `module.aurora.schema` 속성을 설정합니다:
+| 필드 | 컬럼 | 설명 |
+|------|------|------|
+| `id` | `id` | TSID PK |
+| `isDeleted` | `is_deleted` | soft delete 여부 |
+| `deletedAt` / `deletedBy` | `deleted_at` / `deleted_by` | 삭제 시각·주체 |
+| `createdAt` / `createdBy` | `created_at` / `created_by` | 생성 시각·주체 |
+| `updatedAt` / `updatedBy` | `updated_at` / `updated_by` | 수정 시각·주체 |
 
-```yaml
-module:
-  aurora:
-    schema: auth  # 또는 archive, chatbot
-```
+`@PrePersist`에서 생성/수정 시각을, `@PreUpdate`에서 수정 시각을 채웁니다. `ConversationMessageEntity`는 한 번 쓰면 바꾸지 않는 로그성 데이터라 `BaseEntity`를 상속하지 않고 `message_id`·`created_at`만 가집니다.
 
-`domain/aurora/src/main/resources/application-api-domain.yml`에서 `${module.aurora.schema}` 환경변수를 사용하여 동적으로 스키마를 참조합니다.
+## 엔티티
 
-## 주요 엔티티
+### auth
 
-### BaseEntity
+| 엔티티 | 테이블 | 메모 |
+|--------|--------|------|
+| `UserEntity` | `users` | 이메일/비밀번호 또는 OAuth 가입. `AuthenticationState` 계산, 정적 팩토리 제공 |
+| `AdminEntity` | `admins` | 로그인 실패 횟수·잠금 시각으로 계정 잠금 처리 |
+| `ProviderEntity` | `providers` | OAuth 제공자(Google/Naver/Kakao) 설정 |
+| `RefreshTokenEntity` | `refresh_tokens` | JWT Refresh Token. 사용자용/관리자용을 `user_id`/`admin_id`로 분리 |
+| `EmailVerificationEntity` | `email_verifications` | 이메일 인증·비밀번호 재설정 토큰 |
+| `AuthenticationState` | (enum) | `UserEntity` 상태 열거형(EMAIL_NOT_VERIFIED/ACTIVE/DELETED) |
+| `UserHistoryEntity` / `AdminHistoryEntity` | `user_history` / `admin_history` | 변경 이력 |
 
-모든 엔티티의 기본 클래스로, 다음 필드를 제공합니다:
+### bookmark
 
-- `id` (Long): TSID Primary Key
-- `isDeleted` (Boolean): 삭제 여부
-- `deletedAt` (LocalDateTime): 삭제 일시
-- `deletedBy` (Long): 삭제한 사용자 ID
-- `createdAt` (LocalDateTime): 생성 일시
-- `createdBy` (Long): 생성한 사용자 ID
-- `updatedAt` (LocalDateTime): 수정 일시
-- `updatedBy` (Long): 수정한 사용자 ID
+| 엔티티 | 테이블 | 메모 |
+|--------|--------|------|
+| `BookmarkEntity` | `bookmarks` | EmergingTech 북마크 전용. MongoDB `EmergingTechDocument` 값을 비정규화해 보관. 태그는 `\|` 구분자로 한 컬럼에 저장, soft delete 후 기간 내 복구 지원 |
+| `BookmarkHistoryEntity` | `bookmark_history` | 변경 이력 |
 
-### 주요 엔티티 목록
+### conversation
 
-#### Auth 스키마
-- **ProviderEntity**: OAuth 제공자 정보
-- **UserEntity**: 사용자 정보
-- **AdminEntity**: 관리자 정보 (로그인 잠금: `failedLoginAttempts`, `accountLockedUntil` 포함)
-- **RefreshTokenEntity**: JWT Refresh Token (`user_id`/`admin_id` FK 분리 저장)
-- **EmailVerificationEntity**: 이메일 인증 정보
-- **UserHistoryEntity**: 사용자 변경 이력
-- **AdminHistoryEntity**: 관리자 변경 이력
+`@Table(schema = "chatbot")`로 스키마가 고정됩니다.
 
-#### Bookmark 스키마
-- **BookmarkEntity**: 사용자 북마크 정보
-- **BookmarkHistoryEntity**: 북마크 변경 이력
+| 엔티티 | 테이블 | 메모 |
+|--------|--------|------|
+| `ConversationSessionEntity` | `chatbot.conversation_sessions` | `@AttributeOverride`로 PK 컬럼명을 `session_id`로. `user_id`, `title`, `last_message_at`, `is_active` |
+| `ConversationMessageEntity` | `chatbot.conversation_messages` | `message_id`(TSID PK), `role`(USER/ASSISTANT/SYSTEM), `content`, `token_count`, `sequence_number` |
 
-#### Chatbot 스키마
-- **ConversationSessionEntity**: 대화 세션 정보
-- **ConversationMessageEntity**: 대화 메시지 히스토리
+## 리포지토리
 
-## Repository 구조
+**reader (읽기)** — `repository/reader/`의 인터페이스는 모두 Spring Data JPA(`JpaRepository`, 일부 `JpaSpecificationExecutor`)입니다. 예: `UserReaderRepository.findByEmail`, `ConversationSessionReaderRepository.findByUserIdAndIsActiveTrueAndIsDeletedFalse`.
 
-### Reader Repository (읽기 전용)
+**writer (쓰기 + 이력)** — 세 겹입니다.
 
-읽기 작업은 Reader Repository를 통해 수행됩니다. Aurora Reader Endpoint에 연결됩니다.
+- `BaseWriterRepository<E>`: 공통 추상 클래스. `save`/`saveAndFlush`/`delete`/`deleteById`를 제공하고 매번 `HistoryService`로 이력을 남김. `delete` 계열은 실제 삭제 대신 `is_deleted = true`로 soft delete.
+- 도메인별 Writer(예: `UserWriterRepository`): `@Service`로 `BaseWriterRepository`를 상속해 자신이 쓸 `JpaRepository`·`HistoryService`·`EntityManager`·엔티티 클래스를 연결.
+- `*WriterJpaRepository`: 실제 JPA 인터페이스. `history/` 하위는 이력 엔티티를 저장하는 얇은 래퍼.
 
-```java
-@Repository
-public interface UserReaderRepository extends JpaRepository<UserEntity, Long> {
-    Optional<UserEntity> findByEmail(String email);
-    Optional<UserEntity> findByUsername(String username);
-}
-```
+## 변경 이력 추적
 
-### Writer Repository (쓰기 전용)
+JPA 엔티티 리스너가 아니라 **`BaseWriterRepository`가 명시적으로 호출하는 서비스**로 구현했습니다.
 
-쓰기 작업은 Writer Repository를 통해 수행됩니다. Aurora Writer Endpoint에 연결됩니다.
+1. `save`가 신규/수정을 구분하고, 수정이면 변경 전 데이터를 먼저 스냅샷으로 떠 둡니다. 1차 캐시의 dirty 값이 섞이지 않도록 `FlushMode.COMMIT` 네이티브 쿼리로 DB에서 직접 읽습니다.
+2. 저장 후 `HistoryService.saveHistory(엔티티, INSERT|UPDATE|DELETE, before, after)`를 호출합니다.
+3. `HistoryServiceImpl`이 before/after를 JSON으로 직렬화합니다. Jackson 3(`tools.jackson.*`) `JsonMapper` + `Hibernate7Module`을 쓰고, `null` 필드도 항상 포함(`Include.ALWAYS`)해 복원 손실을 막습니다.
+4. 엔티티 타입에 맞는 `HistoryEntityFactory`(`supports`)를 골라 이력을 저장합니다. 현재 Factory는 User/Admin/Bookmark 셋이며, 미지원 타입은 `IllegalArgumentException`.
 
-```java
-@Repository
-public interface UserWriterRepository extends JpaRepository<UserEntity, Long> {
-    UserEntity save(UserEntity user);
-    void deleteById(Long id);
-}
-```
+이력 테이블 공통 컬럼: `history_id`(TSID PK), `{entity}_id`(FK), `operation_type`, `before_data`(JSON), `after_data`(JSON), `changed_by`, `changed_at`, `change_reason`.
 
-## 환경 설정
+> `changedBy`는 현재 `getCurrentUserId()`가 `null`을 반환합니다. SecurityContext 연동은 TODO입니다.
 
-### 필수 환경변수
+## 데이터소스 설정
 
-Aurora DB Cluster 연결을 위한 환경변수:
+기본 드라이버는 AWS Advanced JDBC Wrapper(`software.aws.rds.jdbc.mysql.Driver`)이고 HikariCP로 풀을 구성합니다. writer 풀엔 `readWriteSplitting,failover,efm` 플러그인이, reader 풀은 `read-only`로 설정됩니다. `local` 프로필에서는 failover/EFM 플러그인을 끕니다(`wrapperPlugins: ""`, `useConnectionPlugins: false`). build.gradle엔 `mariadb-java-client`도 `runtimeOnly`로 들어 있습니다.
 
-| 환경변수명 | 설명 | 예시 |
-|-----------|------|------|
-| `AURORA_WRITER_ENDPOINT` | Aurora Writer 엔드포인트 | `aurora-cluster.cluster-xxxxx.ap-northeast-2.rds.amazonaws.com` |
-| `AURORA_READER_ENDPOINT` | Aurora Reader 엔드포인트 | `aurora-cluster.cluster-ro-xxxxx.ap-northeast-2.rds.amazonaws.com` |
-| `AURORA_USERNAME` | 데이터베이스 사용자명 | `admin` |
-| `AURORA_PASSWORD` | 데이터베이스 비밀번호 | `********` |
-| `AURORA_OPTIONS` | JDBC 연결 옵션 | `useSSL=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8` |
+JDBC URL의 데이터베이스 이름은 `${module.aurora.schema}`로 비워 두고 각 서비스가 자기 `application.yml`에서 채웁니다(한 모듈 = 한 스키마). 로컬 인프라는 루트 `docker-compose.yml`로 띄웁니다.
 
-### 로컬 환경 설정 (Docker Compose)
+| 서비스 | 로컬 MySQL 포트 | 스키마 |
+|--------|----------------|--------|
+| `batch-source` | 3307 | batch |
+| `api-auth` | 3308 | auth |
+| `api-bookmark` | 3309 | bookmark |
+| `api-chatbot` | 3310 | chatbot |
 
-로컬 환경에서는 Docker Compose로 MySQL 8.0 인스턴스를 모듈별로 제공하여 AWS RDS Aurora 의존성을 제거합니다:
+`dev`/`beta`/`prod`는 Aurora 클러스터 엔드포인트에 붙고, JDBC 옵션은 `${AURORA_OPTIONS}`로 덮어쓸 수 있습니다.
 
-| 컨테이너 | 호스트 포트 | 스키마 | 대상 모듈 |
-|---------|----------|-------|---------|
-| `mysql-batch` | 3307 | batch | batch/source |
-| `mysql-auth` | 3308 | auth | api/auth |
-| `mysql-bookmark` | 3309 | bookmark | api/bookmark |
-| `mysql-chatbot` | 3310 | chatbot | api/chatbot |
+## Flyway / MyBatis
 
-```bash
-# Docker Compose 실행
-docker compose up -d
-
-# 환경 변수 설정
-cp .env.example .env
-```
-
-각 모듈의 `application-local.yml`에서 `module.mysql.port`와 `module.aurora.schema` 속성을 설정합니다.
-
-로컬 프로파일에서는 AWS Aurora JDBC 드라이버의 failover/EFM 플러그인이 비활성화됩니다:
-```yaml
-data-source-properties:
-  wrapperPlugins: ""
-  useConnectionPlugins: false
-```
-
-자세한 설정은 [MySQL Docker 로컬 환경 구축 가이드](../../docs/reference/mysql-docker-local-setup-guide.md)를 참고하세요.
-
-### 운영 환경 설정
-
-운영 환경에서는 환경변수를 통해 Aurora DB Cluster에 연결합니다:
-
-```bash
-# Aurora DB Cluster 연결 정보
-AURORA_WRITER_ENDPOINT=aurora-cluster.cluster-xxxxx.ap-northeast-2.rds.amazonaws.com
-AURORA_READER_ENDPOINT=aurora-cluster.cluster-ro-xxxxx.ap-northeast-2.rds.amazonaws.com
-AURORA_USERNAME=admin
-AURORA_PASSWORD=your-password-here
-AURORA_OPTIONS=useSSL=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-```
+- **Flyway**: 의존성(`flyway-core`, `flyway-mysql`)과 위치(`db/migration/`)는 있으나 디렉터리는 비어 있습니다. 스키마는 외부에서 관리되며 `hibernate.ddl-auto: none`으로 JPA가 DDL을 만들지 않습니다.
+- **MyBatis**: 양쪽 프로필 모두 writer/reader `SqlSessionTemplate` 빈과 전역 설정(`mapper-config.xml`)을 구성하지만, 이 모듈엔 매퍼 XML이 없습니다. 복잡한 읽기 쿼리가 필요한 서비스가 자기 모듈에서 매퍼를 추가해 이 인프라를 씁니다.
 
 ## 의존성
 
-### 주요 의존성
+`jpa.gradle`(HikariCP, QueryDSL, AWS MySQL JDBC 등)과 `docs.gradle`을 적용합니다. 직접 선언하는 주요 의존성: `tsid-creator`(TSID), `spring-boot-starter-data-jpa`, `jackson-datatype-hibernate7`(이력 JSON 직렬화 시 Hibernate 프록시 처리), `spring-boot-starter-data-mongodb`(EmergingTech 식별자 연동), `flyway-core`/`flyway-mysql`, `mybatis-spring-boot-starter`, `mariadb-java-client`(runtimeOnly).
 
-- **Spring Boot Data JPA**: JPA 및 Repository 지원
-- **MariaDB JDBC Driver**: Aurora MySQL 연결 드라이버
-- **Flyway**: 데이터베이스 마이그레이션
-- **MyBatis Spring Boot Starter**: MyBatis 통합
-- **TSID Creator**: TSID 생성 라이브러리
+## CQRS에서의 위치
 
-### build.gradle
+Command 쪽입니다. 쓰기가 끝나면 Kafka 이벤트가 발행되고 Query 쪽(`datasource-mongodb`)이 받아 동기화합니다(목표 지연 1초 이내, Redis 멱등 처리). 이벤트 발행은 각 API 서비스와 `common-kafka`가 담당합니다.
 
-```gradle
-dependencies {
-    implementation project(':common-core')
-    
-    implementation 'com.github.f4b6a3:tsid-creator:5.2.6'
-    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-    implementation 'org.springframework.boot:spring-boot-starter-data-mongodb'
-    implementation 'org.springframework.boot:spring-boot-starter-data-mongodb-reactive'
-    implementation 'org.springframework.boot:spring-boot-starter-flyway'
-    implementation 'org.springframework.boot:spring-boot-starter-mongodb'
-    implementation 'org.flywaydb:flyway-mysql'
-    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:4.0.1'
-    runtimeOnly 'org.mariadb.jdbc:mariadb-java-client'
-}
-```
+## 참고
 
-## 히스토리 추적 메커니즘
-
-### HistoryEntityListener
-
-`HistoryEntityListener`는 JPA Entity Listener로, 모든 엔티티의 변경 사항을 자동으로 히스토리 테이블에 저장합니다.
-
-### 지원하는 작업 타입
-
-- **INSERT**: 새로운 레코드 생성
-- **UPDATE**: 기존 레코드 수정
-- **DELETE**: Soft Delete 처리 (`is_deleted = TRUE`로 변경)
-
-### 히스토리 테이블 구조
-
-모든 히스토리 테이블은 다음 구조를 가집니다:
-
-- `history_id` (Long): TSID Primary Key
-- `{entity}_id` (Long): 엔티티 ID (Foreign Key)
-- `operation_type` (String): 작업 타입 (INSERT, UPDATE, DELETE)
-- `before_data` (JSON): 변경 전 데이터
-- `after_data` (JSON): 변경 후 데이터
-- `changed_by` (Long): 변경한 사용자 ID
-- `changed_at` (LocalDateTime): 변경 일시
-- `change_reason` (String): 변경 사유
-
-## CQRS 동기화
-
-이 모듈은 Command Side로, 모든 쓰기 작업을 처리합니다. 쓰기 작업 후 Kafka 이벤트를 발행하여 Query Side(MongoDB Atlas)와 동기화합니다.
-
-자세한 내용은 다음 문서를 참고하세요:
-- [CQRS Kafka 동기화 설계서](../../docs/step11/cqrs-kafka-sync-design.md)
-
-## 참고 문서
-
-### 설계서
-- [Aurora MySQL 스키마 설계서](../../docs/step1/3.%20aurora-schema-design.md)
-- [Aurora MySQL 베스트 프랙티스](../../docs/step1/aurora-mysql-schema-design-best-practices.md)
-
-### 공식 문서
-- [Spring Data JPA 공식 문서](https://docs.spring.io/spring-data/jpa/docs/current/reference/html/)
-- [Amazon Aurora MySQL 사용자 가이드](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.AuroraMySQL.html)
-- [TSID Creator GitHub](https://github.com/f4b6a3/tsid-creator)
-- [Flyway 공식 문서](https://flywaydb.org/documentation/)
-
-## 라이선스
-
-이 모듈은 프로젝트의 라이선스를 따릅니다.
-
+- [Spring Data JPA](https://docs.spring.io/spring-data/jpa/reference/) · [Amazon Aurora MySQL](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.AuroraMySQL.html)
+- [AWS Advanced JDBC Wrapper](https://github.com/aws/aws-advanced-jdbc-wrapper) · [TSID Creator](https://github.com/f4b6a3/tsid-creator) · [Flyway](https://documentation.red-gate.com/fd)

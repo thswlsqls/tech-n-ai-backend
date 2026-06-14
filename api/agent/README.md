@@ -4,7 +4,7 @@ LangChain4j 기반 Emerging Tech 데이터 분석 및 업데이트 추적 AI Age
 
 ## 개요
 
-`api-agent` 모듈은 LangChain4j와 OpenAI를 활용하여 빅테크 AI 서비스(OpenAI, Anthropic, Google, Meta, xAI)의 업데이트를 자율적으로 추적하고 분석하는 AI Agent를 제공합니다. 자연어 목표(Goal)를 입력받아 GitHub Release 조회, 웹 스크래핑, 데이터 통계 집계, 키워드 빈도 분석 등의 작업을 자동으로 수행하며, 결과를 Markdown 표와 Mermaid 차트로 시각화합니다.
+`api-agent`는 LangChain4j와 OpenAI(gpt-4o-mini)로 빅테크 AI 서비스(OpenAI, Anthropic, Google, Meta, xAI)의 업데이트를 자율 추적·분석하는 Agent입니다. 자연어 목표(Goal)를 받아 GitHub Release 수집, 웹 스크래핑/RSS, 통계 집계, 키워드 빈도 분석을 자동 수행하고 결과를 Markdown 표와 Mermaid 차트로 정리합니다. ADMIN JWT 인증과 `sessionId` 기반 멀티턴 대화를 지원하며, 6시간 주기 스케줄러로도 실행됩니다(실행 실패 시 Slack 알림).
 
 ## 아키텍처
 
@@ -86,21 +86,7 @@ flowchart TB
     T9 --> DataCollectionAdapter --> WebScraper
 ```
 
-## 주요 기능
-
-### Agent 기능
-
-| 기능 | 설명 |
-|------|------|
-| 자율 실행 | 자연어 목표(Goal)를 입력받아 필요한 Tool을 자동으로 선택하고 실행 |
-| 데이터 분석 | Provider/SourceType/UpdateType별 통계 집계, 키워드 빈도 분석 |
-| 시각화 | Mermaid pie/bar 차트 및 Markdown 표로 분석 결과 시각화 |
-| 데이터 수집 | GitHub Release 추적, 웹 스크래핑으로 최신 업데이트 수집 |
-| 중복 방지 | 수집 전 기존 업데이트 검색으로 중복 확인 |
-| 스케줄 실행 | 6시간 주기로 자동 업데이트 추적 |
-| 오류 알림 | 실행 실패 시 Slack 알림 |
-
-### LangChain4j Tools (9개)
+## LangChain4j Tools (9개)
 
 #### 조회 (3개)
 
@@ -115,7 +101,7 @@ flowchart TB
 | Tool | 설명 | 주요 파라미터 |
 |------|------|---------------|
 | `get_emerging_tech_statistics` | Provider/SourceType/UpdateType별 통계 집계 (MongoDB Aggregation) | `groupBy`(필수), `startDate`, `endDate` |
-| `analyze_text_frequency` | title/summary 키워드 빈도 분석 (61개 영어 불용어 필터링) | `provider`, `updateType`, `sourceType`, `startDate`, `endDate`, `topN`(기본20, 최대100) |
+| `analyze_text_frequency` | title/summary 키워드 빈도 분석 (영어 불용어 필터링, `AnalyticsConfig.stopWords`로 설정·오버라이드) | `provider`, `updateType`, `sourceType`, `startDate`, `endDate`, `topN`(기본20, 최대100) |
 
 #### 알림 (1개)
 
@@ -131,222 +117,127 @@ flowchart TB
 | `collect_rss_feeds` | OpenAI/Google 블로그 RSS 피드 수집 → DB 저장 | `provider`(선택: OPENAI, GOOGLE) |
 | `collect_scraped_articles` | Anthropic/Meta 블로그 웹 스크래핑 수집 → DB 저장 | `provider`(선택: ANTHROPIC, META) |
 
-## Agent 동작 흐름
+> 분석 Tool(`get_emerging_tech_statistics`, `analyze_text_frequency`)은 실행 시 `ChartData`(pie/bar)를 함께 수집해 응답에 포함합니다. 동일 인자 반복 호출은 `ToolExecutionMetrics`가 차단하며, 한도를 넘으면 `AgentLoopDetectedException`으로 강제 종료합니다.
 
-### 통계 분석 요청
+## Agent 동작 예시
 
 ```
-사용자 Goal: "최근 AI 업데이트 현황을 수집해주세요"
+Goal: "최근 AI 업데이트 현황을 수집해주세요"
 
-Agent 추론 과정:
 1. get_emerging_tech_statistics("provider", "", "")
-   → { totalCount: 179, groups: [{name:"ANTHROPIC", count:72}, {name:"OPENAI", count:45}, ...] }
-
+   → { totalCount: 179, groups: [{ANTHROPIC:72}, {OPENAI:45}, ...] }
 2. get_emerging_tech_statistics("source_type", "", "")
-   → { totalCount: 179, groups: [{name:"WEB_SCRAPING", count:115}, {name:"GITHUB_RELEASE", count:64}] }
-
+   → { groups: [{WEB_SCRAPING:115}, {GITHUB_RELEASE:64}] }
 3. send_slack_notification("데이터 수집 완료: ...")
-   → Slack 알림 전송
 
-결과: Provider별/SourceType별 통계 Markdown 표 + 신규 데이터 수집 결과 요약
+결과: Provider별/SourceType별 통계 Markdown 표 + 차트(ChartData) + 수집 요약
 ```
-
-### 키워드 빈도 분석 요청
-
-```
-사용자 Goal: "올해 수집된 데이터의 주요 키워드를 분석해줘"
-
-Agent 추론 과정:
-1. analyze_text_frequency("", "", "", "2025-01-01", "2025-12-31", 20)
-   → { totalDocuments: 179, topWords: [{word:"model", count:312}, ...] }
-
-2. Mermaid xychart-beta 바 차트 + Markdown 표 생성
-
-결과:
-| 순위 | 키워드 | 빈도 |
-|------|--------|------|
-| 1    | model  | 312  |
-| 2    | api    | 218  |
-| ...  | ...    | ...  |
-```
-
-## 테스트
-
-### 단위 테스트
-
-langchain4j 1.10.0 업그레이드와 함께 주요 컴포넌트에 대한 단위 테스트가 추가되었습니다.
-
-| 테스트 클래스 | 대상 |
-|--------------|------|
-| `AgentControllerTest` | REST API 컨트롤러 |
-| `AgentFacadeTest` | Facade 계층 |
-| `EmergingTechAgentToolsTest` | Tool 정의 및 검증 로직 |
-| `ToolExecutionMetricsTest` | ThreadLocal 메트릭 집계 |
-| `AnalyticsToolAdapterTest` | 통계/빈도 분석 어댑터 |
-| `DataCollectionToolAdapterTest` | 데이터 수집 어댑터 |
-| `EmergingTechToolAdapterTest` | Emerging Tech 검색/목록/상세 어댑터 |
-| `ToolErrorHandlersTest` | Tool 오류 처리 전략 |
-| `ToolInputValidatorTest` | Tool 입력값 검증 |
-
-### Agent 실행 테스트 결과
-
-EmergingTech Agent의 로컬 환경 테스트가 성공적으로 완료되었습니다. 아래는 실제 테스트 과정에서 확인된 시스템 동작 로그입니다.
-
-#### 1. Agent 실행 요청 및 응답
-
-자연어 목표를 입력하면 Agent가 자율적으로 Tool을 선택하여 데이터 수집 및 분석을 수행합니다.
-
-![Agent 실행 요청 및 응답](../../contents/api-agent/api-agent%20250204_1-실행로그.png)
-
-**주요 확인 사항**:
-- Agent 실행 API (`POST /api/v1/agent/run`) 정상 동작
-- 데이터 수집 및 Slack 알림 자동 수행
-- `toolCallCount`, `analyticsCallCount` 메트릭 정상 집계
-
-#### 2. LLM Function Calling - 통계 분석 Tool 호출
-
-Agent가 `get_emerging_tech_statistics` Tool을 호출하여 Provider/SourceType별 통계를 집계하는 과정입니다.
-
-![통계 분석 Tool 호출](../../contents/api-agent/api-agent%20250204_2-실행로그.png)
-
-#### 3. LLM 자율 추론 및 Tool 선택
-
-OpenAI GPT-4o-mini가 Function Calling을 통해 다음 Tool을 자율적으로 선택하는 과정입니다.
-
-![LLM 자율 추론](../../contents/api-agent/api-agent%20250204_4-실행로그.png)
-
-#### 4. 통계 결과 시각화 및 Slack 알림
-
-Agent가 수집/분석 결과를 Markdown 표로 정리하고 Slack 알림을 전송하는 과정입니다.
-
-![통계 시각화 및 Slack 알림](../../contents/api-agent/api-agent%20250204_6-실행로그.png)
-
-#### 5. 최종 실행 결과
-
-전체 데이터 수집 및 분석 작업의 최종 결과 응답입니다.
-
-![최종 실행 결과](../../contents/api-agent/api-agent%20250204_7-실행로그.png)
-
-#### 6. MongoDB Atlas 데이터 확인
-
-수집된 Emerging Tech 데이터가 MongoDB Atlas `emerging_techs` 컬렉션에 정상 저장된 모습입니다.
-
-![MongoDB Atlas 데이터](../../contents/api-agent/api-agent%20250204_8-실행로그.png)
 
 ## API 엔드포인트
 
-### Agent 실행 API
+모든 Agent API는 Gateway에서 ADMIN 역할 JWT 인증을 거칩니다. Gateway가 검증 후 `x-user-id` 헤더를 주입하며, 컨트롤러는 이 헤더로 세션 소유자를 식별합니다.
 
-```
+| Method | Endpoint | 설명 |
+|--------|---------|------|
+| POST | `/api/v1/agent/run` | Agent 실행 (자연어 목표 입력) |
+| GET | `/api/v1/agent/sessions` | 세션 목록 조회 (페이징) |
+| GET | `/api/v1/agent/sessions/{sessionId}` | 세션 상세 조회 |
+| GET | `/api/v1/agent/sessions/{sessionId}/messages` | 대화 이력 조회 (페이징) |
+| PATCH | `/api/v1/agent/sessions/{sessionId}/title` | 세션 타이틀 수동 변경 |
+| DELETE | `/api/v1/agent/sessions/{sessionId}` | 세션 삭제 |
+
+### Agent 실행 요청
+
+```http
 POST /api/v1/agent/run
-X-Internal-Api-Key: {api-key}
+Authorization: Bearer {accessToken}
 Content-Type: application/json
 
 {
-  "goal": "최근 AI 업데이트 현황을 수집해주세요"
+  "goal": "최근 AI 업데이트 현황을 수집해주세요",
+  "sessionId": "{기존 세션 ID, 생략 가능}"
 }
 ```
+
+> `sessionId`를 생략하면 새 세션이 생성되어 응답으로 반환되고, 같은 `sessionId`로 재요청하면 이전 대화 맥락을 유지합니다.
 
 ### Response
 
 ```json
 {
   "code": "2000",
-  "message": "성공",
+  "message": "success",
   "data": {
     "success": true,
-    "summary": "최근 AI 업데이트 데이터 수집 및 분석 완료...",
+    "summary": "## Provider별 통계\n\n| Provider | 건수 |\n|---|---|\n| OPENAI | 145 |",
+    "sessionId": "{세션 ID}",
     "toolCallCount": 8,
     "analyticsCallCount": 2,
     "executionTimeMs": 48612,
-    "errors": []
+    "errors": [],
+    "chartData": [
+      {
+        "chartType": "pie",
+        "title": "Provider별 통계",
+        "meta": { "groupBy": "provider", "startDate": null, "endDate": null, "totalCount": 243 },
+        "dataPoints": [
+          { "label": "OPENAI", "value": 145 }
+        ]
+      }
+    ]
   }
 }
 ```
 
+## 동작 확인 (로컬 테스트)
+
+로컬 환경에서 자연어 목표 입력 → 자율 Tool 선택 → 수집/분석 → Slack 알림 → MongoDB 저장까지 확인했습니다.
+
+- [실행 요청/응답](../../contents/api-agent/api-agent%20250204_1-실행로그.png) — `POST /api/v1/agent/run`, 메트릭(`toolCallCount`/`analyticsCallCount`) 집계
+- [통계 Tool 호출](../../contents/api-agent/api-agent%20250204_2-실행로그.png) — `get_emerging_tech_statistics`로 Provider/SourceType 집계
+- [LLM 자율 추론](../../contents/api-agent/api-agent%20250204_4-실행로그.png) — Function Calling으로 다음 Tool 선택
+- [시각화 + Slack](../../contents/api-agent/api-agent%20250204_6-실행로그.png) — Markdown 표 정리 후 Slack 알림 전송
+- [최종 실행 결과](../../contents/api-agent/api-agent%20250204_7-실행로그.png)
+- [MongoDB 저장](../../contents/api-agent/api-agent%20250204_8-실행로그.png) — `emerging_techs` 컬렉션에 수집 데이터 저장
+
+## 단위 테스트
+
+| 테스트 클래스 | 대상 |
+|--------------|------|
+| `AgentControllerTest` | REST API 컨트롤러 |
+| `AgentFacadeTest` | Facade 계층 |
+| `EmergingTechAgentImplTest` | Agent 구현체 (루프 감지, 에러 처리) |
+| `EmergingTechAgentToolsTest` | Tool 정의 및 검증 로직 |
+| `ToolExecutionMetricsTest` | ThreadLocal 메트릭 집계 |
+| `AnalyticsToolAdapterTest` / `DataCollectionToolAdapterTest` / `EmergingTechToolAdapterTest` | Tool 어댑터 |
+| `ToolErrorHandlersTest` | Tool 오류 처리 전략 |
+| `ToolInputValidatorTest` | Tool 입력값 검증 |
+| `DataCollectionProcessorUtilTest` | 데이터 수집 결과 가공 유틸 |
+
 ## 디렉토리 구조
 
 ```
-api/agent/
-├── src/main/java/.../api/agent/
-│   ├── ApiAgentApplication.java
-│   ├── agent/
-│   │   ├── EmergingTechAgent.java          # Agent 인터페이스
-│   │   ├── EmergingTechAgentImpl.java      # Agent 구현체
-│   │   ├── AgentAssistant.java             # LangChain4j AiServices 인터페이스
-│   │   └── AgentExecutionResult.java       # 실행 결과 DTO
-│   ├── config/
-│   │   ├── AiAgentConfig.java              # OpenAI 모델 설정
-│   │   ├── AgentPromptConfig.java          # System Prompt 외부 설정
-│   │   ├── AnalyticsConfig.java            # 분석 설정 (불용어 등)
-│   │   └── ServerConfig.java               # ComponentScan 설정
-│   ├── controller/
-│   │   └── AgentController.java
-│   ├── dto/
-│   │   └── request/
-│   │       └── AgentRunRequest.java
-│   ├── facade/
-│   │   └── AgentFacade.java                # Controller ↔ Agent 중간 계층
-│   ├── metrics/
-│   │   └── ToolExecutionMetrics.java       # ThreadLocal 기반 Tool 실행 메트릭
-│   ├── scheduler/
-│   │   └── EmergingTechAgentScheduler.java
-│   └── tool/
-│       ├── EmergingTechAgentTools.java      # Tool 정의 클래스 (9개 Tool)
-│       ├── adapter/
-│       │   ├── AnalyticsToolAdapter.java    # 통계/빈도 분석 어댑터
-│       │   ├── DataCollectionToolAdapter.java # 데이터 수집 어댑터 (GitHub/RSS/Scraper)
-│       │   ├── EmergingTechToolAdapter.java # 검색/목록/상세 조회 어댑터
-│       │   └── SlackToolAdapter.java        # Slack 알림 어댑터
-│       ├── dto/
-│       │   ├── DataCollectionResultDto.java  # 데이터 수집 결과
-│       │   ├── EmergingTechDetailDto.java    # 상세 조회 결과
-│       │   ├── EmergingTechDto.java
-│       │   ├── EmergingTechListDto.java      # 목록 조회 결과 (페이징)
-│       │   ├── GitHubReleaseDto.java
-│       │   ├── ScrapedContentDto.java
-│       │   ├── StatisticsDto.java            # 통계 집계 결과
-│       │   ├── ToolResult.java
-│       │   └── WordFrequencyDto.java         # 키워드 빈도 분석 결과
-│       ├── handler/
-│       │   └── ToolErrorHandlers.java       # Tool 오류 처리 전략
-│       ├── util/
-│       │   ├── DataCollectionProcessorUtil.java
-│       │   └── TextTruncator.java
-│       └── validation/
-│           └── ToolInputValidator.java      # Tool 입력값 검증
-└── src/main/resources/
-    ├── application.yml
-    └── application-agent-api.yml
+api/agent/src/main/java/.../api/agent/
+├── ApiAgentApplication.java
+├── agent/        # Agent 인터페이스·구현체, AiServices(AgentAssistant), 실행결과 DTO, dto/ChartData
+├── config/       # OpenAI 모델, System Prompt, 분석(불용어), ComponentScan 설정
+├── controller/   # AgentController (실행 + 세션 관리 REST API)
+├── dto/          # request(실행/세션목록/메시지/타이틀), response(세션목록/메시지)
+├── exception/    # AgentLoopDetectedException (루프 감지)
+├── facade/       # AgentFacade (Controller ↔ Agent 오케스트레이션)
+├── metrics/      # ToolExecutionMetrics (ThreadLocal 실행 메트릭)
+├── scheduler/    # EmergingTechAgentScheduler (6시간 주기)
+├── service/      # GitHub/RSS/Scraper 수집 서비스 + 세션 타이틀 자동생성(@Async)
+└── tool/         # EmergingTechAgentTools(9개) + adapter/ dto/ handler/ util/ validation/
 ```
 
 ## 설정
 
-### application.yml
+`application.yml`: 포트 8086, 프로필 include(`common-core`, `kafka`, `api-domain`, `agent-api`, `mongodb-domain`, `feign-github`, `feign-internal`, `slack`, `scraper`, `rss`). Aurora 스키마는 `chatbot`을 공유하며 로컬 MySQL 포트는 `MYSQL_PORT`(기본 3310)로 지정합니다.
+
+`application-agent-api.yml` (Agent 전용 설정):
 
 ```yaml
-server:
-  port: 8086
-
-spring:
-  application:
-    name: agent-api
-  profiles:
-    include:
-      - common-core
-      - agent-api
-      - mongodb-domain
-      - feign-github
-      - feign-internal
-      - slack
-      - scraper
-      - rss
-```
-
-### application-agent-api.yml
-
-```yaml
-# Agent용 OpenAI 설정
 langchain4j:
   open-ai:
     chat-model:
@@ -355,13 +246,13 @@ langchain4j:
       temperature: 0.3
       max-tokens: 4096
       timeout: 120
+      log-requests: ${AGENT_LOG_REQUESTS:false}
+      log-responses: ${AGENT_LOG_RESPONSES:false}
 
-# Emerging Tech 내부 API 설정
 internal-api:
   emerging-tech:
     api-key: ${EMERGING_TECH_INTERNAL_API_KEY:}
 
-# Emerging Tech Agent 스케줄러 설정
 agent:
   scheduler:
     enabled: ${AGENT_SCHEDULER_ENABLED:false}
@@ -370,7 +261,7 @@ agent:
     default-top-n: 20
     max-top-n: 100
   slack:
-    enabled: false    # Slack 발송 비활성화 (true로 변경 시 실제 발송)
+    enabled: false    # true로 변경 시 실제 발송 (기본 Mock)
 ```
 
 ### 환경 변수
@@ -382,6 +273,19 @@ agent:
 | `AGENT_SCHEDULER_ENABLED` | 스케줄러 활성화 (true/false) | No |
 | `GITHUB_TOKEN` | GitHub API 토큰 (Rate Limit 완화) | No |
 
+## 대상 AI 서비스 (GitHub 화이트리스트)
+
+`ToolInputValidator`로 아래 조합만 허용하며, 목록 밖 저장소 호출은 거부합니다.
+
+| Provider | Owner | Repository |
+|----------|-------|------------|
+| OpenAI | openai | openai-python, whisper, tiktoken |
+| Anthropic | anthropics | anthropic-sdk-python, claude-code |
+| Google | google | generative-ai-python, gemma.cpp |
+| Google | google-deepmind | gemma |
+| Meta | meta-llama | llama-models, llama-stack |
+| xAI | xai-org | grok-1 |
+
 ## 의존성
 
 ```gradle
@@ -389,6 +293,9 @@ dependencies {
     // 프로젝트 모듈
     implementation project(':common-core')
     implementation project(':common-exception')
+    implementation project(':common-conversation')
+    implementation project(':common-kafka')
+    implementation project(':datasource-aurora')
     implementation project(':datasource-mongodb')
 
     // LangChain4j Core + OpenAI (1.10.0: Tool Error Handler 지원)
@@ -411,60 +318,21 @@ dependencies {
 ## 실행
 
 ```bash
-# 빌드
-./gradlew :api-agent:build
-
-# 실행
-./gradlew :api-agent:bootRun
-
-# 테스트
-./gradlew :api-agent:test
+./gradlew :api-agent:build     # 빌드
+./gradlew :api-agent:bootRun   # 실행 (8086)
+./gradlew :api-agent:test      # 테스트
 ```
-
-## 대상 AI 서비스 (GitHub 화이트리스트)
-
-| Provider | Owner | Repository |
-|----------|-------|------------|
-| OpenAI | openai | openai-python, whisper, tiktoken |
-| Anthropic | anthropics | anthropic-sdk-python, claude-code |
-| Google | google | generative-ai-python, gemma.cpp |
-| Google | google-deepmind | gemma |
-| Meta | meta-llama | llama-models, llama-stack |
-| xAI | xai-org | grok-1 |
 
 ## 연동 모듈
 
 - **api-emerging-tech**: 업데이트 검색 API 제공
 - **datasource-mongodb**: MongoDB Aggregation 기반 통계/빈도 집계
 - **client-feign**: GitHub API, Internal API Feign 클라이언트
-- **client-slack**: Slack 알림 전송
-- **client-scraper**: 웹 페이지 크롤링
-- **client-rss**: RSS 피드 수집
+- **client-slack** / **client-scraper** / **client-rss**: Slack 알림, 웹 크롤링, RSS 수집
 
 ## 참고 자료
 
-### 설계 문서
-
-- [Phase 1: 데이터 수집 파이프라인 설계서](../../docs/reference/agent-pipeline/001-data-pipeline-design.md)
-- [Phase 2: LangChain4j Tool 래퍼 설계서](../../docs/reference/agent-pipeline/002-langchain4j-tools-design.md)
-- [Phase 3: AI Agent 통합 설계서](../../docs/reference/agent-pipeline/003-agent-integration-design.md)
-- [Phase 4: AI Agent Tool 재설계 - 데이터 분석 기능 전환 설계서](../../docs/reference/agent-pipeline/004-analytics-tool-redesign.md)
-- [Phase 5: 데이터 수집 Agent 설계서](../../docs/reference/agent-pipeline/005-data-collection-agent.md)
-- [Phase 6: Agent Query Tool 개선 설계서](../../docs/reference/agent-pipeline/006-agent-query-tool-improvement.md)
-- [Phase 7: 지원하지 않는 요청 처리 설계서](../../docs/reference/agent-pipeline/007-unsupported-request-handling.md)
-
-### 테스트 결과
-
-- [Agent 테스트 결과 문서 목록](../../docs/reference/agent-pipeline/tests/)
-- [Agent 실행 테스트 결과](../../docs/reference/agent-pipeline/tests/01-agent-run-test-results.md)
-- [Agent 데이터 분석 테스트 결과](../../docs/reference/agent-pipeline/tests/02-agent-analytics-test-results.md)
-- [Agent 데이터 수집 테스트 결과](../../docs/reference/agent-pipeline/tests/03-agent-data-collection-test-results.md)
-- [Agent Query Tool 테스트 결과](../../docs/reference/agent-pipeline/tests/04-agent-query-tools-test-results.md)
-
-### 공식 문서
-
-- [LangChain4j Documentation](https://docs.langchain4j.dev/)
-- [LangChain4j Tools Tutorial](https://docs.langchain4j.dev/tutorials/tools)
-- [LangChain4j AI Services](https://docs.langchain4j.dev/tutorials/ai-services)
-- [Spring Data MongoDB Aggregation](https://docs.spring.io/spring-data/mongodb/reference/mongodb/aggregation-framework.html)
-- [OpenAI API Reference](https://platform.openai.com/docs/api-reference)
+- 설계 문서: [Agent 파이프라인 설계서 (Phase 1~7)](../../docs/reference/agent-pipeline/) — 데이터 수집, Tool 래퍼, Agent 통합, 분석 Tool 재설계, 데이터 수집 Agent, Query Tool 개선, 미지원 요청 처리
+- 테스트 결과: [Agent 테스트 결과 문서](../../docs/reference/agent-pipeline/tests/)
+- 공식 문서: [LangChain4j](https://docs.langchain4j.dev/) · [Tools](https://docs.langchain4j.dev/tutorials/tools) · [AI Services](https://docs.langchain4j.dev/tutorials/ai-services) · [Spring Data MongoDB Aggregation](https://docs.spring.io/spring-data/mongodb/reference/mongodb/aggregation-framework.html) · [OpenAI API](https://platform.openai.com/docs/api-reference)
+```

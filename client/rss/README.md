@@ -2,289 +2,99 @@
 
 ## 개요
 
-`client-rss` 모듈은 RSS(Really Simple Syndication) 및 Atom 피드를 파싱하여 IT 테크 뉴스 정보를 수집하는 클라이언트 모듈입니다. Rome 라이브러리를 사용하여 RSS 2.0 및 Atom 1.0 형식을 지원하며, Spring WebClient를 통한 비동기 HTTP 요청과 Resilience4j를 통한 재시도 로직을 제공합니다.
+`client-rss`는 외부 기술 블로그의 RSS/Atom 피드를 가져와 공통 형식(`RssFeedItem`)으로 파싱하는 라이브러리입니다. Rome로 피드를 해석하고 WebClient로 내려받습니다. `bootJar.enabled = false`인 라이브러리라 `batch-source`가 의존성으로 가져다 씁니다.
 
 ## 주요 기능
 
-### 1. RSS/Atom 피드 파싱
-- **RSS 2.0 형식 지원**: TechCrunch, Ars Technica, Medium Technology
-- **Atom 1.0 형식 지원**: Google Developers Blog
-- **피드 검증**: 필수 필드 존재 여부 확인, 중복 항목 제거
-- **데이터 정제**: HTML 태그 제거, 특수 문자 정규화
+파서 하나가 피드 하나를 담당합니다.
 
-### 2. 대상 출처
-- **Google Developers Blog** (Priority 1, total_score: 36)
-  - 피드 URL: `https://developers.googleblog.com/feeds/posts/default`
-  - 피드 형식: Atom 1.0
-  - 업데이트 빈도: 주간
-- **TechCrunch** (Priority 1, total_score: 35)
-  - 피드 URL: `https://techcrunch.com/feed/`
-  - 피드 형식: RSS 2.0
-  - 업데이트 빈도: 일일
-- **Ars Technica** (Priority 2, total_score: 34)
-  - 피드 URL: `https://feeds.arstechnica.com/arstechnica/index`
-  - 피드 형식: RSS 2.0
-  - 업데이트 빈도: 일일
-- **Medium Technology** (Priority 2, total_score: 30)
-  - 피드 URL: `https://medium.com/feed/tag/technology`
-  - 피드 형식: RSS 2.0
-  - 업데이트 빈도: 일일
+```java
+public interface RssParser {
+    List<RssFeedItem> parse();   // 피드를 가져와 아이템 리스트로 변환
+    String getSourceName();      // 표시용 소스 이름
+    String getFeedUrl();
+}
+```
 
-### 3. 에러 핸들링 및 재시도
-- **Resilience4j 재시도**: 최대 3회, 지수 백오프 적용
-- **타임아웃 처리**: 기본 30초
-- **실패 시 로깅**: 에러 발생 시 상세 로그 기록
+지원 피드(구체 파서 6종): TechCrunch, Google Developers Blog(Atom 1.0), Ars Technica, Google AI Blog, Medium Technology, OpenAI Blog. 실제 피드 URL은 `application-rss.yml`의 `rss.sources.*.feed-url`에서 관리합니다.
 
-## 아키텍처
-
-### 패키지 구조
+## 패키지 구조
 
 ```
 com.tech.n.ai.client.rss
-├── config/
-│   ├── RssParserConfig.java (WebClient 빈 설정)
-│   └── RssProperties.java (@ConfigurationProperties)
-├── parser/
-│   ├── RssParser.java (인터페이스)
-│   ├── TechCrunchRssParser.java
-│   ├── GoogleDevelopersBlogRssParser.java
-│   ├── ArsTechnicaRssParser.java
-│   └── MediumTechnologyRssParser.java
-├── dto/
-│   └── RssFeedItem.java (파싱된 RSS 아이템 DTO)
-├── util/
-│   ├── RssFeedValidator.java (피드 검증)
-│   └── RssDataCleaner.java (데이터 정제)
-└── exception/
-    └── RssParsingException.java (파싱 예외)
+├── config/   RssParserConfig(rssWebClientBuilder 빈), RssProperties
+├── dto/      RssFeedItem (record)
+├── parser/   RssParser → AbstractRssParser → 구체 파서 6종
+├── util/     RssDataCleaner(HTML 정제·요약), RssFeedValidator(검증·중복 제거)
+└── exception/ RssParsingException (BaseException 상속)
 ```
 
-### 설계 원칙
+## 설계 패턴
 
-#### 1. 단일 책임 원칙 (SRP)
-- `RssParser`: RSS 피드 파싱만 담당
-- `RssFeedValidator`: 피드 검증만 담당
-- `RssDataCleaner`: 데이터 정제만 담당
+### Template Method — `AbstractRssParser`
+상위 클래스가 `parse()` 흐름을 고정하고 하위 클래스는 달라지는 부분만 채웁니다.
 
-#### 2. 의존성 역전 원칙 (DIP)
-- `RssParser` 인터페이스를 통한 추상화
-- 구현체는 인터페이스에 의존
+1. 소스 키로 설정 조회(없으면 `RssParsingException`) → 2. WebClient 구성 → 3. Resilience4j 재시도(`rssRetry`)로 감싸 피드 fetch → 4. `prepareContent()`로 원문 정리 → 5. Rome `SyndFeedInput` 파싱 → 6. `RssFeedItem` 변환
 
-#### 3. 개방-폐쇄 원칙 (OCP)
-- 새로운 RSS 출처 추가 시 기존 코드 수정 없이 새로운 Parser 구현체만 추가
-- 전략 패턴을 통한 유연한 확장
+하위 클래스가 반드시 구현하는 것은 `getSourceKey()` 하나이고, 필요 시 `prepareContent()`·`extractCategory()`·`extractImageUrl()`을 오버라이드합니다. (예: TechCrunch는 XML 선언 앞 잡문자 제거, Google AI Blog는 이미지 URL 추출)
 
-### 데이터 흐름
+### WebClient 공통 빌더
+`RssParserConfig`가 `rssWebClientBuilder` 하나를 등록하고 구체 파서들이 소스별 baseUrl만 바꿔 씁니다. 공통 설정: 리다이렉트 추적, gzip 압축, 타임아웃(`rss.timeout-seconds`), 브라우저형 User-Agent, 응답 버퍼 10MB.
 
-```
-외부 RSS 피드
-  → WebClient (비동기 HTTP 요청)
-  → Rome 라이브러리 (피드 파싱)
-  → RssFeedValidator (피드 검증)
-  → RssDataCleaner (데이터 정제)
-  → RssFeedItem DTO
-  → MongoDB Atlas 저장 (Query Side)
-  → API 제공 (api-news)
-```
+## 출력 데이터 (`RssFeedItem`)
+
+`title`, `link`, `description`, `publishedDate`(없으면 `updatedDate`로 대체), `author`, `category`, `guid`(`uri` 우선, 없으면 `link`), `imageUrl`(Google AI Blog만 실제 값).
+
+## 유틸리티
+
+- **`RssDataCleaner`**: `cleanHtml`(태그 제거·엔티티 디코딩·공백 정규화), `createSummary`(단어 단위로 잘라 요약, 기본 200자)
+- **`RssFeedValidator`**: `validate`(feed null이면 예외), `validateAndRemoveDuplicates`(GUID/link 기준 중복 제거)
+
+> 두 유틸은 빈으로 등록만 되고 `parse()` 안에서 자동 호출되지는 않습니다. 결과를 받는 쪽(`batch-source`)이 필요에 따라 주입해 씁니다.
 
 ## 기술 스택
 
-### 의존성
-
-- **Rome 라이브러리** (RSS/Atom 피드 파싱)
-  - 공식 문서: https://rometools.github.io/rome/
-  - Maven/Gradle: `com.rometools:rome:1.19.0`
-  - RSS 2.0 및 Atom 1.0 형식 지원
-- **Spring WebFlux** (WebClient 사용)
-  - 비동기 HTTP 요청
-  - Reactor 기반 논블로킹 I/O
-- **Resilience4j** (재시도 로직)
-  - 공식 문서: https://resilience4j.readme.io/
-  - 비동기 지원, 지수 백오프 적용
-  - Maven/Gradle: `io.github.resilience4j:resilience4j-spring-boot3:2.1.0`
-- **Common 모듈**:
-  - `common-core`: 공통 DTO 및 유틸리티
-  - `common-exception`: 예외 처리
+- **rometools rome 1.19.0**: RSS 2.0 / Atom 1.0 파싱
+- **spring-boot-starter-webflux** + **reactor-netty-http**(classic 모드에서 명시 선언): WebClient
+- **resilience4j 2.1.0**: 재시도
+- **공통 모듈**: `common-core`, `common-exception`
 
 ## 설정
-
-### application-rss.yml
 
 ```yaml
 rss:
   timeout-seconds: 30
-  max-retries: 3
-  retry-delay-ms: 1000
   sources:
-    google-developers-blog:
-      feed-url: https://developers.googleblog.com/feeds/posts/default
-      feed-format: ATOM_1.0
-      update-frequency: 주간
     techcrunch:
       feed-url: https://techcrunch.com/feed/
       feed-format: RSS_2.0
-      update-frequency: 일일
-    ars-technica:
-      feed-url: https://feeds.arstechnica.com/arstechnica/index
-      feed-format: RSS_2.0
-      update-frequency: 일일
-    medium-technology:
-      feed-url: https://medium.com/feed/tag/technology
-      feed-format: RSS_2.0
-      update-frequency: 일일
+    # ... google-developers-blog, ars-technica, medium-technology, openai-blog, google-ai-blog
 
 resilience4j:
   retry:
-    configs:
-      default:
-        max-attempts: 3
-        wait-duration: 1000ms
-        exponential-backoff-multiplier: 2
-        retry-exceptions:
-          - org.springframework.web.reactive.function.client.WebClientException
-          - java.io.IOException
     instances:
       rssRetry:
-        base-config: default
+        base-config: default   # max-attempts 3, 지수 백오프
 ```
 
-### 환경 변수
-
-특별한 환경 변수는 필요하지 않습니다. RSS 피드는 일반적으로 공개적으로 접근 가능합니다.
+> 실제 재시도는 `resilience4j.retry.instances.rssRetry`가 제어합니다. `RssProperties`의 `max-retries`·`retry-delay-ms` 필드는 현재 재시도 로직에 연결돼 있지 않습니다.
 
 ## 사용 예시
-
-### RSS 피드 파싱
 
 ```java
 @Service
 @RequiredArgsConstructor
-public class NewsCollectionService {
-    private final TechCrunchRssParser techCrunchParser;
-    private final GoogleDevelopersBlogRssParser googleDevParser;
-    
-    public List<RssFeedItem> collectTechCrunchNews() {
-        return techCrunchParser.parse();
-    }
-    
-    public List<RssFeedItem> collectGoogleDevNews() {
-        return googleDevParser.parse();
-    }
-}
-```
+public class FeedCollector {
+    private final List<RssParser> parsers;  // 구체 파서 6종이 모두 주입됨
 
-### 커스텀 Parser 구현
-
-```java
-@Component
-@Slf4j
-@RequiredArgsConstructor
-public class CustomRssParser implements RssParser {
-    private final WebClient.Builder webClientBuilder;
-    private final RssFeedValidator validator;
-    private final RssProperties properties;
-    private final Retry retry; // Resilience4j Retry
-    
-    @Override
-    public List<RssFeedItem> parse() {
-        RssProperties.RssSourceConfig config = properties.getSources().get("custom-source");
-        WebClient webClient = webClientBuilder.baseUrl(config.getFeedUrl()).build();
-        
-        return retry.executeSupplier(() -> {
-            String feedContent = webClient.get()
-                .retrieve()
-                .bodyToMono(String.class)
-                .block();
-            
-            SyndFeed feed = new SyndFeedInput().build(new StringReader(feedContent));
-            validator.validate(feed);
-            
-            return feed.getEntries().stream()
-                .map(this::convertToRssFeedItem)
-                .collect(Collectors.toList());
-        });
-    }
-    
-    @Override
-    public String getSourceName() {
-        return "Custom Source";
-    }
-    
-    @Override
-    public String getFeedUrl() {
-        return properties.getSources().get("custom-source").getFeedUrl();
-    }
-}
-```
-
-## 테스트
-
-### 테스트 컨텍스트
-
-```java
-@ImportAutoConfiguration({
-    WebFluxAutoConfiguration.class,
-})
-@Import({
-    RssParserConfig.class,
-})
-class RssTestContext {
-}
-```
-
-### 테스트 예시
-
-```java
-@SpringBootTest(classes = {
-    RssTestContext.class,
-    RssParserConfig.class
-}, properties = {
-    "spring.profiles.active=local",
-    "rss.sources.techcrunch.feed-url=https://techcrunch.com/feed/",
-    "rss.sources.techcrunch.feed-format=RSS_2.0"
-})
-public class TechCrunchRssParserTest {
-    @Autowired
-    private TechCrunchRssParser parser;
-    
-    @Test
-    @DisplayName("TechCrunch RSS 피드 파싱 테스트")
-    void testParse() {
-        // given
-        // (설정은 application.yml 또는 properties로 주입됨)
-        
-        // when
-        List<RssFeedItem> items = parser.parse();
-        
-        // then
-        assertNotNull(items);
-        assertFalse(items.isEmpty());
-        items.forEach(item -> {
-            assertNotNull(item.getTitle());
-            assertNotNull(item.getLink());
-            assertNotNull(item.getPublishedDate());
-        });
+    public List<RssFeedItem> collectAll() {
+        return parsers.stream().flatMap(p -> p.parse().stream()).toList();
     }
 }
 ```
 
 ## 참고 문서
 
-### 프로젝트 내부 문서
-
-- **RSS 및 Scraper 모듈 분석**: `docs/step8/rss-scraper-modules-analysis.md`
-- **데이터 모델 설계**: `docs/step2/2. data-model-design.md`
-- **API 엔드포인트 설계**: `docs/step2/1. api-endpoint-design.md`
-
-### 공식 문서
-
-- [Rome 라이브러리 공식 문서](https://rometools.github.io/rome/)
-- [RSS 2.0 표준 스펙](https://www.rssboard.org/rss-specification)
-- [Atom 1.0 표준 스펙](https://tools.ietf.org/html/rfc4287)
-- [Spring WebClient 공식 문서](https://docs.spring.io/spring-framework/reference/web/webflux-webclient.html)
-- [Resilience4j 공식 문서](https://resilience4j.readme.io/)
-- [Google Developers Blog](https://developers.googleblog.com)
-- [TechCrunch](https://techcrunch.com)
-- [Ars Technica](https://arstechnica.com)
-- [Medium](https://medium.com)
-
+- [Rome](https://rometools.github.io/rome/) · [Resilience4j](https://resilience4j.readme.io/)
+- [Spring WebClient](https://docs.spring.io/spring-framework/reference/web/webflux-webclient.html)
+- [RSS 2.0 명세](https://www.rssboard.org/rss-specification) · [Atom 1.0 (RFC 4287)](https://datatracker.ietf.org/doc/html/rfc4287)
