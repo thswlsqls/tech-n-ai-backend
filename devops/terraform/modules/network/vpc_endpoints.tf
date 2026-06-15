@@ -30,7 +30,7 @@ resource "aws_security_group" "vpce" {
 
   # Endpoint ENI 는 outbound 가 필요하지 않음
   egress {
-    description = "(None) — Endpoint ENI does not initiate connections"
+    description = "(None) - Endpoint ENI does not initiate connections"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"

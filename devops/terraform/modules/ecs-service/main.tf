@@ -289,7 +289,8 @@ locals {
         config-file-value = var.firelens_config_s3_arn
       }
     } : {
-      type = "fluentbit"
+      type    = "fluentbit"
+      options = null
     }
 
     environment = [

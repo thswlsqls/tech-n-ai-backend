@@ -78,7 +78,7 @@ resource "aws_security_group_rule" "ingress_tls" {
 # Broker → Broker (클러스터 내부)
 resource "aws_security_group_rule" "intra_cluster" {
   type              = "ingress"
-  description       = "Broker ↔ Broker (intra-cluster replication)"
+  description       = "Broker-to-Broker (intra-cluster replication)"
   from_port         = 0
   to_port           = 65535
   protocol          = "tcp"

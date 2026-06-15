@@ -68,7 +68,7 @@ devops/terraform/
 - **명명**: `{project}-{env}-{resource}` (예: `techai-dev-vpc`).
 - **CIDR**: dev `10.10.0.0/16`, beta `10.20.0.0/16`, prod `10.30.0.0/16` (02 §1.1.1).
 - **AZ**: 서울 리전 3 AZ (`ap-northeast-2a/b/c`).
-- **Provider 버전 고정**: Terraform `~> 1.9.5`, AWS Provider `~> 5.60`, random `~> 3.6` (aurora-mysql·elasticache-valkey·bootstrap).
+- **버전 고정**: Terraform CLI는 루트(`envs/*`·`bootstrap`)에서 `~> 1.15.0`으로 고정하고, 재사용 모듈(`modules/*`)은 하한만 `>= 1.9`로 둬서 루트가 버전을 정하게 한다. AWS Provider는 `~> 5.100` (5.x 마지막 라인, 6.0 미만 — 6.x는 별도 마이그레이션 작업으로 분리), random `~> 3.6` (aurora-mysql·elasticache-valkey·bootstrap).
 
 ## 외부 참조
 

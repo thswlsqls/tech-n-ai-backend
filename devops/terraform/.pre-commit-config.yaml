@@ -4,7 +4,7 @@
 
 repos:
   - repo: https://github.com/antonbabenko/pre-commit-terraform
-    rev: v1.92.0
+    rev: v1.106.0
     hooks:
       # fmt: 모든 .tf 파일 포맷 검사
       - id: terraform_fmt
@@ -31,7 +31,7 @@ repos:
           - --hook-config=--create-file-if-not-exist=true
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v6.0.0
     hooks:
       - id: end-of-file-fixer
       - id: trailing-whitespace
