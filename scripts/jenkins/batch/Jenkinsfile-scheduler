@@ -64,7 +64,8 @@ pipeline {
         stage('Execute Batch Job') {
             steps {
                 withCredentials([
-                    string(credentialsId: 'github-token-batch-source', variable: 'GITHUB_TOKEN')
+                    string(credentialsId: 'github-token-batch-source', variable: 'GITHUB_TOKEN'),
+                    string(credentialsId: 'mongodb-atlas-connection-string', variable: 'MONGODB_ATLAS_CONNECTION_STRING')
                 ]) {
                     script {
                         echo "Executing: ${jobName} with profile ${params.SPRING_PROFILE}"
