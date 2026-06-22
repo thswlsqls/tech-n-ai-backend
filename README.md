@@ -150,13 +150,9 @@ CQRS 데이터 플로우와 전체 구조는 [AWS 배포 인프라 아키텍처]
 - **멀티 Provider 포맷 변환**: OpenAI 기본(`@Primary`), Anthropic 대안
 - **비용 통제**: 토큰 상한(입력 4,000 / 출력 2,000, 80% 경고) + Redis 캐싱(TTL 1시간)
 
-### RAG 파이프라인 아키텍처
+### RAG 파이프라인 시퀀스 다이어그램  
 
 ![Chatbot LLM RAG Pipeline](contents/api-chatbot/chatbot-llm-rag-pipeline.png)
-
-### 전체 시스템 아키텍처
-
-![Overall System Architecture](contents/api-chatbot/overall-system-architecture.png)
 
 ### 데이터 소스
 
@@ -288,10 +284,6 @@ GitHub 저장소는 `ToolInputValidator`의 화이트리스트로 고정되어 �
 | Google | google/generative-ai-python, google/gemma.cpp, google-deepmind/gemma | RSS (https://blog.google/technology/ai/) |
 | Meta | meta-llama/llama-models, meta-llama/llama-stack | 웹 스크래핑 (https://ai.meta.com/blog/) |
 | xAI | xai-org/grok-1 | GitHub 릴리스만 |
-
-### 시스템 아키텍처
-
-![AI Agent System Architecture](contents/api-agent/sytem-architecture.png)
 
 AI Agent는 REST API(ADMIN JWT 인증) 또는 Scheduler로 트리거되며, AgentFacade를 거쳐 LangChain4j AiServices로 OpenAI GPT-4o-mini와 통신합니다. 9개 Tool로 GitHub API·웹 페이지·api-emerging-tech·MongoDB Atlas(Aggregation 분석)·Slack과 상호작용하며, 조회/분석뿐 아니라 자율 수집 후 MongoDB 저장도 수행합니다. AgentFacade는 대화를 `common-conversation`으로 Aurora MySQL + MongoDB에 CQRS 영속화하고 새 세션 타이틀을 비동기 생성하며, `ToolExecutionMetrics`가 `ChartData`를 모아 응답에 포함합니다.
 
