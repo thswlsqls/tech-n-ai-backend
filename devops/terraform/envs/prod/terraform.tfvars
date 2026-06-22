@@ -36,3 +36,8 @@ msk_broker_instance_type = "kafka.m7g.large"
 ecs_desired_count         = 2
 ecs_autoscaling_min_count = 2
 ecs_autoscaling_max_count = 6
+
+# ALB HTTPS — ACM 인증서(ap-northeast-2) 발급 후 ARN 으로 교체.
+# 값이 채워지면 HTTPS(443) 리스너 + HTTP(80)→443 리다이렉트 + ALB SG 443 인바운드가 켜진다.
+alb_certificate_arn            = "arn:aws:acm:ap-northeast-2:000000000000:certificate/REPLACE-WITH-ISSUED-CERT"
+alb_enable_deletion_protection = true

@@ -15,7 +15,7 @@
 | ElastiCache 백업 | 0 | 3일 | **7일** |
 | MSK | 비활성 | Serverless | **Provisioned 3.9.x KRaft, m7g.large × 3** |
 | ECS desired_count | 1 | 1 | **2** (auto 2~6) |
-| ALB | HTTP | HTTP | HTTP (도메인 보유 후 HTTPS 전환) |
+| ALB | HTTP | HTTP | **HTTPS (443) + HTTP(80)→443 리다이렉트** (`alb_certificate_arn` 설정 시) |
 
 본 디렉토리는 dev 와 **동일한 .tf 파일**을 사용한다. 환경 차이는 `terraform.tfvars` 의 변수값으로 표현되며, MSK 모드 분기(`use_msk_provisioned = true`)도 같은 main.tf 안에서 처리된다.
 
@@ -34,16 +34,20 @@ terraform apply
 
 ## 도메인·HTTPS 보강 (도메인 보유 후)
 
-현재 `cluster.tf` 의 ALB 는 HTTP listener (port 80) 만. 도메인 보유 후:
+ALB HTTPS 전환은 코드에 반영돼 있고 `alb_certificate_arn` 변수로 켠다. ap-northeast-2 ACM 인증서를
+발급한 뒤 `terraform.tfvars` 의 `alb_certificate_arn` 을 실제 ARN 으로 바꾸면 다음이 함께 켜진다.
+
+- ALB 에 HTTPS Listener (port 443) 생성 — 보안 정책 `var.alb_ssl_policy` (기본 TLS 1.3/1.2)
+- HTTP(80) Listener 가 443 으로 301 리다이렉트
+- ALB SG 에 443 인바운드 추가
+- ALB `enable_deletion_protection` 은 `alb_enable_deletion_protection = true` 로 켠다
+
+아직 별도 PR 로 남은 항목 (이번 범위 밖):
 
 1. us-east-1 ACM 인증서 발급 (CloudFront 용) — `aws_acm_certificate` (provider `aws.us_east_1`)
-2. ap-northeast-2 ACM 인증서 발급 (ALB 용)
-3. ALB 에 HTTPS Listener (port 443) 추가, HTTP → HTTPS 리다이렉트
-4. WAF Web ACL 생성 + ALB 부착
-5. CloudFront Distribution (`cloudfront-spa` 모듈) 생성
-6. Route 53 레코드 생성
-
-이 보강은 별도 PR 로 분리.
+2. WAF Web ACL 생성 + ALB 부착
+3. CloudFront Distribution (`cloudfront-spa` 모듈) 생성
+4. Route 53 레코드 생성
 
 ## prod 안전장치
 

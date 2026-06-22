@@ -52,7 +52,7 @@ module "api_gateway" {
   otel_config_ssm_arn     = var.otel_config_ssm_arn
   firelens_config_s3_arn  = var.firelens_config_s3_arn
 
-  alb_listener_arn       = aws_lb_listener.http.arn
+  alb_listener_arn       = local.app_listener_arn
   alb_security_group_id  = aws_security_group.alb.id
   listener_rule_priority = 1000 # 가장 낮은 우선순위 — fallback
   listener_path_patterns = ["/*"]
@@ -94,7 +94,7 @@ module "api_auth" {
   otel_config_ssm_arn     = var.otel_config_ssm_arn
   firelens_config_s3_arn  = var.firelens_config_s3_arn
 
-  alb_listener_arn       = aws_lb_listener.http.arn
+  alb_listener_arn       = local.app_listener_arn
   alb_security_group_id  = aws_security_group.alb.id
   listener_rule_priority = 100
   listener_path_patterns = ["/auth/*"]
@@ -136,7 +136,7 @@ module "api_emerging_tech" {
   otel_config_ssm_arn     = var.otel_config_ssm_arn
   firelens_config_s3_arn  = var.firelens_config_s3_arn
 
-  alb_listener_arn       = aws_lb_listener.http.arn
+  alb_listener_arn       = local.app_listener_arn
   alb_security_group_id  = aws_security_group.alb.id
   listener_rule_priority = 110
   listener_path_patterns = ["/emerging-tech/*"]
@@ -175,7 +175,7 @@ module "api_chatbot" {
   otel_config_ssm_arn     = var.otel_config_ssm_arn
   firelens_config_s3_arn  = var.firelens_config_s3_arn
 
-  alb_listener_arn       = aws_lb_listener.http.arn
+  alb_listener_arn       = local.app_listener_arn
   alb_security_group_id  = aws_security_group.alb.id
   listener_rule_priority = 120
   listener_path_patterns = ["/chatbot/*"]
@@ -216,7 +216,7 @@ module "api_bookmark" {
   otel_config_ssm_arn     = var.otel_config_ssm_arn
   firelens_config_s3_arn  = var.firelens_config_s3_arn
 
-  alb_listener_arn       = aws_lb_listener.http.arn
+  alb_listener_arn       = local.app_listener_arn
   alb_security_group_id  = aws_security_group.alb.id
   listener_rule_priority = 130
   listener_path_patterns = ["/bookmark/*"]
@@ -255,7 +255,7 @@ module "api_agent" {
   otel_config_ssm_arn     = var.otel_config_ssm_arn
   firelens_config_s3_arn  = var.firelens_config_s3_arn
 
-  alb_listener_arn       = aws_lb_listener.http.arn
+  alb_listener_arn       = local.app_listener_arn
   alb_security_group_id  = aws_security_group.alb.id
   listener_rule_priority = 140
   listener_path_patterns = ["/agent/*"]

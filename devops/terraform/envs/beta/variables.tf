@@ -174,6 +174,28 @@ variable "enable_vpc_endpoints" {
 }
 
 # ----------------------------------------------------------------------------
+# ALB / HTTPS
+# ----------------------------------------------------------------------------
+
+variable "alb_certificate_arn" {
+  description = "ALB HTTPS 리스너용 ACM 인증서 ARN (리전 = ap-northeast-2). 값이 있으면 HTTPS(443) 리스너를 만들고 HTTP(80)는 443 으로 리다이렉트한다. 빈 문자열이면 HTTP(80) 단독 — dev/beta."
+  type        = string
+  default     = ""
+}
+
+variable "alb_ssl_policy" {
+  description = "HTTPS 리스너 보안 정책. TLS 1.3 + 1.2 호환 정책이 기본. prod 는 AWS 권장 PQ-TLS 정책으로 올릴 수 있다."
+  type        = string
+  default     = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+}
+
+variable "alb_enable_deletion_protection" {
+  description = "ALB 삭제 보호. prod=true 권장."
+  type        = bool
+  default     = false
+}
+
+# ----------------------------------------------------------------------------
 # ECS 워크로드 사이즈
 # ----------------------------------------------------------------------------
 
