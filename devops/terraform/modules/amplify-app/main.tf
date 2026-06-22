@@ -109,9 +109,9 @@ locals {
 # ----------------------------------------------------------------------------
 
 resource "aws_amplify_app" "this" {
-  name        = local.app_full_name
-  repository  = var.repository_url
-  platform    = var.platform   # WEB_COMPUTE — Next.js 16 SSR
+  name                 = local.app_full_name
+  repository           = var.repository_url
+  platform             = var.platform # WEB_COMPUTE — Next.js 16 SSR
   iam_service_role_arn = local.service_role_arn
 
   # Personal Access Token (PAT) 으로 GitHub 연동 — Secrets Manager 의 ARN 을 직접 박지 않고 fetch
@@ -121,12 +121,12 @@ resource "aws_amplify_app" "this" {
 
   # 자동 브랜치 생성 차단 — main/develop 만 명시 등록
   enable_auto_branch_creation = false
-  enable_branch_auto_build    = false   # GitHub Actions 가 start-job 으로 트리거 (CI 일관성)
+  enable_branch_auto_build    = false # GitHub Actions 가 start-job 으로 트리거 (CI 일관성)
   enable_branch_auto_deletion = false
 
   environment_variables = merge(
     {
-      AMPLIFY_DIFF_DEPLOY      = "false"
+      AMPLIFY_DIFF_DEPLOY       = "false"
       AMPLIFY_MONOREPO_APP_ROOT = var.app_name
       _LIVE_UPDATES = jsonencode([
         { pkg = "next-version", type = "internal", version = "latest" },
@@ -145,7 +145,7 @@ resource "aws_amplify_app" "this" {
 
   lifecycle {
     ignore_changes = [
-      access_token,   # Secrets Manager 회전 시 plan 노이즈 방지
+      access_token, # Secrets Manager 회전 시 plan 노이즈 방지
     ]
   }
 }
@@ -160,7 +160,7 @@ resource "aws_amplify_branch" "this" {
   stage       = var.stage
   framework   = var.framework
 
-  enable_auto_build         = false   # GitHub Actions 트리거만
+  enable_auto_build           = false # GitHub Actions 트리거만
   enable_pull_request_preview = false
 
   enable_basic_auth      = var.enable_basic_auth

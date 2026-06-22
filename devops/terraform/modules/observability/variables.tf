@@ -32,11 +32,11 @@ variable "alarm_sns_topic_arn" {
 variable "service_alarms" {
   description = "서비스별 표준 알람 (CPU·메모리·실행중 태스크 수). cluster_name + service_name 매핑."
   type = list(object({
-    cluster_name           = string
-    service_name           = string
-    cpu_threshold          = optional(number, 80)
-    memory_threshold       = optional(number, 85)
-    min_running_count      = optional(number, 1)
+    cluster_name      = string
+    service_name      = string
+    cpu_threshold     = optional(number, 80)
+    memory_threshold  = optional(number, 85)
+    min_running_count = optional(number, 1)
   }))
   default = []
 }

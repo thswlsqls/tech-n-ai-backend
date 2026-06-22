@@ -38,7 +38,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
       sse_algorithm     = "aws:kms"
       kms_master_key_id = var.kms_key_arn
     }
-    bucket_key_enabled = true   # 비용 절감 — KMS request 90%↓
+    bucket_key_enabled = true # 비용 절감 — KMS request 90%↓
   }
 }
 

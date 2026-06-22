@@ -21,15 +21,15 @@ resource "aws_secretsmanager_secret_version" "jwt_signing_key_initial" {
   secret_id = aws_secretsmanager_secret.jwt_signing_key.id
 
   secret_string = jsonencode({
-    active_kid  = "v1-PLACEHOLDER"
-    active_key  = "REPLACE_WITH_BASE64_ENCODED_512BIT_RANDOM"
-    next_kid    = "v2-PLACEHOLDER"
-    next_key    = "REPLACE_WITH_BASE64_ENCODED_512BIT_RANDOM"
-    rotated_at  = "2026-01-01T00:00:00Z"
+    active_kid = "v1-PLACEHOLDER"
+    active_key = "REPLACE_WITH_BASE64_ENCODED_512BIT_RANDOM"
+    next_kid   = "v2-PLACEHOLDER"
+    next_key   = "REPLACE_WITH_BASE64_ENCODED_512BIT_RANDOM"
+    rotated_at = "2026-01-01T00:00:00Z"
   })
 
   lifecycle {
-    ignore_changes = [secret_string]   # 실 값은 별도 입력 후 Terraform 무관여
+    ignore_changes = [secret_string] # 실 값은 별도 입력 후 Terraform 무관여
   }
 }
 
@@ -97,6 +97,6 @@ resource "aws_secretsmanager_secret_version" "elasticache_auth_token_initial" {
   secret_string = module.cache[0].auth_token
 
   lifecycle {
-    ignore_changes = [secret_string]   # 토큰 회전 시 별도 워크플로 처리
+    ignore_changes = [secret_string] # 토큰 회전 시 별도 워크플로 처리
   }
 }

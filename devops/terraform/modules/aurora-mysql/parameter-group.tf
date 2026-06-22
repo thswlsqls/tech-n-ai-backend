@@ -15,7 +15,7 @@ resource "aws_rds_cluster_parameter_group" "this" {
 
   parameter {
     name  = "long_query_time"
-    value = "1"   # 1초 초과 쿼리 기록
+    value = "1" # 1초 초과 쿼리 기록
   }
 
   parameter {
@@ -26,7 +26,7 @@ resource "aws_rds_cluster_parameter_group" "this" {
   # 일반 로그는 파일로 (CloudWatch Logs export 됨)
   parameter {
     name  = "general_log"
-    value = "0"   # 운영 시 비활성. 디버그 시에만 1.
+    value = "0" # 운영 시 비활성. 디버그 시에만 1.
   }
 
   # SQL 모드 — 엄격 모드

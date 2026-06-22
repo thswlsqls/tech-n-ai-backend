@@ -185,7 +185,7 @@ locals {
   # 메인 컨테이너의 OTel 환경변수 — sidecar 활성 시 자동 주입
   otel_env = var.enable_otel_sidecar ? [
     { name = "OTEL_EXPORTER_OTLP_ENDPOINT", value = "http://localhost:4317" },
-    { name = "OTEL_RESOURCE_ATTRIBUTES",    value = "service.name=${var.service_name},service.namespace=${var.project},deployment.environment=${var.environment}" },
+    { name = "OTEL_RESOURCE_ATTRIBUTES", value = "service.name=${var.service_name},service.namespace=${var.project},deployment.environment=${var.environment}" },
   ] : []
 
   # logConfiguration — FireLens 활성 시 awsfirelens, 아니면 awslogs
@@ -194,7 +194,7 @@ locals {
     options = {
       Name = "cloudwatch_logs"
     }
-  } : {
+    } : {
     logDriver = "awslogs"
     options = {
       awslogs-group         = local.log_group_name
@@ -241,7 +241,7 @@ locals {
     }
 
     stopTimeout            = 60
-    readonlyRootFilesystem = false   # Spring Boot 는 /tmp 사용
+    readonlyRootFilesystem = false # Spring Boot 는 /tmp 사용
   }
 
   # ADOT Collector sidecar — OTLP 4317/4318 수신, X-Ray + CloudWatch EMF 송신
@@ -255,8 +255,8 @@ locals {
     command = ["--config=/etc/ecs/otel-config.yaml"]
 
     environment = [
-      { name = "AWS_REGION",   value = data.aws_region.current.name },
-      { name = "ENVIRONMENT",  value = var.environment },
+      { name = "AWS_REGION", value = data.aws_region.current.name },
+      { name = "ENVIRONMENT", value = var.environment },
       { name = "SERVICE_NAME", value = var.service_name },
     ]
 
@@ -288,14 +288,14 @@ locals {
         config-file-type  = "s3"
         config-file-value = var.firelens_config_s3_arn
       }
-    } : {
+      } : {
       type    = "fluentbit"
       options = null
     }
 
     environment = [
-      { name = "AWS_REGION",   value = data.aws_region.current.name },
-      { name = "ENVIRONMENT",  value = var.environment },
+      { name = "AWS_REGION", value = data.aws_region.current.name },
+      { name = "ENVIRONMENT", value = var.environment },
       { name = "SERVICE_NAME", value = var.service_name },
     ]
 
@@ -326,7 +326,7 @@ resource "aws_ecs_task_definition" "this" {
   execution_role_arn       = var.execution_role_arn
 
   runtime_platform {
-    cpu_architecture        = "ARM64"   # Graviton (03 §2.3)
+    cpu_architecture        = "ARM64" # Graviton (03 §2.3)
     operating_system_family = "LINUX"
   }
 

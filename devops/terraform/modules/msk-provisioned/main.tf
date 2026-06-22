@@ -146,7 +146,7 @@ resource "aws_msk_cluster" "this" {
         volume_size = var.ebs_volume_size
 
         dynamic "provisioned_throughput" {
-          for_each = []   # gp3 기본값으로 충분 — 필요 시 enabled=true + volume_throughput
+          for_each = [] # gp3 기본값으로 충분 — 필요 시 enabled=true + volume_throughput
           content {
             enabled           = true
             volume_throughput = 250

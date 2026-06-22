@@ -86,15 +86,15 @@ resource "aws_vpc_endpoint" "dynamodb" {
 
 locals {
   interface_endpoints = var.enable_vpc_endpoints ? {
-    ecr_api          = "ecr.api"
-    ecr_dkr          = "ecr.dkr"
-    logs             = "logs"
-    kms              = "kms"
-    sts              = "sts"
-    secretsmanager   = "secretsmanager"
-    ssm              = "ssm"
-    ssmmessages      = "ssmmessages"
-    ec2messages      = "ec2messages"
+    ecr_api        = "ecr.api"
+    ecr_dkr        = "ecr.dkr"
+    logs           = "logs"
+    kms            = "kms"
+    sts            = "sts"
+    secretsmanager = "secretsmanager"
+    ssm            = "ssm"
+    ssmmessages    = "ssmmessages"
+    ec2messages    = "ec2messages"
   } : {}
 }
 
@@ -106,8 +106,8 @@ resource "aws_vpc_endpoint" "interface" {
   vpc_endpoint_type   = "Interface"
   private_dns_enabled = true
 
-  subnet_ids          = aws_subnet.private_app[*].id
-  security_group_ids  = [aws_security_group.vpce[0].id]
+  subnet_ids         = aws_subnet.private_app[*].id
+  security_group_ids = [aws_security_group.vpce[0].id]
 
   tags = merge(local.common_tags, {
     Name = "${local.name_prefix}-vpce-${each.key}"

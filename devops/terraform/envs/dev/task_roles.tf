@@ -208,7 +208,7 @@ module "task_role_api_bookmark" {
 
 data "aws_iam_policy_document" "api_bookmark_perms" {
   statement {
-    sid = "RdsIamConnect"
+    sid     = "RdsIamConnect"
     actions = ["rds-db:connect"]
     resources = [
       "arn:aws:rds-db:${var.region}:${data.aws_caller_identity.current.account_id}:dbuser:${try(module.aurora[0].cluster_resource_id, "*")}/api_bookmark",
@@ -227,8 +227,8 @@ data "aws_iam_policy_document" "api_bookmark_perms" {
   }
 
   statement {
-    sid = "DecryptDataKms"
-    actions = ["kms:Decrypt"]
+    sid       = "DecryptDataKms"
+    actions   = ["kms:Decrypt"]
     resources = [aws_kms_key.data.arn]
   }
 }

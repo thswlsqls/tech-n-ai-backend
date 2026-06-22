@@ -123,7 +123,7 @@ module "aurora" {
 
   db_name = var.aurora_db_name
 
-  allowed_security_group_ids = []   # 워크로드 SG 인바운드는 services.tf 의 별도 rule 로 추가
+  allowed_security_group_ids = [] # 워크로드 SG 인바운드는 services.tf 의 별도 rule 로 추가
 
   backup_retention_period      = var.aurora_backup_retention_period
   deletion_protection          = var.aurora_deletion_protection
@@ -154,7 +154,7 @@ module "cache" {
 
   auth_mode = "auth_token"
 
-  allowed_security_group_ids = []   # services.tf 별도 rule
+  allowed_security_group_ids = [] # services.tf 별도 rule
 }
 
 # ----------------------------------------------------------------------------
@@ -171,7 +171,7 @@ module "msk" {
   vpc_id             = module.network.vpc_id
   private_subnet_ids = module.network.private_subnet_ids
 
-  allowed_security_group_ids = []   # services.tf 별도 rule
+  allowed_security_group_ids = [] # services.tf 별도 rule
 }
 
 module "msk_provisioned" {
@@ -182,14 +182,14 @@ module "msk_provisioned" {
   environment = var.environment
 
   vpc_id             = module.network.vpc_id
-  private_subnet_ids = module.network.data_subnet_ids   # MSK Provisioned 는 Private-Data 권장
+  private_subnet_ids = module.network.data_subnet_ids # MSK Provisioned 는 Private-Data 권장
   kms_key_arn        = aws_kms_key.data.arn
 
-  kafka_version          = var.msk_kafka_version
-  broker_count           = var.msk_broker_count
-  broker_instance_type   = var.msk_broker_instance_type
+  kafka_version        = var.msk_kafka_version
+  broker_count         = var.msk_broker_count
+  broker_instance_type = var.msk_broker_instance_type
 
-  allowed_security_group_ids = []   # services.tf 별도 rule
+  allowed_security_group_ids = [] # services.tf 별도 rule
 }
 
 # ----------------------------------------------------------------------------

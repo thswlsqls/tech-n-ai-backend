@@ -71,7 +71,7 @@ resource "aws_rds_cluster" "this" {
 
   engine         = "aurora-mysql"
   engine_version = var.engine_version
-  engine_mode    = "provisioned"  # serverlessv2 도 engine_mode=provisioned + serverlessv2_scaling_configuration
+  engine_mode    = "provisioned" # serverlessv2 도 engine_mode=provisioned + serverlessv2_scaling_configuration
 
   database_name   = var.db_name
   master_username = var.master_username

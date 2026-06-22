@@ -131,7 +131,7 @@ variable "log_kms_key_arn" {
 
 variable "environment_vars" {
   description = "Task Definition `environment[]`. SPRING_PROFILES_ACTIVE 등."
-  type        = list(object({
+  type = list(object({
     name  = string
     value = string
   }))

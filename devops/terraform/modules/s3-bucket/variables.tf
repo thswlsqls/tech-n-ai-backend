@@ -45,16 +45,16 @@ variable "object_lock_days" {
 variable "lifecycle_rules" {
   description = "라이프사이클 규칙 목록. 미지정 시 빈 리스트."
   type = list(object({
-    id                                       = string
-    enabled                                  = bool
-    prefix                                   = optional(string, "")
-    abort_incomplete_multipart_upload_days   = optional(number, 7)
-    transition_to_standard_ia_days           = optional(number)
-    transition_to_intelligent_tiering_days   = optional(number)
-    transition_to_glacier_days               = optional(number)
-    transition_to_deep_archive_days          = optional(number)
-    expiration_days                          = optional(number)
-    noncurrent_version_expiration_days       = optional(number)
+    id                                         = string
+    enabled                                    = bool
+    prefix                                     = optional(string, "")
+    abort_incomplete_multipart_upload_days     = optional(number, 7)
+    transition_to_standard_ia_days             = optional(number)
+    transition_to_intelligent_tiering_days     = optional(number)
+    transition_to_glacier_days                 = optional(number)
+    transition_to_deep_archive_days            = optional(number)
+    expiration_days                            = optional(number)
+    noncurrent_version_expiration_days         = optional(number)
     noncurrent_version_transition_glacier_days = optional(number)
   }))
   default = []

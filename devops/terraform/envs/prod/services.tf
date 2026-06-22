@@ -9,13 +9,13 @@
 
 locals {
   common_env = [
-    { name = "SPRING_PROFILES_ACTIVE",                     value = var.environment },
-    { name = "MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED",  value = "true" },
-    { name = "AWS_REGION",                                 value = var.region },
+    { name = "SPRING_PROFILES_ACTIVE", value = var.environment },
+    { name = "MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED", value = "true" },
+    { name = "AWS_REGION", value = var.region },
   ]
 
   # 시드 이미지 — 실제 배포 시 GitHub Actions 가 digest 로 갱신
-  ecr_registry         = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.region}.amazonaws.com"
+  ecr_registry = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.region}.amazonaws.com"
   placeholder_image_for = { for m in [
     "api-gateway", "api-emerging-tech", "api-auth", "api-chatbot", "api-bookmark", "api-agent"
   ] : m => "${local.ecr_registry}/techai/${m}:initial" }
@@ -40,7 +40,7 @@ module "api_gateway" {
   container_port  = 8081
   cpu             = 512
   memory          = 1024
-  desired_count   = var.ecs_desired_count   # dev — 비용 최소
+  desired_count   = var.ecs_desired_count # dev — 비용 최소
 
   task_role_arn      = module.task_role_api_gateway.role_arn
   execution_role_arn = module.task_execution_role.role_arn
@@ -54,7 +54,7 @@ module "api_gateway" {
 
   alb_listener_arn       = aws_lb_listener.http.arn
   alb_security_group_id  = aws_security_group.alb.id
-  listener_rule_priority = 1000   # 가장 낮은 우선순위 — fallback
+  listener_rule_priority = 1000 # 가장 낮은 우선순위 — fallback
   listener_path_patterns = ["/*"]
 
   environment_vars = local.common_env
@@ -161,7 +161,7 @@ module "api_chatbot" {
 
   container_image = local.placeholder_image_for["api-chatbot"]
   container_port  = 8084
-  cpu             = 1024  # RAG 추론 — 더 큼
+  cpu             = 1024 # RAG 추론 — 더 큼
   memory          = 2048
   desired_count   = var.ecs_desired_count
 
@@ -182,7 +182,7 @@ module "api_chatbot" {
 
   environment_vars = local.common_env
 
-  rollback_alarm_latency_p95_seconds = 5.0  # LLM 호출 — 다른 서비스보다 느림
+  rollback_alarm_latency_p95_seconds = 5.0 # LLM 호출 — 다른 서비스보다 느림
 }
 
 # ----------------------------------------------------------------------------

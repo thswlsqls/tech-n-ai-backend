@@ -176,10 +176,10 @@ output "alerts_sns_topic_arn" {
 output "kms_key_arns" {
   description = "환경 KMS 키 ARN map (data, s3-app, auth, ai, logs)."
   value = {
-    data    = aws_kms_key.data.arn
-    s3-app  = aws_kms_key.s3_app.arn
-    auth    = aws_kms_key.auth.arn
-    ai      = aws_kms_key.ai.arn
-    logs    = aws_kms_key.logs.arn
+    data   = aws_kms_key.data.arn
+    s3-app = aws_kms_key.s3_app.arn
+    auth   = aws_kms_key.auth.arn
+    ai     = aws_kms_key.ai.arn
+    logs   = aws_kms_key.logs.arn
   }
 }

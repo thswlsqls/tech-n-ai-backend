@@ -42,11 +42,11 @@ resource "aws_kms_alias" "ecr" {
 resource "aws_ecr_repository" "this" {
   for_each = toset(local.ecr_repositories)
 
-  name                 = "${var.project}/${each.value}"   # techai/api-auth
-  image_tag_mutability = "IMMUTABLE"                       # 태그 재사용 차단 (불변 아티팩트)
+  name                 = "${var.project}/${each.value}" # techai/api-auth
+  image_tag_mutability = "IMMUTABLE"                    # 태그 재사용 차단 (불변 아티팩트)
 
   image_scanning_configuration {
-    scan_on_push = true   # ECR Enhanced Scanning 사용 시 Inspector 가 자동 분석
+    scan_on_push = true # ECR Enhanced Scanning 사용 시 Inspector 가 자동 분석
   }
 
   encryption_configuration {
@@ -60,7 +60,7 @@ resource "aws_ecr_repository" "this" {
   }
 
   lifecycle {
-    prevent_destroy = true   # ECR 리포 사고성 삭제 차단
+    prevent_destroy = true # ECR 리포 사고성 삭제 차단
   }
 }
 
@@ -130,8 +130,8 @@ resource "aws_ecr_repository_policy" "this" {
         ]
       },
       {
-        Sid    = "AllowEcsTaskPull"
-        Effect = "Allow"
+        Sid       = "AllowEcsTaskPull"
+        Effect    = "Allow"
         Principal = { Service = "ecs-tasks.amazonaws.com" }
         Action = [
           "ecr:BatchCheckLayerAvailability",
@@ -140,8 +140,8 @@ resource "aws_ecr_repository_policy" "this" {
         ]
       },
       {
-        Sid    = "DenyDeleteImage"
-        Effect = "Deny"
+        Sid       = "DenyDeleteImage"
+        Effect    = "Deny"
         Principal = "*"
         Action = [
           "ecr:BatchDeleteImage",

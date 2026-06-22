@@ -23,9 +23,9 @@ locals {
   use_auth_token = var.auth_mode == "auth_token"
 
   # replicas=0 이면 자동 페일오버·Multi-AZ 의미 없음
-  has_replicas        = var.replicas_per_node_group > 0
-  effective_failover  = var.automatic_failover_enabled && local.has_replicas
-  effective_multi_az  = var.multi_az_enabled && local.has_replicas
+  has_replicas       = var.replicas_per_node_group > 0
+  effective_failover = var.automatic_failover_enabled && local.has_replicas
+  effective_multi_az = var.multi_az_enabled && local.has_replicas
 }
 
 # ----------------------------------------------------------------------------
@@ -75,7 +75,7 @@ resource "random_password" "auth_token" {
   count = local.use_auth_token ? 1 : 0
 
   length  = 64
-  special = false   # ElastiCache AUTH 토큰은 영숫자만
+  special = false # ElastiCache AUTH 토큰은 영숫자만
   upper   = true
   lower   = true
   numeric = true
@@ -111,7 +111,7 @@ resource "aws_elasticache_replication_group" "this" {
   transit_encryption_enabled = var.transit_encryption_enabled
 
   # 인증 — auth_token 또는 RBAC (User Group)
-  auth_token = local.use_auth_token ? random_password.auth_token[0].result : null
+  auth_token     = local.use_auth_token ? random_password.auth_token[0].result : null
   user_group_ids = var.auth_mode == "rbac" ? var.rbac_user_group_ids : null
 
   snapshot_retention_limit = var.snapshot_retention_limit
@@ -124,7 +124,7 @@ resource "aws_elasticache_replication_group" "this" {
 
   lifecycle {
     ignore_changes = [
-      auth_token,   # 토큰 회전은 별도 워크플로
+      auth_token, # 토큰 회전은 별도 워크플로
     ]
   }
 }

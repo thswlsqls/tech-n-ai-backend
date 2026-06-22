@@ -79,7 +79,7 @@ resource "aws_cloudfront_distribution" "this" {
   enabled         = true
   is_ipv6_enabled = true
   comment         = local.name
-  price_class     = "PriceClass_200"   # 북미·유럽·아시아·중동 (서울 포함)
+  price_class     = "PriceClass_200" # 북미·유럽·아시아·중동 (서울 포함)
 
   aliases = var.domain_aliases
 
@@ -118,8 +118,8 @@ resource "aws_cloudfront_distribution" "this" {
     cached_methods         = ["GET", "HEAD"]
     compress               = true
 
-    cache_policy_id            = "658327ea-f89d-4fab-a63d-7e88639e58f6"  # CachingOptimized (AWS Managed)
-    origin_request_policy_id   = "59781a5b-3903-41f3-afcb-af62929ccde1"  # CORS-CustomOrigin (Managed)
+    cache_policy_id            = "658327ea-f89d-4fab-a63d-7e88639e58f6" # CachingOptimized (AWS Managed)
+    origin_request_policy_id   = "59781a5b-3903-41f3-afcb-af62929ccde1" # CORS-CustomOrigin (Managed)
     response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
   }
 

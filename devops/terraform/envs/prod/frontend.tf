@@ -72,6 +72,6 @@ module "amplify_admin" {
   stage       = "DEVELOPMENT"
   platform    = "WEB_COMPUTE"
 
-  enable_basic_auth      = false   # dev 는 미적용. prod admin 은 true 권장
+  enable_basic_auth      = false # dev 는 미적용. prod admin 은 true 권장
   basic_auth_credentials = null
 }

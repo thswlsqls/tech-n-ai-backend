@@ -60,7 +60,7 @@ resource "aws_lb" "main" {
   security_groups    = [aws_security_group.alb.id]
 
   drop_invalid_header_fields = true
-  enable_deletion_protection = false   # dev — true 권장은 prod
+  enable_deletion_protection = false # dev — true 권장은 prod
 
   tags = local.common_tags
 }

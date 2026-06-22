@@ -9,7 +9,7 @@ enable_vpc_endpoints = true
 
 # Aurora Provisioned — Multi-AZ + I/O-Optimized
 aurora_engine_mode                  = "provisioned"
-aurora_instance_count               = 3   # Writer 1 + Reader 2 (3 AZ 분산, 04 §1.3 prod 권장)
+aurora_instance_count               = 3 # Writer 1 + Reader 2 (3 AZ 분산, 04 §1.3 prod 권장)
 aurora_instance_class               = "db.r7g.large"
 aurora_storage_type                 = "aurora-iopt1"
 aurora_backup_retention_period      = 30
