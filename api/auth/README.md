@@ -112,6 +112,8 @@ Refresh Token을 JWT·DB 양쪽으로 검증하고, 기존 토큰을 Soft Delete
 
 Google/Naver/Kakao 소셜 로그인을 지원합니다. 자세한 플로우는 [6. OAuth 로그인](#6-oauth-로그인)을 참고하세요.
 
+![OAuth Login Start](../../contents/api-auth/oauth-login-start.png)
+
 ![OAuth Login Callback Flow](../../contents/api-auth/oauth-login-callback-flow.png)
 
 ### 3.8 회원 탈퇴 (`DELETE /api/v1/auth/me`)
