@@ -115,6 +115,72 @@ langchain4j 활용의 RAG 기반 LLM 멀티턴 챗봇과 Tool 기반 AI Agent �
 자세한 CQRS 및 Kafka 동기화 설계는 다음 문서를 참고하세요:
 - [CQRS Kafka 동기화 설계서](docs/prototype/step11/cqrs-kafka-sync-design.md)
 
+### AWS 배포 인프라 아키텍처
+
+위 애플리케이션 아키텍처를 실제로 올리는 AWS 인프라는 `devops/terraform/`에 Terraform으로 정의돼 있습니다. `dev`·`beta`·`prod` 세 환경을 같은 모듈로 조립하고, 환경 차이는 `terraform.tfvars` 값으로만 둡니다.
+
+핵심 구성은 ECS Fargate(ARM64) 마이크로서비스 6개가 ALB 경로 라우팅 뒤에서 돌고, 쓰기는 Aurora MySQL, 읽기는 MongoDB Atlas, 캐시는 ElastiCache Valkey, 이벤트 동기화는 MSK(Kafka)를 쓰는 형태입니다. 아래는 배포되는 구조의 개요입니다(prod 기준).
+
+```mermaid
+flowchart LR
+    client["Client / API consumer"]
+
+    subgraph aws["AWS Cloud · ap-northeast-2"]
+        alb["ALB<br/>(HTTP :80, path-based)"]
+
+        subgraph ecs["ECS Cluster (Fargate, ARM64)"]
+            gw["api-gateway :8081<br/>/*"]
+            auth["api-auth :8083<br/>/auth/*"]
+            et["api-emerging-tech :8082<br/>/emerging-tech/*"]
+            chat["api-chatbot :8084<br/>/chatbot/*"]
+            book["api-bookmark :8085<br/>/bookmark/*"]
+            agent["api-agent :8086<br/>/agent/*"]
+        end
+
+        subgraph data["Data layer"]
+            aurora[("Aurora MySQL<br/>write store :3306")]
+            valkey[("ElastiCache Valkey<br/>cache :6379")]
+            msk["MSK Kafka<br/>event bus :9098"]
+        end
+
+        logs["CloudWatch Logs"]
+    end
+
+    mongo[("MongoDB Atlas<br/>external · CQRS read store")]
+
+    client -->|HTTP :80| alb
+    alb --> gw & auth & et & chat & book & agent
+    auth --> aurora
+    book --> aurora
+    auth --> valkey
+    chat --> valkey
+    book --> valkey
+    et -.->|produce/consume| msk
+    book -.->|produce/consume| msk
+    agent -.->|produce/consume| msk
+    chat --> mongo
+    agent --> mongo
+    et --> mongo
+    ecs --> logs
+```
+
+> MSK는 환경별로 다릅니다: prod=Provisioned, beta=Serverless, dev=없음. 프런트(Amplify/CloudFront) 모듈은 정의돼 있으나 현재 어느 환경에서도 배포되지 않아, 진입점은 ALB뿐입니다.
+
+#### 다이어그램 (환경별)
+
+아래 `.drawio` 파일은 VS Code의 **Draw.io Integration**(`hediet.vscode-drawio`) 확장이나 [app.diagrams.net](https://app.diagrams.net)에서 열어 봅니다. 위 mermaid 개요와 텍스트 버전은 [devops/aws/mermaid/architecture.md](devops/aws/mermaid/architecture.md)에 있습니다.
+
+| 다이어그램 | dev | beta | prod |
+|---|---|---|---|
+| Reference Architecture (전체 구조) | [열기](devops/aws/dev/reference-architecture.drawio) | [열기](devops/aws/beta/reference-architecture.drawio) | [열기](devops/aws/prod/reference-architecture.drawio) |
+| Network Topology (VPC·서브넷·NAT) | [열기](devops/aws/dev/network-topology.drawio) | [열기](devops/aws/beta/network-topology.drawio) | [열기](devops/aws/prod/network-topology.drawio) |
+| Security (KMS·IAM·OIDC·SG) | [열기](devops/aws/dev/security.drawio) | [열기](devops/aws/beta/security.drawio) | [열기](devops/aws/prod/security.drawio) |
+
+#### 인프라 설계 문서
+
+- [아키텍처 사실 정리 (Terraform 코드 기준, 인용 포함)](devops/aws/architecture-facts.md) — 컴퓨팅·데이터·네트워크·보안·환경 차이를 코드 출처와 함께 정리
+- [AWS Well-Architected Review](devops/aws/well-architected-review.md) — 6개 기둥 점검, 개선 권고, 환경별 비용 추정
+
 ## 🌟 langchain4j RAG 기반 멀티턴 챗봇
 
 ### 개요
