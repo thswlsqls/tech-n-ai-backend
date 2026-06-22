@@ -10,7 +10,7 @@ locals {
 
 resource "aws_s3_bucket" "tfstate" {
   bucket              = local.state_bucket_name
-  object_lock_enabled = true   # 한 번 켜면 못 끔 — 사고성 삭제 보호
+  object_lock_enabled = true # 한 번 켜면 못 끔 — 사고성 삭제 보호
 
   # state 버킷은 절대 삭제되어선 안 됨 — terraform destroy 차단
   lifecycle {
@@ -63,6 +63,9 @@ resource "aws_s3_bucket_lifecycle_configuration" "tfstate" {
   rule {
     id     = "expire-noncurrent-versions"
     status = "Enabled"
+
+    # 모든 객체에 적용 — AWS Provider 가 rule 마다 filter/prefix 중 하나를 요구한다.
+    filter {}
 
     noncurrent_version_expiration {
       noncurrent_days = var.state_bucket_noncurrent_version_expiration_days
