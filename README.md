@@ -71,7 +71,7 @@ langchain4j 활용의 RAG 기반 LLM 멀티턴 챗봇과 Tool 기반 AI Agent �
 
 ### 전체 시스템 아키텍처
 
-![System Architecture Diagram](contents/system-architecture-diagram.png)
+전체 시스템 구조 다이어그램은 아래 [AWS 배포 인프라 아키텍처](#aws-배포-인프라-아키텍처) 섹션의 `devops/aws/` 다이어그램으로 대체했습니다.
 
 ### CQRS 패턴 기반 아키텍처
 
@@ -95,10 +95,6 @@ langchain4j 활용의 RAG 기반 LLM 멀티턴 챗봇과 Tool 기반 AI Agent �
   - 프로젝션을 통한 네트워크 트래픽 최소화
   - **Vector Search 지원** (RAG 챗봇용)
 
-#### CQRS 패턴 데이터 플로우
-
-![CQRS Pattern Diagram](contents/cqrs-pattern-diagram.png)
-
 #### Kafka 기반 실시간 동기화
 
 **Apache Kafka**를 통한 이벤트 기반 CQRS 동기화 메커니즘:
@@ -108,73 +104,28 @@ langchain4j 활용의 RAG 기반 LLM 멀티턴 챗봇과 Tool 기반 AI Agent �
 - **멱등성 보장**: Redis 기반 중복 처리 방지 (TTL: 7일)
 - **동기화 지연 시간**: 실시간 동기화 목표 (1초 이내)
 
-![CQRS Kafka Sync Flow](contents/cqrs-kafka-sync-flow.png)
-
-![Kafka Events Diagram](contents/kafka-events-diagram.png)
-
-자세한 CQRS 및 Kafka 동기화 설계는 다음 문서를 참고하세요:
+CQRS 데이터 플로우와 전체 구조는 [AWS 배포 인프라 아키텍처](#aws-배포-인프라-아키텍처) 섹션의 `devops/aws/` 다이어그램, 특히 [mermaid 버전](devops/aws/mermaid/architecture.md)으로 대체했습니다. 자세한 CQRS 및 Kafka 동기화 설계는 다음 문서를 참고하세요:
 - [CQRS Kafka 동기화 설계서](docs/prototype/step11/cqrs-kafka-sync-design.md)
 
 ### AWS 배포 인프라 아키텍처
 
 위 애플리케이션 아키텍처를 실제로 올리는 AWS 인프라는 `devops/terraform/`에 Terraform으로 정의돼 있습니다. `dev`·`beta`·`prod` 세 환경을 같은 모듈로 조립하고, 환경 차이는 `terraform.tfvars` 값으로만 둡니다.
 
-핵심 구성은 ECS Fargate(ARM64) 마이크로서비스 6개가 ALB 경로 라우팅 뒤에서 돌고, 쓰기는 Aurora MySQL, 읽기는 MongoDB Atlas, 캐시는 ElastiCache Valkey, 이벤트 동기화는 MSK(Kafka)를 쓰는 형태입니다. 아래는 배포되는 구조의 개요입니다(prod 기준).
-
-```mermaid
-flowchart LR
-    client["Client / API consumer"]
-
-    subgraph aws["AWS Cloud · ap-northeast-2"]
-        alb["ALB<br/>(HTTP :80, path-based)"]
-
-        subgraph ecs["ECS Cluster (Fargate, ARM64)"]
-            gw["api-gateway :8081<br/>/*"]
-            auth["api-auth :8083<br/>/auth/*"]
-            et["api-emerging-tech :8082<br/>/emerging-tech/*"]
-            chat["api-chatbot :8084<br/>/chatbot/*"]
-            book["api-bookmark :8085<br/>/bookmark/*"]
-            agent["api-agent :8086<br/>/agent/*"]
-        end
-
-        subgraph data["Data layer"]
-            aurora[("Aurora MySQL<br/>write store :3306")]
-            valkey[("ElastiCache Valkey<br/>cache :6379")]
-            msk["MSK Kafka<br/>event bus :9098"]
-        end
-
-        logs["CloudWatch Logs"]
-    end
-
-    mongo[("MongoDB Atlas<br/>external · CQRS read store")]
-
-    client -->|HTTP :80| alb
-    alb --> gw & auth & et & chat & book & agent
-    auth --> aurora
-    book --> aurora
-    auth --> valkey
-    chat --> valkey
-    book --> valkey
-    et -.->|produce/consume| msk
-    book -.->|produce/consume| msk
-    agent -.->|produce/consume| msk
-    chat --> mongo
-    agent --> mongo
-    et --> mongo
-    ecs --> logs
-```
+핵심 구성은 ECS Fargate(ARM64) 마이크로서비스 6개가 ALB 경로 라우팅 뒤에서 돌고, 쓰기는 Aurora MySQL, 읽기는 MongoDB Atlas, 캐시는 ElastiCache Valkey, 이벤트 동기화는 MSK(Kafka)를 쓰는 형태입니다.
 
 > MSK는 환경별로 다릅니다: prod=Provisioned, beta=Serverless, dev=없음. 프런트(Amplify/CloudFront) 모듈은 정의돼 있으나 현재 어느 환경에서도 배포되지 않아, 진입점은 ALB뿐입니다.
 
 #### 다이어그램 (환경별)
 
-아래 `.drawio` 파일은 VS Code의 **Draw.io Integration**(`hediet.vscode-drawio`) 확장이나 [app.diagrams.net](https://app.diagrams.net)에서 열어 봅니다. 위 mermaid 개요와 텍스트 버전은 [devops/aws/mermaid/architecture.md](devops/aws/mermaid/architecture.md)에 있습니다.
+환경별 다이어그램은 **[devops/aws 갤러리](devops/aws/README.md)** 에서 한 페이지로 모두 볼 수 있습니다 (PNG 로 GitHub 에서 바로 렌더링). 편집은 `.drawio` 원본을 [app.diagrams.net](https://app.diagrams.net)이나 VS Code **Draw.io Integration**(`hediet.vscode-drawio`) 확장에서 하고, 텍스트(mermaid) 버전은 [devops/aws/mermaid/architecture.md](devops/aws/mermaid/architecture.md)에 있습니다.
+
+아래 표의 링크는 PNG 미리보기로 연결됩니다 (GitHub 에서 렌더). 같은 이름의 `.drawio` 가 편집 원본입니다.
 
 | 다이어그램 | dev | beta | prod |
 |---|---|---|---|
-| Reference Architecture (전체 구조) | [열기](devops/aws/dev/reference-architecture.drawio) | [열기](devops/aws/beta/reference-architecture.drawio) | [열기](devops/aws/prod/reference-architecture.drawio) |
-| Network Topology (VPC·서브넷·NAT) | [열기](devops/aws/dev/network-topology.drawio) | [열기](devops/aws/beta/network-topology.drawio) | [열기](devops/aws/prod/network-topology.drawio) |
-| Security (KMS·IAM·OIDC·SG) | [열기](devops/aws/dev/security.drawio) | [열기](devops/aws/beta/security.drawio) | [열기](devops/aws/prod/security.drawio) |
+| Reference Architecture (전체 구조) | [보기](devops/aws/dev/reference-architecture.png) | [보기](devops/aws/beta/reference-architecture.png) | [보기](devops/aws/prod/reference-architecture.png) |
+| Network Topology (VPC·서브넷·NAT) | [보기](devops/aws/dev/network-topology.png) | [보기](devops/aws/beta/network-topology.png) | [보기](devops/aws/prod/network-topology.png) |
+| Security (KMS·IAM·OIDC·SG) | [보기](devops/aws/dev/security.png) | [보기](devops/aws/beta/security.png) | [보기](devops/aws/prod/security.png) |
 
 #### 인프라 설계 문서
 
@@ -586,39 +537,9 @@ api/gateway/
 - **Naver OAuth 2.0**: 네이버 계정을 통한 로그인
 - **Kakao OAuth 2.0**: 카카오 계정을 통한 로그인
 
-### OAuth 로그인 플로우
+### 인증 플로우 다이어그램
 
-#### OAuth 로그인 시작
-
-![OAuth Login Start](contents/api-auth/oauth-login-start.png)
-
-#### OAuth 로그인 콜백
-
-![OAuth Login Callback Flow](contents/api-auth/oauth-login-callback-flow.png)
-
-### 인증/인가 플로우
-
-![Authentication Authorization Flow](contents/api-auth/authentication-authorization-flow.png)
-
-
-### 주요 인증 플로우
-
-#### 회원가입 플로우
-
-![Signup Flow](contents/api-auth/signup-flow.png)
-
-#### 로그인 플로우
-
-![Login Flow](contents/api-auth/login-flow.png)
-
-#### 토큰 갱신 플로우
-
-![Token Refresh Flow](contents/api-auth/token-refresh-flow.png)
-
-#### 비밀번호 재설정 요청 플로우
-
-![Password Reset Request Flow](contents/api-auth/password-reset-request-flow.png)
-
+회원가입·로그인·로그아웃·토큰 갱신·비밀번호 재설정·OAuth 로그인(시작·콜백)의 상세 시퀀스 다이어그램은 `api/auth` 모듈 README의 [3. 주요 기능](api/auth/README.md#3-주요-기능)으로 옮겼습니다. 전체 인증/인가 흐름은 [5. 인증/인가 플로우](api/auth/README.md#5-인증인가-플로우), OAuth Authorization Code Flow의 단계별 설명은 [6. OAuth 로그인](api/auth/README.md#6-oauth-로그인)을 참고하세요.
 
 ### State 파라미터 관리
 
