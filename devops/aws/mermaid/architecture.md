@@ -2,11 +2,11 @@
 
 > 근거: `devops/aws/architecture-facts.md` (Terraform 코드에서 추출). drawio 다이어그램과 같은 사실을 텍스트로 표현합니다.
 >
-> 현재 **배포되는** 구조 기준입니다. CloudFront·Amplify는 모듈만 있고 어느 env에서도 호출되지 않아(facts §3) 진입점은 ALB(port 80)뿐입니다.
+> 현재 **배포되는** 구조 기준입니다. CloudFront·Amplify는 모듈만 있고 어느 env에서도 호출되지 않아(facts §3) 진입점은 ALB 뿐입니다. ALB 프로토콜은 환경마다 다릅니다 — prod 는 HTTPS(443) + HTTP(80)→443 리다이렉트(`alb_certificate_arn` 설정), dev/beta 는 HTTP(80) 단독입니다.
 
 ## 1. Reference Architecture
 
-ALB(port 80, path 라우팅) → ECS Fargate 서비스 6개 → 데이터 저장소. 이벤트 흐름은 점선.
+ALB(prod=HTTPS 443, dev/beta=HTTP 80, path 라우팅) → ECS Fargate 서비스 6개 → 데이터 저장소. 이벤트 흐름은 점선.
 MSK는 env별로 다릅니다(prod=Provisioned, beta=Serverless, dev=없음). 아래는 prod 기준이며, dev는 MSK 노드와 연결이 빠집니다.
 
 ```mermaid
@@ -14,7 +14,7 @@ flowchart LR
     client["Client / API consumer"]
 
     subgraph aws["AWS Cloud · ap-northeast-2"]
-        alb["ALB<br/>(HTTP :80, path-based)"]
+        alb["ALB<br/>(HTTPS :443, path-based)<br/>HTTP :80 → :443 redirect"]
 
         subgraph ecs["ECS Cluster (Fargate, ARM64)"]
             gw["api-gateway :8081<br/>/*"]
@@ -36,7 +36,7 @@ flowchart LR
 
     mongo[("MongoDB Atlas<br/>external · CQRS read store")]
 
-    client -->|HTTP :80| alb
+    client -->|HTTPS :443| alb
     alb --> gw & auth & et & chat & book & agent
 
     auth --> aurora
@@ -56,6 +56,7 @@ flowchart LR
     ecs --> logs
 
     %% 환경 차이: dev 에는 MSK 노드와 점선 연결이 없음. beta=MSK Serverless, prod=MSK Provisioned(3 broker).
+    %% ALB 프로토콜: prod=HTTPS 443(+80 리다이렉트), dev/beta=HTTP 80. 위 그림은 prod 기준.
     %% 프런트(Amplify/CloudFront)는 모듈만 있고 미배포 → 진입점은 ALB 뿐.
 ```
 
@@ -72,7 +73,7 @@ flowchart TB
 
     subgraph vpc["VPC 10.30.0.0/16 · ap-northeast-2"]
         subgraph pub["public /24 (a/b/c)"]
-            alb["ALB"]
+            alb["ALB<br/>HTTPS :443 (+80 redirect)"]
             nat_a["NAT-a"]
             nat_b["NAT-b"]
             nat_c["NAT-c"]
@@ -98,7 +99,7 @@ flowchart TB
     igw -->|0.0.0.0/0| pub
     app -->|0.0.0.0/0| nat_a
     nat_a --> igw
-    alb -->|":80 → :8081-8086"| ecs
+    alb -->|":443 → :8081-8086"| ecs
     ecs -->|":3306"| aurora
     ecs -->|":6379"| valkey
     ecs -->|":9098 / :9094"| msk
@@ -213,14 +214,15 @@ flowchart LR
     k_state -.encrypts.-> rapply
 
     %% 경계 통제: private-data 인터넷 격리, ECR IMMUTABLE+scan, S3 Object Lock GOVERNANCE, VPC Flow Logs
-    %% 전송 구간: ALB→Fargate HTTP:80, Aurora IAM DB auth, Valkey TLS+token, MSK TLS+IAM SASL
-    %% dev 에서는 MSK가 없어 api-agent 의 kafka-cluster 권한이 미사용.
+    %% 전송 구간: (prod) client→ALB HTTPS:443(ACM, TLS 종료), ALB→Fargate HTTP:80(백엔드), Aurora IAM DB auth, Valkey TLS+token, MSK TLS+IAM SASL
+    %% dev/beta 는 client→ALB 가 HTTP:80. dev 에서는 MSK가 없어 api-agent 의 kafka-cluster 권한이 미사용.
 ```
 
 ## 4. 환경 차이 요약
 
 | 항목 | dev | beta | prod |
 |---|---|---|---|
+| ALB 프로토콜 | HTTP 80 | HTTP 80 | HTTPS 443 (+80→443 리다이렉트) |
 | VPC CIDR | 10.10.0.0/16 | 10.20.0.0/16 | 10.30.0.0/16 |
 | NAT Gateway | 1 (shared) | 1 (shared) | 3 (per AZ) |
 | Aurora | serverless v2 0.5–2.0 ACU | serverless v2 0.5–4.0 ACU | provisioned 3×db.r7g.large |

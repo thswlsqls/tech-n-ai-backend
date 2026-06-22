@@ -39,8 +39,9 @@ ECS 모듈 호출은 6개. **`batch-source`는 ECS 서비스로 배포되지 않
 - `secrets_arn_map`은 services.tf에서 전달하지 않음 → 빈 map (시크릿 주입은 별도 워크플로). (주석 `envs/prod/services.tf:4`)
 
 ### ALB + 라우팅
-- ALB는 env당 1개, `internal=false`, type `application`, Public 서브넷, `drop_invalid_header_fields=true`, `enable_deletion_protection=false`. (`envs/prod/cluster.tf:55`~`:65`)
-- Listener: port **80 / HTTP** (HTTPS/ACM 아님). default action = 404 fixed-response. (`envs/prod/cluster.tf:68`~`:82`)
+- ALB는 env당 1개, `internal=false`, type `application`, Public 서브넷, `drop_invalid_header_fields=true`. `enable_deletion_protection`은 `var.alb_enable_deletion_protection`(prod tfvars=true, dev/beta=default false). (`envs/prod/cluster.tf` `aws_lb.main`)
+- **HTTPS 토글**: `var.alb_certificate_arn`이 비어있지 않으면 HTTPS(443) 리스너 생성 + HTTP(80)→443 301 리다이렉트 + ALB SG 443 인바운드를 켠다. prod tfvars는 ACM ARN을 지정해 HTTPS, dev/beta는 빈 값이라 HTTP(80) 단독. (`envs/prod/cluster.tf` `local.alb_https_enabled`; `prod/terraform.tfvars`)
+- Listener: **prod = HTTPS 443** (보안정책 `var.alb_ssl_policy` 기본 `ELBSecurityPolicy-TLS13-1-2-2021-06`, cert = `var.alb_certificate_arn`), 서비스 path 규칙이 443 리스너에 부착되고 80 리스너는 443 으로 리다이렉트. **dev/beta = HTTP 80**, default action = 404 fixed-response. (`envs/prod/cluster.tf` `aws_lb_listener.https`/`aws_lb_listener.http`)
 - 라우팅은 **path-based** (위 표의 path), 우선순위로 매칭. host header 조건은 사용 안 함(빈 리스트). (`modules/ecs-service/main.tf:143`~`:168`)
 - Target Group은 서비스마다 blue/green 2개, `target_type=ip`, protocol HTTP, health check path 기본 `/actuator/health/readiness` (matcher 200, healthy 2 / unhealthy 3 / interval 15 / timeout 5). (`modules/ecs-service/main.tf:81`, `:110`; default path `modules/ecs-service/variables.tf:99`)
 
@@ -200,7 +201,7 @@ ECS 모듈 호출은 6개. **`batch-source`는 ECS 서비스로 배포되지 않
 ### Security Group (inbound)
 | SG | inbound | source | 출처 |
 |---|---|---|---|
-| ALB | 80/TCP | 0.0.0.0/0 | `envs/prod/cluster.tf:30` |
+| ALB | 80/TCP (+443/TCP, HTTPS 토글 시) | 0.0.0.0/0 | `envs/prod/cluster.tf` `aws_security_group.alb` |
 | Workload(서비스별) | container_port(8081~8086) | ALB SG | `modules/ecs-service/main.tf:67` |
 | Aurora | 3306 | 워크로드 SG들(services.tf rule) | `modules/aurora-mysql/main.tf:53`; `envs/prod/services.tf:305` |
 | Valkey | 6379 | 워크로드 SG들 | `modules/elasticache-valkey/main.tf:56`; `envs/prod/services.tf:317` |
@@ -234,6 +235,7 @@ ECS 모듈 호출은 6개. **`batch-source`는 ECS 서비스로 배포되지 않
 
 | 항목 | dev | beta | prod | 출처 |
 |---|---|---|---|---|
+| ALB 프로토콜 | HTTP 80 | HTTP 80 | HTTPS 443 (+80→443 리다이렉트) | `*/cluster.tf`, `prod/terraform.tfvars` |
 | VPC CIDR | 10.10.0.0/16 | 10.20.0.0/16 | 10.30.0.0/16 | `*/terraform.tfvars` |
 | NAT 개수 | 1 (single) | 1 (single) | 3 (AZ별) | `dev/variables.tf:167`, `beta/terraform.tfvars:7`, `prod/terraform.tfvars:7` |
 | Aurora 모드 | serverlessv2 0.5–2.0 ACU | serverlessv2 0.5–4.0 ACU | provisioned 3×db.r7g.large, iopt1 | tfvars/variables |
@@ -252,7 +254,7 @@ ECS 모듈 호출은 6개. **`batch-source`는 ECS 서비스로 배포되지 않
 
 ## 8. 데이터 흐름 서술
 
-- 인입: client → ALB(port 80, path-based) → 각 ECS 서비스(api-gateway 8081 fallback `/*`, api-auth 8083 `/auth/*`, api-emerging-tech 8082 `/emerging-tech/*`, api-chatbot 8084 `/chatbot/*`, api-bookmark 8085 `/bookmark/*`, api-agent 8086 `/agent/*`). (`envs/prod/services.tf`, `cluster.tf`)
+- 인입: client → ALB(prod=HTTPS 443, dev/beta=HTTP 80, path-based) → 각 ECS 서비스(api-gateway 8081 fallback `/*`, api-auth 8083 `/auth/*`, api-emerging-tech 8082 `/emerging-tech/*`, api-chatbot 8084 `/chatbot/*`, api-bookmark 8085 `/bookmark/*`, api-agent 8086 `/agent/*`). prod는 HTTP 80 요청을 443으로 301 리다이렉트. ALB→Fargate 백엔드 레그는 모든 env에서 HTTP. (`envs/prod/services.tf`, `cluster.tf`)
 - 프런트(Amplify/CloudFront)는 코드상 비활성/미호출이라 현재 흐름에 포함되지 않음(§3).
 - ECS 서비스 → 데이터: Aurora(3306), Valkey(6379), MSK(9098/9094)로 SG 인바운드가 워크로드별 선택 부여. MongoDB Atlas는 외부 서비스로 시크릿 URI를 통해 연결. (`envs/prod/services.tf:282`~`:347`)
 - 이벤트 흐름: api-agent가 `kafka-cluster:*` 권한으로 MSK에 produce/consume(topic `{project}.conversation.*`, group `{project}.*`). MSK는 prod=Provisioned, beta=Serverless, dev=없음. (`envs/prod/task_roles.tf:158`)
@@ -269,4 +271,4 @@ ECS 모듈 호출은 6개. **`batch-source`는 ECS 서비스로 배포되지 않
 - **MongoDB Atlas 클러스터/사양**: Terraform 관리 밖(외부). 연결 URI 시크릿만 존재.
 - **batch-source 실행 방식**: ECR 리포만 있고 ECS 서비스 정의가 없음. 어떻게 실행되는지(Scheduled Task, 외부 Jenkins 등) Terraform 코드에 없음 → 확인 불가.
 - **dev/beta의 Aurora·ElastiCache·MSK 인스턴스 실제 ARN·엔드포인트**: 시드 placeholder와 토글에 의존하며 apply 결과 산출물이라 코드만으로 값 확인 불가.
-- **WAF / ACM 인증서**: CloudFront 모듈 변수로만 존재(default null), 실제 ACL/인증서 리소스는 코드에 없음.
+- **WAF / ACM 인증서**: 인증서 리소스 자체는 코드에 없다(외부에서 발급). ALB HTTPS는 발급된 ACM ARN을 `var.alb_certificate_arn`으로 주입받아 쓴다(prod tfvars). CloudFront용 WAF/cert는 여전히 모듈 변수로만 존재(default null).
