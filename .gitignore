@@ -51,5 +51,29 @@ out/
 ### Decompiled classes ###
 org/
 
-### AWS 강의자료 제외 
+### AWS 강의자료 제외
 contents/AWS/*
+
+### Terraform ###
+# init이 내려받는 provider 캐시 (수백 MB) — 다시 생성 가능하므로 제외
+**/.terraform/*
+# state 파일에는 평문 시크릿이 들어갈 수 있어 제외 (원격 백엔드 사용 권장)
+*.tfstate
+*.tfstate.*
+# plan/crash 산출물
+*.tfplan
+crash.log
+crash.*.log
+# CLI 설정·로컬 override
+.terraformrc
+terraform.rc
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+# provider 버전 잠금 파일은 커밋 대상 (HashiCorp 권장)
+!**/.terraform.lock.hcl
+
+### DevOps 산출물 생성 프롬프트·결과 — git 추적 제외 ###
+devops/prompts/
+devops/results/
