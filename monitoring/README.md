@@ -64,6 +64,11 @@ docker compose down
 
 ## 3. 데이터가 흐르는 방식
 
+![로컬 관측 스택 다이어그램](../docs/monitoring/observability_stack.png)
+
+> 위 그림 소스: [`../docs/monitoring/observability_stack.py`](../docs/monitoring/observability_stack.py)
+> (mingrammer Diagrams). 아래 텍스트 버전은 그림이 안 보일 때를 위한 대체본이다.
+
 ```
 [API 서버 8081~8086]  --/actuator/prometheus-->  ┐
 [Jenkins 8080]        --/prometheus/----------->  ├─> [Prometheus 9091] ─┐

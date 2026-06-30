@@ -77,3 +77,6 @@ override.tf.json
 ### DevOps 산출물 생성 프롬프트·결과 — git 추적 제외 ###
 devops/prompts/
 devops/results/
+
+### 다이어그램 생성용 파이썬 가상환경 — git 추적 제외 ###
+docs/monitoring/.venv/

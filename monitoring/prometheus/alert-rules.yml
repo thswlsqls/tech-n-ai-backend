@@ -3,7 +3,7 @@ groups:
     rules:
       # ─── Batch Job 실패 ───
       - alert: BatchJobFailed
-        expr: increase(spring_batch_job_seconds_count{status="FAILURE"}[5m]) > 0
+        expr: increase(spring_batch_job_seconds_count{spring_batch_job_status="FAILED"}[5m]) > 0
         for: 0m
         labels:
           severity: critical
@@ -13,7 +13,7 @@ groups:
 
       # ─── Batch Job 장시간 실행 ───
       - alert: BatchJobSlowExecution
-        expr: spring_batch_job_active_seconds_active_count > 0 and spring_batch_job_active_seconds_duration_sum > 1800
+        expr: spring_batch_job_active_seconds_count > 0 and spring_batch_job_active_seconds_sum > 1800
         for: 5m
         labels:
           severity: warning
@@ -35,7 +35,7 @@ groups:
 
       # ─── Jenkins 빌드 연속 실패 ───
       - alert: JenkinsBuildConsecutiveFailures
-        expr: increase(default_jenkins_builds_failed_build_count{jenkins_job=~"batch-source.*"}[1h]) >= 3
+        expr: increase(default_jenkins_builds_failed_build_count_total{jenkins_job=~"batch-source.*"}[1h]) >= 3
         for: 0m
         labels:
           severity: warning
