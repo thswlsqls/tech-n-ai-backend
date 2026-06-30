@@ -1,7 +1,7 @@
 # AWS 배포 아키텍처 다이어그램
 
 `devops/terraform/` 로 올리는 AWS 인프라를 `dev`·`beta`·`prod` 환경별로 그린 다이어그램이다.
-환경마다 세 장을 둔다 — 레퍼런스 아키텍처, 네트워크 토폴로지, 보안.
+환경마다 네 장을 둔다 — 레퍼런스 아키텍처, 네트워크 토폴로지, 보안, 관측성.
 
 - **편집 소스**: `*.drawio` — [app.diagrams.net](https://app.diagrams.net) 또는 draw.io 데스크톱에서 열어 편집
 - **렌더본**: `*.png` — GitHub 에서 바로 보이는 이미지 (draw.io CLI 로 `.drawio` 에서 생성)
@@ -18,6 +18,9 @@
 ### 보안
 ![prod security](prod/security.png)
 
+### 관측성
+![prod observability](prod/observability.png)
+
 ## beta
 
 ### 레퍼런스 아키텍처
@@ -29,6 +32,9 @@
 ### 보안
 ![beta security](beta/security.png)
 
+### 관측성
+![beta observability](beta/observability.png)
+
 ## dev
 
 ### 레퍼런스 아키텍처
@@ -39,6 +45,9 @@
 
 ### 보안
 ![dev security](dev/security.png)
+
+### 관측성
+![dev observability](dev/observability.png)
 
 ## PNG 를 다시 생성하려면
 
