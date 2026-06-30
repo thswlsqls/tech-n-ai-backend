@@ -9,7 +9,7 @@
 | 기둥 | 상태 | 한 줄 평 |
 |---|---|---|
 | 운영 우수성 | 🟢 양호 | Terraform 모듈화 + GitHub OIDC + CodeDeploy Blue/Green. 관측성 사이드카는 꺼져 있음 |
-| 보안 | 🟢 양호 | KMS 키 분리, 최소권한 task role, 키리스 OIDC, private-data 격리. ALB가 HTTP(:80)인 점이 약점 |
+| 보안 | 🟢 양호 | KMS 키 분리, 최소권한 task role, 키리스 OIDC, private-data 격리. prod ALB 는 HTTPS(:443) 토글 적용(실 인증서 ARN 필요), dev/beta 는 HTTP(:80) |
 | 신뢰성 | 🟡 주의 | prod는 Multi-AZ·다중 NAT로 견고. dev/beta는 단일 NAT·단일 노드라 SPOF 존재(의도된 비용 절감) |
 | 성능 효율 | 🟢 양호 | Graviton(ARM64) + Aurora Serverless v2 + VPC Endpoint. 적절한 사이징 |
 | 비용 최적화 | 🟡 주의 | env별 차등 사이징은 좋음. prod NAT 3개·MSK Provisioned·Aurora iopt1이 비용 주동인 |
@@ -63,12 +63,12 @@ Elastic Beanstalk 개념 — <https://docs.aws.amazon.com/elasticbeanstalk/lates
 - VPC Flow Logs 모든 env on(facts §4).
 
 **위험·격차**
-- **ALB가 HTTP :80 단독**이다(ACM/HTTPS 아님, facts §1). 클라이언트→ALB 구간이 평문이다. 가장 큰 보안 격차.
+- **dev/beta ALB가 HTTP :80 단독**이다(ACM/HTTPS 아님, facts §1). 해당 구간 클라이언트→ALB 트래픽이 평문이다. prod 는 HTTPS(:443) 리스너 토글이 구현돼 있으나 `alb_certificate_arn` 이 placeholder 라 실제 발급 인증서로 교체해야 적용된다.
 - WAF가 붙어 있지 않다(CloudFront 모듈 변수로만 존재, default null — facts §3). 단, CloudFront 자체가 미배포라 현재 WAF 적용 지점이 없다.
 - 시크릿 자동 로테이션은 Aurora Managed Master Password만 자동이고, JWT/OpenAI/Mongo 등은 수동 로테이션 설계로 보인다(확인 필요).
 
 **권고**
-- ALB에 ACM 인증서를 붙여 HTTPS :443 + HTTP→HTTPS 리다이렉트를 적용한다. prod 우선. (High)
+- prod 는 placeholder 를 실 ACM 인증서 ARN 으로 교체해 HTTPS :443 을 활성화하고, dev/beta 에도 같은 토글로 HTTPS + HTTP→HTTPS 리다이렉트를 확장한다. (High)
 - 외부 노출 진입점(ALB 또는 향후 CloudFront)에 AWS WAF를 적용한다. (Medium)
 - Secrets Manager 로테이션 람다 또는 일정 기반 로테이션을 JWT·API 키에 적용 검토. (Medium)
 
@@ -173,7 +173,7 @@ Savings Plans — <https://docs.aws.amazon.com/savingsplans/latest/userguide/wha
 
 | ID | 기둥 | 심각도 | 권고 | 근거 |
 |---|---|---|---|---|
-| R-01 | 보안 | **High** | ALB에 ACM 인증서로 HTTPS(:443) 적용 + HTTP 리다이렉트 (특히 prod) | facts §1 (ALB :80 단독) |
+| R-01 | 보안 | **High** | prod 실 인증서 ARN 교체로 HTTPS(:443) 활성화 + dev/beta 확장 + HTTP 리다이렉트 | facts §1 (prod HTTPS 토글, dev/beta :80) |
 | R-02 | 보안 | Medium | 외부 진입점에 AWS WAF 적용 | facts §3 (WAF 미부착) |
 | R-03 | 운영 | Medium | prod에 ADOT 사이드카 활성화(X-Ray 추적) | facts §1 (sidecar off) |
 | R-04 | 비용 | Medium | prod 상시 가동분에 Savings Plans / Aurora RI, MSK Provisioned 필요성 재검토 | facts §2/§7 |

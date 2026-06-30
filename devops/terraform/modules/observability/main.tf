@@ -44,7 +44,7 @@ resource "aws_cloudwatch_metric_alarm" "ecs_cpu" {
   for_each = { for s in var.service_alarms : "${s.cluster_name}/${s.service_name}" => s }
 
   alarm_name          = "${var.project}-${var.environment}-${each.value.service_name}-cpu-high"
-  alarm_description   = "${each.value.service_name} CPU > ${each.value.cpu_threshold}% (5분)"
+  alarm_description   = "${each.value.service_name} CPU > ${each.value.cpu_threshold}% (3분)"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 3
   threshold           = each.value.cpu_threshold
@@ -68,7 +68,7 @@ resource "aws_cloudwatch_metric_alarm" "ecs_memory" {
   for_each = { for s in var.service_alarms : "${s.cluster_name}/${s.service_name}" => s }
 
   alarm_name          = "${var.project}-${var.environment}-${each.value.service_name}-mem-high"
-  alarm_description   = "${each.value.service_name} 메모리 > ${each.value.memory_threshold}% (5분)"
+  alarm_description   = "${each.value.service_name} 메모리 > ${each.value.memory_threshold}% (3분)"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 3
   threshold           = each.value.memory_threshold
@@ -83,6 +83,7 @@ resource "aws_cloudwatch_metric_alarm" "ecs_memory" {
   }
 
   alarm_actions = local.alarm_actions
+  ok_actions    = local.alarm_actions
 
   tags = local.common_tags
 }
@@ -100,12 +101,17 @@ resource "aws_cloudwatch_metric_alarm" "ecs_running_count" {
   period              = 60
   statistic           = "Average"
 
+  # 태스크가 0 이 되면 메트릭 송신이 끊겨 INSUFFICIENT_DATA 로 빠진다.
+  # "서비스 다운" 을 놓치지 않도록 결측치를 위반(ALARM)으로 처리.
+  treat_missing_data = "breaching"
+
   dimensions = {
     ClusterName = each.value.cluster_name
     ServiceName = each.value.service_name
   }
 
   alarm_actions = local.alarm_actions
+  ok_actions    = local.alarm_actions
 
   tags = local.common_tags
 }
@@ -129,7 +135,7 @@ resource "aws_cloudwatch_dashboard" "overview" {
           width  = 24
           height = 2
           properties = {
-            markdown = "# ${var.project} ${var.environment} — Overview\n\n서비스별 CPU·메모리·태스크 수, ALB 5xx 비율, 데이터 계층 메트릭."
+            markdown = "# ${var.project} ${var.environment} — Overview\n\n서비스별 CPU 사용률."
           }
         },
       ],

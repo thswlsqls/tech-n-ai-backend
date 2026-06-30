@@ -294,3 +294,9 @@ variable "frontend_branch_name" {
   type        = string
   default     = "develop"
 }
+
+variable "alert_emails" {
+  description = "알람 통지를 받을 이메일 목록. 비우면 SNS 구독을 만들지 않는다."
+  type        = list(string)
+  default     = []
+}

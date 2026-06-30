@@ -2,6 +2,13 @@
 
 > 08-observability.md 의 OTLP 표준 + 로그 파이프라인을 실 파일로 구현. ECS Task Definition 에 sidecar 로 부착.
 
+> **현재 상태 — 미가동:** dev·beta·prod 모두 ADOT/FireLens 사이드카가 꺼져 있다
+> (`enable_otel_sidecar`·`enable_firelens_sidecar` 기본값 false, 각 env tfvars 미설정).
+> 그래서 분산 추적이 수집되지 않고, `masking.lua` 의 PII 마스킹도 적용되지 않는다 —
+> 앱 로그가 awslogs 드라이버로 CloudWatch 에 마스킹 없이 그대로 적재된다.
+> 마스킹을 실제로 켜려면 사이드카를 활성화하고 이 설정 파일들을 SSM/S3 로 주입해야 한다
+> (아래 '설정 파일 배포 옵션' 참고).
+
 ## 파일
 
 | 파일 | 용도 |
