@@ -97,6 +97,30 @@ Jaeger 트레이스에서 같은 `traceId`의 로그로 바로 넘어갈 수 있
 > 가져와(Import) `/var/lib/grafana/dashboards`에 두면 자동 인식된다
 > (provider 설정: [`grafana/provisioning/dashboards/dashboards.yml`](grafana/provisioning/dashboards/dashboards.yml)).
 
+### OpenTelemetry는 어디에 쓰나
+
+세 신호 중 **트레이스에만 OpenTelemetry(OTLP)를 쓴다.** 메트릭은 Prometheus, 로그는 Loki의
+기본 경로를 따른다. 즉 "관측을 OTel 하나로 통일"한 게 아니라, 신호마다 가장 잘 맞는 경로를 골랐다.
+
+| 신호 | 앱 쪽 계측·전송 | 수집 | OTel |
+|---|---|---|---|
+| **트레이스** | `io.micrometer:micrometer-tracing-bridge-otel` + `io.opentelemetry:opentelemetry-exporter-otlp` (+ `spring-boot-starter-opentelemetry`), OTLP gRPC `4317` / HTTP `4318`로 전송 | Jaeger v2 — OpenTelemetry Collector 기반 구성([`jaeger/jaeger-config.yml`](jaeger/jaeger-config.yml)의 `receivers.otlp` → `pipelines.traces`) | **사용** |
+| **메트릭** | `io.micrometer:micrometer-registry-prometheus`로 `/actuator/prometheus` 노출 | Prometheus가 scrape | 미사용 |
+| **로그** | JSON 파일에 `traceId`/`spanId` 포함 | Promtail → Loki | 미사용 (단 trace context는 전파) |
+
+메트릭과 로그를 OTel 경로(OTLP 내보내기 / OTel Collector)로 보내지 않은 이유:
+
+- **Jenkins는 OTLP를 못 낸다.** Prometheus 포맷만 `/prometheus/`로 노출하므로 긁어오는(scrape) 방식이 강제된다.
+- **알림 규칙이 Prometheus에 묶여 있다.** [`prometheus/alert-rules.yml`](prometheus/alert-rules.yml)의 식이
+  `up{job="jenkins"}`(타깃 생사), `spring_batch_job_seconds_count`, `jvm_memory_used_bytes` 같은
+  Prometheus 메트릭과 PromQL에 의존한다. 타깃이 살아 있는지 알려주는 `up`은 scrape(pull) 모델에서만 공짜로 생긴다.
+- **batch-source 메트릭은 Pushgateway**(Prometheus 생태계)로 들어온다.
+- 로그는 Loki로 보내되, Promtail이 `traceId`/`spanId`를 structured metadata로 남겨
+  Grafana에서 트레이스↔로그로 바로 넘어갈 수 있게 했다(OTel의 상관관계 이점은 그대로 챙긴다).
+
+> 이 로컬 스택은 신호별 직접 경로를 쓰고 **중앙 OpenTelemetry Collector는 두지 않는다.**
+> 운영(AWS)은 별개로 CloudWatch + X-Ray + Amazon Managed Grafana다(맨 위 머리말 참고).
+
 ---
 
 ## 4. Jenkins
