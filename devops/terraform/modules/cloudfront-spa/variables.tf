@@ -59,12 +59,6 @@ variable "waf_web_acl_arn" {
   default     = null
 }
 
-variable "default_ttl_seconds" {
-  description = "기본 TTL."
-  type        = number
-  default     = 300
-}
-
 variable "spa_404_to_index" {
   description = "SPA 라우팅: 404 응답을 /index.html 로 변환."
   type        = bool

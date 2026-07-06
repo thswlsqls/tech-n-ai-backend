@@ -264,20 +264,11 @@ module "api_agent" {
 }
 
 # ----------------------------------------------------------------------------
-# 데이터 SG 인바운드 — 모든 워크로드가 Aurora·Cache·MSK 에 접근 가능하도록
+# 데이터 SG 인바운드 — 각 데이터 저장소를 실제로 쓰는 워크로드만 접근 허용
 # 매트릭스 §3 의 sg-aurora·sg-elasticache·sg-msk 인바운드 규칙
 # ----------------------------------------------------------------------------
 
 locals {
-  all_workload_sg_ids = [
-    module.api_gateway.security_group_id,
-    module.api_auth.security_group_id,
-    module.api_emerging_tech.security_group_id,
-    module.api_chatbot.security_group_id,
-    module.api_bookmark.security_group_id,
-    module.api_agent.security_group_id,
-  ]
-
   # Aurora 에 접근하는 워크로드만 (api-auth, api-bookmark, api-emerging-tech, api-agent)
   aurora_consumers = [
     module.api_auth.security_group_id,

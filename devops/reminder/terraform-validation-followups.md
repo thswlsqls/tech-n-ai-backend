@@ -12,21 +12,17 @@
 
 ---
 
-## 1. 출시 전 반드시 처리 — prod ALB HTTPS 전환 (우선순위 높음)
+## 1. 출시 전 반드시 처리 — prod ALB HTTPS 전환 (코드는 완료, 인증서 발급만 남음)
 
-**무엇**: `envs/beta/cluster.tf`·`envs/prod/cluster.tf`가 `envs/dev/cluster.tf`와 완전히 같다.
-세 환경 모두 ALB가 HTTP 80 만 받고, HTTPS(443)·ACM 인증서가 없으며, `enable_deletion_protection = false`다.
-파일 주석도 "(dev)" 그대로 남아 있다.
+**진행 상황 (2026-07-06 갱신)**: 코드 쪽은 커밋 `a980621`로 끝났다. `cluster.tf`가
+`var.alb_certificate_arn` 토글로 HTTPS(443) 리스너·80→443 리다이렉트·SG 443 인바운드를 만들고,
+prod 는 `alb_enable_deletion_protection = true`다. "(dev)" 주석도 정리됐다.
 
-**왜 지금 안 고쳤나**: 의도된 보류다. `envs/prod/README.md`에 "도메인 보유 후 HTTPS 전환"으로 적혀 있다.
-ACM 인증서의 DNS 검증은 도메인이 있어야 하므로, 도메인 확보 전에는 HTTPS 리스너를 만들 수 없다.
-
-**언제·무엇을 해야 하나** (도메인 확보 시점):
-1. ACM 인증서 발급 — ALB 용은 서울 리전(`ap-northeast-2`), CloudFront 용은 `us-east-1`
-2. prod ALB 에 HTTPS(443) 리스너 추가, HTTP(80) → HTTPS 리다이렉트로 변경
-3. prod ALB SG 인바운드를 80 에서 443 으로 교체
-4. prod ALB `enable_deletion_protection = true` 로 변경
-5. cluster.tf 의 "(dev)" 주석을 환경에 맞게 정리
+**남은 것**: 도메인 확보 후 ACM 인증서 발급 (ALB 용 `ap-northeast-2`, CloudFront 용 `us-east-1`).
+`envs/prod/terraform.tfvars` 의 `alb_certificate_arn` 이 아직 자리표시
+(`...000000000000:certificate/REPLACE-WITH-ISSUED-CERT`)다. **이 값이 빈 문자열이 아니어서
+HTTPS 분기가 켜진 상태이므로, 실제 인증서로 바꾸기 전에 prod apply 를 하면 유효하지 않은
+ARN 으로 리스너 생성이 실패한다.**
 
 근거 문서: `envs/prod/README.md` 의 "도메인·HTTPS 보강 (도메인 보유 후)" 절.
 
@@ -66,15 +62,15 @@ IAM 관리 권한(`resources = ["*"]`)을 가진다. 권한 범위를 좁히는 
   지금 동작에는 문제없다. AWS Provider 6.0 으로 올릴 때 함께 처리하는 게 낫다. 리소스 주소가 바뀌어
   `terraform state mv` 가 필요하므로 한 번에 일괄로 한다.
 
-- **미사용 선언 정리** (tflint 가 잡은 것)
-  - `bootstrap/variables.tf` — `permissions_boundary_managed` (위 2번과 연결, 쓰게 되면 해소)
-  - `modules/cloudfront-spa/variables.tf` — `default_ttl_seconds`
-  - `envs/{dev,beta,prod}/services.tf` — `local.all_workload_sg_ids`
-  기존 코드라 이번엔 건드리지 않았다. 의도된 자리표시인지 확인 후 지울지 결정한다.
+- **미사용 선언 정리** (tflint 가 잡은 것) — 2026-07-06 일부 해소
+  - `bootstrap/variables.tf` — `permissions_boundary_managed` (위 2번과 연결, 쓰게 되면 해소) — **유지**
+  - ~~`modules/cloudfront-spa/variables.tf` — `default_ttl_seconds`~~ — 제거함 (관리형 캐시 정책
+    CachingOptimized 를 쓰므로 어디에도 반영되지 않는 죽은 설정값이었다)
+  - ~~`envs/{dev,beta,prod}/services.tf` — `local.all_workload_sg_ids`~~ — 제거함 (서비스별 consumer
+    목록으로 대체된 잔재)
 
-- **`.terraform.lock.hcl` 버전 관리 여부**
-  검증 중 `terraform init` 으로 `bootstrap/`·`envs/dev/` 에 lock 파일이 생겼다. 보통 lock 파일은
-  레포에 커밋해 provider 버전을 고정하는 게 권장된다. 팀 정책에 맞게 커밋할지 `.gitignore` 에 둘지 정한다.
+- ~~**`.terraform.lock.hcl` 버전 관리 여부**~~ — 해소됨. 커밋 `a5e2f85`로 `bootstrap/`·`envs/dev/`
+  lock 파일을 레포에 커밋했다.
 
 ---
 
