@@ -165,6 +165,167 @@ langchain4j 1.10.0을 사용하며, 검색에는 MongoDB Atlas Vector Search를,
 - 프로필: `local`, `dev`, `beta`, `prod`. 테스트와 `bootRun`은 기본적으로 `local`을 쓴다.
 - 로컬 인프라(Kafka, Redis, MongoDB, 모니터링 스택)는 `docker-compose.yml`로 제공된다.
 
+## 인프라·배포·관측 (`devops/`, `monitoring/`)
+
+애플리케이션 코드와 별개로, 인프라와 관측 설정이 저장소 안에 함께 들어 있다.
+
+### Terraform (IaC) — `devops/terraform/`
+AWS 인프라는 Terraform으로 관리한다. 세 부분으로 나뉜다.
+- `bootstrap/` — Terraform 상태 저장용 S3·KMS, ECR, GitHub Actions용 OIDC 역할처럼 다른 모든 것보다 먼저 있어야 하는 리소스. 한 번만 적용한다.
+- `modules/` — 재사용하는 리소스 묶음: `network`, `aurora-mysql`, `elasticache-valkey`, `msk-serverless`/`msk-provisioned`(Kafka), `ecs-service`, `cloudfront-spa`, `amplify-app`, `s3-bucket`, `iam-role-workload`, `observability`.
+- `envs/{dev,beta,prod}/` — 환경별로 위 모듈을 엮어 실제 인프라를 정의한다. 환경마다 상태가 분리돼 있다.
+
+리팩토링할 때는 `terraform plan`이 아무 변경도 만들지 않는지(no-op)로 동작이 그대로인지 확인한다.
+
+### AWS 아키텍처 다이어그램 — `devops/aws/{dev,beta,prod}/`
+환경별로 네트워크 구성, 참조 아키텍처, 보안, 관측 다이어그램을 `.drawio`와 `.png`로 둔다. 인프라를 바꾸면 이 다이어그램도 같이 맞춘다.
+
+### 관측(observability) — 로컬과 운영이 분리돼 있다
+헷갈리기 쉬우므로 둘을 구분한다.
+- **로컬**: 루트 `docker-compose.yml` 하나에 DB·Kafka와 함께 Prometheus, Pushgateway, Alertmanager, Jaeger(트레이스), Loki + Promtail(로그), Grafana가 들어 있다. 각 도구의 설정 파일은 `monitoring/` 아래에 있다. 브라우저 접속 방법은 `monitoring/README.md` 참고.
+- **운영(AWS)**: CloudWatch + X-Ray + Amazon Managed Grafana로 설계돼 있고, 설명은 `devops/results/08-observability.md`에 있다.
+
+`monitoring/README.md`에 적힌 URL은 전부 로컬 PC 주소다. 운영 관측과 섞지 않는다.
+
 ## tmux 개발 환경
-`./scripts/tmux-backend.sh`가 3창 세션(project, module, test)을 띄운다.
-`scripts/tmux-dev-guide.md`, `scripts/tmux-recommended-layouts.md`, `scripts/tmux-overview.md` 참고.
+`./scripts/tmux/tmux-backend.sh`가 3창 세션(project, module, test)을 띄운다.
+`scripts/tmux/tmux-dev-guide.md`, `scripts/tmux/tmux-recommended-layouts.md`, `scripts/tmux/tmux-overview.md` 참고.
+
+<!-- rtk-instructions v2 -->
+# RTK (Rust Token Killer) - Token-Optimized Commands
+
+## Golden Rule
+
+**Always prefix commands with `rtk`**. If RTK has a dedicated filter, it uses it. If not, it passes through unchanged. This means RTK is always safe to use.
+
+**Important**: Even in command chains with `&&`, use `rtk`:
+```bash
+# ❌ Wrong
+git add . && git commit -m "msg" && git push
+
+# ✅ Correct
+rtk git add . && rtk git commit -m "msg" && rtk git push
+```
+
+## RTK Commands by Workflow
+
+### Build & Compile (80-90% savings)
+```bash
+rtk cargo build         # Cargo build output
+rtk cargo check         # Cargo check output
+rtk cargo clippy        # Clippy warnings grouped by file (80%)
+rtk tsc                 # TypeScript errors grouped by file/code (83%)
+rtk lint                # ESLint/Biome violations grouped (84%)
+rtk prettier --check    # Files needing format only (70%)
+rtk next build          # Next.js build with route metrics (87%)
+```
+
+### Test (60-99% savings)
+```bash
+rtk cargo test          # Cargo test failures only (90%)
+rtk go test             # Go test failures only (90%)
+rtk jest                # Jest failures only (99.5%)
+rtk vitest              # Vitest failures only (99.5%)
+rtk playwright test     # Playwright failures only (94%)
+rtk pytest              # Python test failures only (90%)
+rtk rake test           # Ruby test failures only (90%)
+rtk rspec               # RSpec test failures only (60%)
+rtk test <cmd>          # Generic test wrapper - failures only
+```
+
+### Git (59-80% savings)
+```bash
+rtk git status          # Compact status
+rtk git log             # Compact log (works with all git flags)
+rtk git diff            # Compact diff (80%)
+rtk git show            # Compact show (80%)
+rtk git add             # Ultra-compact confirmations (59%)
+rtk git commit          # Ultra-compact confirmations (59%)
+rtk git push            # Ultra-compact confirmations
+rtk git pull            # Ultra-compact confirmations
+rtk git branch          # Compact branch list
+rtk git fetch           # Compact fetch
+rtk git stash           # Compact stash
+rtk git worktree        # Compact worktree
+```
+
+Note: Git passthrough works for ALL subcommands, even those not explicitly listed.
+
+### GitHub (26-87% savings)
+```bash
+rtk gh pr view <num>    # Compact PR view (87%)
+rtk gh pr checks        # Compact PR checks (79%)
+rtk gh run list         # Compact workflow runs (82%)
+rtk gh issue list       # Compact issue list (80%)
+rtk gh api              # Compact API responses (26%)
+```
+
+### JavaScript/TypeScript Tooling (70-90% savings)
+```bash
+rtk pnpm list           # Compact dependency tree (70%)
+rtk pnpm outdated       # Compact outdated packages (80%)
+rtk pnpm install        # Compact install output (90%)
+rtk npm run <script>    # Compact npm script output
+rtk npx <cmd>           # Compact npx command output
+rtk prisma              # Prisma without ASCII art (88%)
+```
+
+### Files & Search (60-75% savings)
+```bash
+rtk ls <path>           # Tree format, compact (65%)
+rtk read <file>         # Code reading with filtering (60%)
+rtk grep <pattern>      # Search grouped by file (75%). Format flags (-c, -l, -L, -o, -Z) run raw.
+rtk find <pattern>      # Find grouped by directory (70%)
+```
+
+### Analysis & Debug (70-90% savings)
+```bash
+rtk err <cmd>           # Filter errors only from any command
+rtk log <file>          # Deduplicated logs with counts
+rtk json <file>         # JSON structure without values
+rtk deps                # Dependency overview
+rtk env                 # Environment variables compact
+rtk summary <cmd>       # Smart summary of command output
+rtk diff                # Ultra-compact diffs
+```
+
+### Infrastructure (85% savings)
+```bash
+rtk docker ps           # Compact container list
+rtk docker images       # Compact image list
+rtk docker logs <c>     # Deduplicated logs
+rtk kubectl get         # Compact resource list
+rtk kubectl logs        # Deduplicated pod logs
+```
+
+### Network (65-70% savings)
+```bash
+rtk curl <url>          # Compact HTTP responses (70%)
+rtk wget <url>          # Compact download output (65%)
+```
+
+### Meta Commands
+```bash
+rtk gain                # View token savings statistics
+rtk gain --history      # View command history with savings
+rtk discover            # Analyze Claude Code sessions for missed RTK usage
+rtk proxy <cmd>         # Run command without filtering (for debugging)
+rtk init                # Add RTK instructions to CLAUDE.md
+rtk init --global       # Add RTK to ~/.claude/CLAUDE.md
+```
+
+## Token Savings Overview
+
+| Category | Commands | Typical Savings |
+|----------|----------|-----------------|
+| Tests | vitest, playwright, cargo test | 90-99% |
+| Build | next, tsc, lint, prettier | 70-87% |
+| Git | status, log, diff, add, commit | 59-80% |
+| GitHub | gh pr, gh run, gh issue | 26-87% |
+| Package Managers | pnpm, npm, npx | 70-90% |
+| Files | ls, read, grep, find | 60-75% |
+| Infrastructure | docker, kubectl | 85% |
+| Network | curl, wget | 65-70% |
+
+Overall average: **60-90% token reduction** on common development operations.
+<!-- /rtk-instructions -->
