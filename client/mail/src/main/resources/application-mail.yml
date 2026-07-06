@@ -6,7 +6,6 @@ mail:
     verification-subject: 이메일 인증을 완료해주세요
     password-reset-subject: 비밀번호 재설정 안내
   async:
-    enabled: true
     core-pool-size: 2
     max-pool-size: 5
     queue-capacity: 100

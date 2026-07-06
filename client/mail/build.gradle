@@ -5,10 +5,6 @@ description = 'client-mail'
 bootJar.enabled = false
 jar.enabled = true
 
-apply from: "${rootDir.absolutePath}/docs.gradle"
-apply from: "${rootDir.absolutePath}/jpa.gradle"
-
-
 dependencies {
 	// 공통 모듈
 	implementation project(':common-core')

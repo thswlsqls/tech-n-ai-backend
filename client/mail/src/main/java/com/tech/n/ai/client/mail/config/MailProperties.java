@@ -21,7 +21,6 @@ public class MailProperties {
     
     @Data
     public static class Async {
-        private boolean enabled = true;
         private int corePoolSize = 2;
         private int maxPoolSize = 5;
         private int queueCapacity = 100;
