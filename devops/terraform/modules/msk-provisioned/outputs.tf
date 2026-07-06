@@ -44,6 +44,9 @@ output "security_group_id" {
 }
 
 output "open_monitoring_prometheus_jmx_endpoint_list" {
-  description = "Prometheus JMX 스크레이프 엔드포인트 (호스트:포트 리스트)."
-  value       = try(aws_msk_cluster.this.bootstrap_brokers_sasl_iam, null)
+  description = "Prometheus JMX 스크레이프 엔드포인트 (브로커호스트:11001 리스트)."
+  value = try(
+    [for b in split(",", aws_msk_cluster.this.bootstrap_brokers_sasl_iam) : "${split(":", b)[0]}:11001"],
+    null,
+  )
 }
