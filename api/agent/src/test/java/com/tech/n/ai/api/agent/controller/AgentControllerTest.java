@@ -7,6 +7,7 @@ import com.tech.n.ai.api.agent.dto.response.AgentSessionListResponse;
 import com.tech.n.ai.api.agent.facade.AgentFacade;
 import com.tech.n.ai.common.conversation.dto.SessionResponse;
 import com.tech.n.ai.common.conversation.service.ConversationSessionService;
+import com.tech.n.ai.common.security.principal.UserPrincipal;
 import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -16,9 +17,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.MethodParameter;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.bind.support.WebDataBinderFactory;
+import org.springframework.web.context.request.NativeWebRequest;
+import org.springframework.web.method.support.HandlerMethodArgumentResolver;
+import org.springframework.web.method.support.ModelAndViewContainer;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -33,6 +39,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * AgentController 단위 테스트
+ *
+ * standaloneSetup 사용하여 순수 Controller 로직만 테스트.
+ * UserPrincipal은 커스텀 ArgumentResolver로 주입.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AgentController 단위 테스트")
@@ -51,7 +60,8 @@ class AgentControllerTest {
     private ObjectMapper objectMapper;
 
     private static final String BASE_URL = "/api/v1/agent";
-    private static final String TEST_USER_ID = "admin123";
+    private static final Long TEST_USER_ID = 1L;
+    private static final String TEST_USER_ID_STR = TEST_USER_ID.toString();
 
     @BeforeEach
     void setUp() {
@@ -59,6 +69,7 @@ class AgentControllerTest {
 
         mockMvc = MockMvcBuilders
                 .standaloneSetup(agentController)
+                .setCustomArgumentResolvers(new TestUserPrincipalArgumentResolver())
                 .build();
     }
 
@@ -76,13 +87,12 @@ class AgentControllerTest {
             AgentExecutionResult result = AgentExecutionResult.success(
                     "실행 완료: 3건의 업데이트 발견", "session-123", 5, 2, 1500L, List.of());
 
-            when(agentFacade.runAgent(eq(TEST_USER_ID), any(AgentRunRequest.class)))
+            when(agentFacade.runAgent(eq(TEST_USER_ID_STR), any(AgentRunRequest.class)))
                     .thenReturn(result);
 
             // When & Then
             mockMvc.perform(post(BASE_URL + "/run")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .header("x-user-id", TEST_USER_ID)
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value("2000"))
@@ -102,37 +112,34 @@ class AgentControllerTest {
                     """;
             AgentExecutionResult result = AgentExecutionResult.success("완료", "auto-session", 1, 0, 100L, List.of());
 
-            when(agentFacade.runAgent(eq(TEST_USER_ID), any(AgentRunRequest.class)))
+            when(agentFacade.runAgent(eq(TEST_USER_ID_STR), any(AgentRunRequest.class)))
                     .thenReturn(result);
 
             // When & Then
             mockMvc.perform(post(BASE_URL + "/run")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .header("x-user-id", TEST_USER_ID)
                             .content(requestBody))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value("2000"));
         }
 
         @Test
-        @DisplayName("x-user-id 헤더 전달 검증")
-        void runAgent_userId헤더전달() throws Exception {
+        @DisplayName("실행 요청은 인증된 사용자 ID로 위임된다")
+        void runAgent_인증된사용자ID로위임() throws Exception {
             // Given
-            String customUserId = "custom-user-456";
             AgentRunRequest request = new AgentRunRequest("목표", null);
             AgentExecutionResult result = AgentExecutionResult.success("완료", "session-1", 0, 0, 0, List.of());
 
-            when(agentFacade.runAgent(eq(customUserId), any(AgentRunRequest.class)))
+            when(agentFacade.runAgent(eq(TEST_USER_ID_STR), any(AgentRunRequest.class)))
                     .thenReturn(result);
 
             // When & Then
             mockMvc.perform(post(BASE_URL + "/run")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .header("x-user-id", customUserId)
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isOk());
 
-            verify(agentFacade).runAgent(eq(customUserId), any(AgentRunRequest.class));
+            verify(agentFacade).runAgent(eq(TEST_USER_ID_STR), any(AgentRunRequest.class));
         }
 
         @Test
@@ -148,26 +155,12 @@ class AgentControllerTest {
             // When & Then
             mockMvc.perform(post(BASE_URL + "/run")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .header("x-user-id", TEST_USER_ID)
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.success").value(false))
                     .andExpect(jsonPath("$.data.errors").isArray())
                     .andExpect(jsonPath("$.data.errors[0]").value("에러1"))
                     .andExpect(jsonPath("$.data.errors[1]").value("에러2"));
-        }
-
-        @Test
-        @DisplayName("x-user-id 헤더 누락 시 400 Bad Request")
-        void runAgent_헤더누락() throws Exception {
-            // Given
-            AgentRunRequest request = new AgentRunRequest("목표", null);
-
-            // When & Then
-            mockMvc.perform(post(BASE_URL + "/run")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isBadRequest());
         }
     }
 
@@ -188,12 +181,11 @@ class AgentControllerTest {
                 .lastMessageAt(LocalDateTime.now())
                 .isActive(true)
                 .build();
-            when(conversationSessionService.getSession("session-123", TEST_USER_ID))
+            when(conversationSessionService.getSession("session-123", TEST_USER_ID_STR))
                 .thenReturn(session);
 
             // When & Then
-            mockMvc.perform(get(BASE_URL + "/sessions/session-123")
-                    .header("x-user-id", TEST_USER_ID))
+            mockMvc.perform(get(BASE_URL + "/sessions/session-123"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("2000"))
                 .andExpect(jsonPath("$.data.sessionId").value("session-123"));
@@ -220,12 +212,11 @@ class AgentControllerTest {
             AgentSessionListResponse response = AgentSessionListResponse.from(
                 com.tech.n.ai.common.core.dto.PageData.of(20, 1, 1, List.of(session)));
 
-            when(agentFacade.listSessions(eq(TEST_USER_ID), eq(1), eq(20), any()))
+            when(agentFacade.listSessions(eq(TEST_USER_ID_STR), eq(1), eq(20), any()))
                 .thenReturn(response);
 
             // When & Then
-            mockMvc.perform(get(BASE_URL + "/sessions")
-                    .header("x-user-id", TEST_USER_ID))
+            mockMvc.perform(get(BASE_URL + "/sessions"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("2000"))
                 .andExpect(jsonPath("$.data.data.list[0].sessionId").value("session-1"));
@@ -238,14 +229,13 @@ class AgentControllerTest {
             AgentSessionListResponse response = AgentSessionListResponse.from(
                 com.tech.n.ai.common.core.dto.PageData.of(10, 2, 0, List.of()));
 
-            when(agentFacade.listSessions(eq(TEST_USER_ID), eq(2), eq(10), any()))
+            when(agentFacade.listSessions(eq(TEST_USER_ID_STR), eq(2), eq(10), any()))
                 .thenReturn(response);
 
             // When & Then
             mockMvc.perform(get(BASE_URL + "/sessions")
                     .param("page", "2")
-                    .param("size", "10")
-                    .header("x-user-id", TEST_USER_ID))
+                    .param("size", "10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.data.pageNumber").value(2))
                 .andExpect(jsonPath("$.data.data.pageSize").value(10));
@@ -274,12 +264,11 @@ class AgentControllerTest {
             AgentMessageListResponse response = AgentMessageListResponse.from(
                 com.tech.n.ai.common.core.dto.PageData.of(50, 1, 1, List.of(msg)));
 
-            when(agentFacade.listMessages(eq("session-123"), eq(TEST_USER_ID), eq(1), eq(50), any()))
+            when(agentFacade.listMessages(eq("session-123"), eq(TEST_USER_ID_STR), eq(1), eq(50), any()))
                 .thenReturn(response);
 
             // When & Then
-            mockMvc.perform(get(BASE_URL + "/sessions/session-123/messages")
-                    .header("x-user-id", TEST_USER_ID))
+            mockMvc.perform(get(BASE_URL + "/sessions/session-123/messages"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("2000"))
                 .andExpect(jsonPath("$.data.data.list[0].messageId").value("msg-1"))
@@ -293,14 +282,13 @@ class AgentControllerTest {
             AgentMessageListResponse response = AgentMessageListResponse.from(
                 com.tech.n.ai.common.core.dto.PageData.of(30, 2, 0, List.of()));
 
-            when(agentFacade.listMessages(eq("session-123"), eq(TEST_USER_ID), eq(2), eq(30), any()))
+            when(agentFacade.listMessages(eq("session-123"), eq(TEST_USER_ID_STR), eq(2), eq(30), any()))
                 .thenReturn(response);
 
             // When & Then
             mockMvc.perform(get(BASE_URL + "/sessions/session-123/messages")
                     .param("page", "2")
-                    .param("size", "30")
-                    .header("x-user-id", TEST_USER_ID))
+                    .param("size", "30"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.data.pageNumber").value(2))
                 .andExpect(jsonPath("$.data.data.pageSize").value(30));
@@ -317,15 +305,30 @@ class AgentControllerTest {
         @DisplayName("세션 삭제 - 200 OK")
         void deleteSession_성공() throws Exception {
             // Given
-            doNothing().when(conversationSessionService).deleteSession("session-123", TEST_USER_ID);
+            doNothing().when(conversationSessionService).deleteSession("session-123", TEST_USER_ID_STR);
 
             // When & Then
-            mockMvc.perform(delete(BASE_URL + "/sessions/session-123")
-                    .header("x-user-id", TEST_USER_ID))
+            mockMvc.perform(delete(BASE_URL + "/sessions/session-123"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("2000"));
 
-            verify(conversationSessionService).deleteSession("session-123", TEST_USER_ID);
+            verify(conversationSessionService).deleteSession("session-123", TEST_USER_ID_STR);
+        }
+    }
+
+    // ========== 커스텀 ArgumentResolver ==========
+
+    static class TestUserPrincipalArgumentResolver implements HandlerMethodArgumentResolver {
+
+        @Override
+        public boolean supportsParameter(MethodParameter parameter) {
+            return parameter.getParameterType().equals(UserPrincipal.class);
+        }
+
+        @Override
+        public Object resolveArgument(MethodParameter parameter, ModelAndViewContainer mavContainer,
+                                      NativeWebRequest webRequest, WebDataBinderFactory binderFactory) {
+            return new UserPrincipal(TEST_USER_ID, "admin@example.com", "ADMIN");
         }
     }
 }

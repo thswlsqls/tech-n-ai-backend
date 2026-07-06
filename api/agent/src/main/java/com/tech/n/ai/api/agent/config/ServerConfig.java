@@ -1,6 +1,7 @@
 package com.tech.n.ai.api.agent.config;
 
 import com.tech.n.ai.client.feign.domain.oauth.config.OAuthFeignConfig;
+import com.tech.n.ai.common.security.config.SecurityConfig;
 import com.tech.n.ai.domain.aurora.config.ApiDomainConfig;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
@@ -20,7 +21,8 @@ import org.springframework.context.annotation.Import;
         "com.tech.n.ai.common.core",
         "com.tech.n.ai.common.exception",
         "com.tech.n.ai.common.conversation",
-        "com.tech.n.ai.common.kafka"
+        "com.tech.n.ai.common.kafka",
+        "com.tech.n.ai.common.security"
     },
     excludeFilters = @ComponentScan.Filter(
         type = FilterType.ASSIGNABLE_TYPE,
@@ -28,7 +30,8 @@ import org.springframework.context.annotation.Import;
     )
 )
 @Import({
-    ApiDomainConfig.class
+    ApiDomainConfig.class,
+    SecurityConfig.class
 })
 public class ServerConfig {
 }

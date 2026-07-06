@@ -11,6 +11,7 @@ import com.tech.n.ai.api.agent.facade.AgentFacade;
 import com.tech.n.ai.common.conversation.dto.SessionResponse;
 import com.tech.n.ai.common.conversation.service.ConversationSessionService;
 import com.tech.n.ai.common.core.dto.ApiResponse;
+import com.tech.n.ai.common.security.principal.UserPrincipal;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,11 +19,12 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 /**
  * Emerging Tech Agent REST API 컨트롤러
- * Gateway에서 JWT 역할 기반(ADMIN) 인증을 수행합니다.
+ * JWT 역할 기반(ADMIN) 인증을 서비스 자체에서 검증합니다.
  */
 @Slf4j
 @RestController
@@ -37,17 +39,17 @@ public class AgentController {
      * Agent 수동 실행
      *
      * POST /api/v1/agent/run
-     * 인증: Gateway에서 JWT ADMIN 역할 검증
+     * 인증: JWT ADMIN 역할 검증
      *
      * @param request goal (필수), sessionId (선택)
-     * @param userId  Gateway가 주입한 사용자 ID 헤더
+     * @param userPrincipal JWT에서 검증된 사용자 정보
      */
     @PostMapping("/run")
     public ResponseEntity<ApiResponse<AgentExecutionResult>> runAgent(
             @Valid @RequestBody AgentRunRequest request,
-            @RequestHeader("x-user-id") String userId) {
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
 
-        AgentExecutionResult result = agentFacade.runAgent(userId, request);
+        AgentExecutionResult result = agentFacade.runAgent(userPrincipal.userId().toString(), request);
         return ResponseEntity.ok(ApiResponse.success(result));
     }
 
@@ -59,11 +61,11 @@ public class AgentController {
     @GetMapping("/sessions")
     public ResponseEntity<ApiResponse<AgentSessionListResponse>> getSessions(
             @Valid AgentSessionListRequest request,
-            @RequestHeader("x-user-id") String userId) {
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
 
         Pageable pageable = PageRequest.of(request.page() - 1, request.size(),
             Sort.by(Sort.Direction.DESC, "lastMessageAt"));
-        AgentSessionListResponse response = agentFacade.listSessions(userId, request.page(), request.size(), pageable);
+        AgentSessionListResponse response = agentFacade.listSessions(userPrincipal.userId().toString(), request.page(), request.size(), pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -75,9 +77,9 @@ public class AgentController {
     @GetMapping("/sessions/{sessionId}")
     public ResponseEntity<ApiResponse<SessionResponse>> getSession(
             @PathVariable String sessionId,
-            @RequestHeader("x-user-id") String userId) {
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
 
-        SessionResponse response = conversationSessionService.getSession(sessionId, userId);
+        SessionResponse response = conversationSessionService.getSession(sessionId, userPrincipal.userId().toString());
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -90,11 +92,11 @@ public class AgentController {
     public ResponseEntity<ApiResponse<AgentMessageListResponse>> getMessages(
             @PathVariable String sessionId,
             @Valid AgentMessageListRequest request,
-            @RequestHeader("x-user-id") String userId) {
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
 
         Pageable pageable = PageRequest.of(request.page() - 1, request.size(),
             Sort.by(Sort.Direction.ASC, "sequenceNumber"));
-        AgentMessageListResponse response = agentFacade.listMessages(sessionId, userId, request.page(), request.size(), pageable);
+        AgentMessageListResponse response = agentFacade.listMessages(sessionId, userPrincipal.userId().toString(), request.page(), request.size(), pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -107,10 +109,10 @@ public class AgentController {
     public ResponseEntity<ApiResponse<SessionResponse>> updateSessionTitle(
             @PathVariable String sessionId,
             @Valid @RequestBody UpdateSessionTitleRequest request,
-            @RequestHeader("x-user-id") String userId) {
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
 
         SessionResponse response = conversationSessionService.updateSessionTitle(
-            sessionId, userId, request.title());
+            sessionId, userPrincipal.userId().toString(), request.title());
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -122,9 +124,9 @@ public class AgentController {
     @DeleteMapping("/sessions/{sessionId}")
     public ResponseEntity<ApiResponse<Void>> deleteSession(
             @PathVariable String sessionId,
-            @RequestHeader("x-user-id") String userId) {
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
 
-        conversationSessionService.deleteSession(sessionId, userId);
+        conversationSessionService.deleteSession(sessionId, userPrincipal.userId().toString());
         return ResponseEntity.ok(ApiResponse.success());
     }
 }
