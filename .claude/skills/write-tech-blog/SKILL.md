@@ -29,7 +29,7 @@ description: 주제와 출력 위치를 인자로 받아 기술 블로그 글 �
 
 만들지 않는 것 (= 범위 밖):
 
-- 주제 설계도(아웃라인 문서)만 따로 만드는 일 — 이 스킬은 완성 글 한 편만 낸다. (설계도+글 2단 구조는 `devops/topics`·`devops/articles`의 별도 워크플로다.)
+- 주제 설계도(아웃라인 문서)만 따로 만드는 일 — 이 스킬은 완성 글 한 편만 낸다. (설계도+글 2단 구조는 `docs/reference/writings/devops/topics/`·`docs/reference/writings/devops/articles/`의 별도 워크플로다.)
 - 여러 편 시리즈 동시 작성 — 한 번에 한 편.
 - 공식 문서로 확인되지 않은 수치·기능·버전을 사실처럼 적는 일.
 
