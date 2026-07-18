@@ -1,0 +1,124 @@
+# ============================================================================
+# run-task Pipeline — ringle-fullstack 설정 (단일 진실 소스)
+# ============================================================================
+# 오케스트레이터(.claude/skills/run-task)와 에이전트 4종이 이 파일을 읽는다.
+# 규칙이 헷갈리면 산문(README/에이전트 프롬프트)이 아니라 이 파일을 본다.
+#
+# 계보: feature-dev(탐색→질문→설계→구현→리뷰 골격)
+#     + pipeline/reference/impl-pipeline(config 단일화·state 문서·휴먼 게이트).
+# ringle 커스텀 요점:
+#   - prompt 문서가 이미 정규화된 스펙이라 spec-analyst 단계가 없다.
+#   - task는 01→07 순차 의존이지만, 각 task는 이전 task가 merge된 main에서 worktree 브랜치를
+#     따 형제 경로에서 격리 작업한다. pipeline/output 장부는 본 저장소에 untracked로 남는다.
+#   - 학습 메모리는 새 파일을 만들지 않고 기존 MEMORY.md/ARCHITECTURE.md를 재사용한다.
+# ============================================================================
+
+project:
+  name: ringle-fullstack
+  root: /Users/m1/workspace/ringle-fullstack
+  remote: thswlsqls/ringle-fullstack   # origin. 이슈·PR은 여기에 만든다.
+
+paths:
+  tasks_dir: docs/tasks
+  prompts_dir: docs/prompts
+  spec_pdf: "docs/ringle AI 튜터 풀스택 구현과제.pdf"
+  output_dir: pipeline/output
+  state_template: pipeline/output/templates/state_TEMPLATE.md
+  issue_template: pipeline/output/templates/issue_TEMPLATE.md
+  pr_template: pipeline/output/templates/pr_TEMPLATE.md
+  plugin_dir: pipeline/run-task-agent
+  # 지식 축적 문서 = 파이프라인의 closed-loop 메모리 (새 메모리 파일을 만들지 않는다)
+  knowledge:
+    root: [MEMORY.md]
+    backend: [backend/MEMORY.md, backend/ARCHITECTURE.md]
+    frontend: [frontend/MEMORY.md, frontend/ARCHITECTURE.md]
+
+tasks: # NN → 작업 영역. 에이전트 fan-out과 검증 커맨드 선택에 쓴다.
+  "01": { areas: [backend] }
+  "02": { areas: [backend] }
+  "03": { areas: [frontend] }
+  "04": { areas: [backend, frontend] }
+  "05": { areas: [backend, frontend] }
+  "06": { areas: [backend, frontend] }
+  "07": { areas: [docs] }              # 문서 task — 코드 검증 커맨드 대신 클린 실행 재현
+
+build: # mise가 셸에 활성화 안 됐으면 Ruby 명령에 `mise exec --` 접두
+  backend:
+    dir: backend
+    test: "bin/rails test"
+    lint: "bin/rubocop"
+    db: "bin/rails db:prepare"
+    server: "bin/rails server"         # port 3000
+  frontend:
+    dir: frontend
+    test: "npm run test"
+    lint: "npm run lint"
+    build: "npm run build"             # 타입체크 포함
+    dev: "npm run dev"                 # port 5173, /api → localhost:3000 프록시
+
+conventions: # 관통 원칙 캐시 — 권위는 CLAUDE.md와 docs/tasks/README.md
+  user_identification: "인증 구현 금지. X-User-Id 헤더로 유저 식별"
+  mock_boundary: "결제(PG)만 mock. LLM·STT·TTS는 실제 연동 (자동화 테스트에서만 stub)"
+  expiry_check: "만료 검사는 멤버십을 쓰는 모든 요청마다. 판정은 Membership#active? 한 곳 재사용"
+  api_contract: "/api/v1/... JSON. 프론트는 상대 경로 호출 (절대 URL 하드코딩 금지)"
+  tests_required: "테스트는 task 안에서 함께 작성 (backend Minitest+fixtures, frontend Vitest+RTL)"
+  secrets: "API 키는 백엔드 ENV만. 코드·커밋·프론트 번들에 노출 금지"
+  overengineering: "prompt 문서에 없는 기능·추상화·미래 대비 코드 금지 (CLAUDE.md Simplicity First)"
+  text_rules: "사람이 읽는 산출 문서는 CLAUDE.md '사람이 검증하는 텍스트 작성 규칙' 준수"
+
+git: # task 1건 = worktree 브랜치 1개 = 이슈 1개 = PR 1개. 제출은 validate, merge는 사용자 수동
+  base_branch: main
+  branch_format: "task/{NN}-{slug}"    # slug = task 문서 파일명의 제목부. 예: task/01-membership-domain
+  worktree:                            # 각 task는 형제 경로의 worktree에서 작업 (본 트리 오염 방지)
+    path_format: "../ringle-fullstack-worktrees/task-{NN}"   # 저장소 형제 경로. gitignore 불필요
+    base: main                         # git worktree add -b task/{NN}-{slug} <path> main
+    cleanup: "merge 후 사용자가 git worktree remove로 정리 (파이프라인이 지우지 않는다)"
+  commit_format: "task-{NN}: {요약}"   # 이슈 번호가 제출 후 정해지므로 Refs trailer는 붙이지 않는다
+  issue:
+    title_format: "Task {NN}: {task 제목}"
+    body: "task 문서 링크 + 완료 기준 체크리스트. run-task는 초안만 작성, 제출(gh issue create)은 run-task-validate"
+  pr:
+    title_format: "Task {NN}: {task 제목}"
+    body: "Closes #{issue} + 구현 요약 + 테스트·lint 결과 + 수동 검증 안내 (Closes 번호는 validate가 제출 시 채움)"
+    merge_command: "gh pr merge {pr} --merge --delete-branch"  # 사용자가 수동 수행 (파이프라인 범위 밖)
+  human_gate: "run-task는 push·초안까지. 이슈·PR 제출은 run-task-validate, main merge와 worktree 정리는 사용자 수동"
+  fallback: "origin이 없으면 보고 후 사용자 선택 — 로컬 worktree 브랜치로만 진행(제출·merge 생략)하거나 중단. gh 인증은 제출 단계(validate)에서 필요"
+
+pipeline:
+  stages: [setup, load, explore, clarify, design, implement, review, record]
+  human_gates:
+    clarify: "미해결 질문은 사용자에게 묻는다 (스킵 금지)"
+    # 설계 승인 게이트는 없앴다 — 설계안은 보고만 하고 승인 없이 구현으로 진행한다
+    # (설계 갈림길 결정은 clarify에서 받는다). 사용자 상시 지시라 prompt 문서의
+    # "설계안 승인 후 구현" 문구보다 우선한다.
+    review_decision: "리뷰 지적의 수정 여부는 사용자가 결정"
+    submit_and_merge: "이슈·PR 제출은 run-task-validate가, main merge와 worktree 정리는 사용자가 수동으로 (run-task 범위 밖)"
+  agents:
+    explorer: { name: ringle-code-explorer, count: "0-2" }   # 기존 코드가 거의 없으면 0, full-stack이면 영역별 1
+    architect: { name: ringle-code-architect, count: "0-2" } # 작은 변경은 오케스트레이터가 인라인 설계
+    implementer: { name: ringle-implementer, count: 1 }      # full-stack이면 backend→frontend 순차 2회
+    reviewer: { name: ringle-code-reviewer, count: "1-3", confidence_min: 80 }
+
+state:
+  file: "pipeline/output/task-{NN}/state.md"   # task 단위 고정 경로 — 재실행 시 이어가기의 기준
+  states: [loaded, designed, implemented, verified, merged, recorded]
+  purpose: "단계별 이력·가정·검증 결과·이슈/PR 번호 축적 → task-07 coding_agent_interaction_history.md 재료"
+
+output: # 실행(run) 단위 산출물 — 이슈·PR 본문은 GitHub에 올리기 전 초안 파일로 남긴다.
+        # run 폴더는 스킬 시작 시점에 mkdir하고, 본 저장소 트리에 untracked로 둔다
+        # (worktree 브랜치에 커밋하지 않는 오케스트레이터 장부).
+  run_folder_format: "{yyyyMMddHHmmss}"        # 실행 시작 시각. `date +%Y%m%d%H%M%S`
+  create_at: "스킬 시작 시점(0단계)에 mkdir -p pipeline/output/{run}/issues pipeline/output/{run}/prs"
+  issue_draft: "pipeline/output/{run}/issues/task-{NN}-issue.md"   # run-task가 저장. 제출은 validate가 gh issue create --body-file
+  pr_draft: "pipeline/output/{run}/prs/task-{NN}-pr.md"            # run-task가 저장(Closes placeholder). 제출은 validate가 gh pr create --body-file
+  keep: "초안은 제출 후에도 삭제하지 않는다 — task-07 문서화(스크린샷·발췌)의 재료"
+  finalized_mark: "검증·제출 완료된 run 폴더는 이름 끝에 '-'를 붙인다 (untracked라 mv, 예: 20260706173000-)"
+
+validate: # run-task-validate 스킬 — run 폴더 최종 검증·제출·마킹 (최종 게이트)
+  skill: .claude/skills/run-task-validate/SKILL.md
+  input: "pipeline/output/{yyyyMMddHHmmss} run 폴더"
+  gates: [artifact_accuracy, branch_commit_consistency, build_proven, submission_consistency]
+  on_valid: "이슈·PR 제출(이슈 먼저 → 번호를 PR Closes에 채워 PR 제출) → run 폴더명 끝에 '-' 마킹"
+  on_invalid: "산출물·브랜치를 건드리지 않고 채팅창에 게이트별 근거 보고 (삭제·마킹 금지)"
+  build_in_worktree: "B-3 검증은 작업 worktree 안에서 재실행한다 (본 트리에서 브랜치 checkout 금지 — worktree가 점유)"
+  merge: "main merge와 worktree 정리는 이 스킬 소관이 아님 — 제출된 PR을 사용자가 수동으로 수행"

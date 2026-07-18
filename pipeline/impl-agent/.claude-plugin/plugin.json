@@ -1,0 +1,8 @@
+{
+  "name": "tech-n-ai-impl",
+  "version": "1.0.0",
+  "description": "tech-n-ai-backend 전용 구현 파이프라인. 입력(요구사항 문서/task·prompt 쌍/GitHub issue)을 정규화 스펙으로 옮기고, worktree 격리 브랜치에 CQRS 멀티모듈 코드+테스트를 커밋·push하고, 이슈·PR 초안을 pipeline/output/<yyyyMMddHHmmss>/에 저장한다. 제출은 /impl-validate 스킬, main merge는 사용자 수동. 단일 진실 소스는 pipeline/impl-config.yml, 학습 메모리는 pipeline/output/_learnings.md(closed-loop 자동 폴링).",
+  "author": {
+    "name": "tech-n-ai"
+  }
+}

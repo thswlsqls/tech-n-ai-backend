@@ -1,0 +1,9 @@
+{
+  "name": "oss-contrib-iceberg",
+  "version": "1.0.0",
+  "description": "Apache Iceberg OSS contribution pipeline. Per-run timestamped output (candidates/issues/prs), three focused agents (finder/reviewer/contributor), and a closed-loop _learnings.md that auto-polls submitted PR status via gh to recalibrate scoring each run. Discovers and verifies contribution candidates, creates a git branch with tested changes and a commit, and drafts issues/PRs for manual human submission. Lineage: langchain4j v2 -> jenkins v3 -> opentelemetry-java v4 -> apache-iceberg. Adapted to Apache Iceberg: Gradle module-scoped build (./gradlew :iceberg-core:check) where the Gradle path differs from the directory, revapi as a build-fail API-compat gate (no committed diff), Module: Description PR titles, no Jackson annotations (custom XxxParser), null over Optional and CloseableIterable over Stream conventions, a PMC-vote spec gate for format/ and open-api/rest-catalog* changes, Google Java Style with an Apache license header, and a Generated-by commit token for AI-assisted work (no AI disclosure block in PR/issue bodies, per user decision).",
+  "author": {
+    "name": "Eunbin Son",
+    "email": "thsdmsqlsspdlqj@naver.com"
+  }
+}

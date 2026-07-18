@@ -1,0 +1,9 @@
+{
+  "name": "oss-contrib-v2",
+  "version": "1.0.0",
+  "description": "LangChain4j OSS contribution pipeline v2. Per-run timestamped output (candidates/issues/prs), three focused agents (finder/reviewer/contributor), and a single _learnings.md feedback loop that makes discovery smarter each run. Discovers and verifies contribution candidates, creates a git branch with tested changes and a commit, and drafts issues/PRs for manual human submission.",
+  "author": {
+    "name": "Eunbin Son",
+    "email": "thsdmsqlsspdlqj@naver.com"
+  }
+}
