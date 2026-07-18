@@ -1,0 +1,9 @@
+{
+  "name": "spec-impl",
+  "version": "1.0.0",
+  "description": "Spec-driven implementation pipeline. Takes a GitHub issue plus design artifacts (API spec, screen design, requirements doc) as input, normalizes them into an internal spec, then implements the feature in an isolated git worktree branch with tests, a module-scoped build verification, a commit, and a Module: Description PR draft for the committed changes. Per-issue state and commit/PR history are tracked in markdown; a closed-loop _memory.md auto-polls submitted PR status via gh to recalibrate each run. The pipeline never pushes or submits (human gate) — a separate validate skill (SKILL.md) runs the final per-issue gates (spec conformance, defect reality, merge eligibility, change appropriateness, build proof) and, only on VALID, pushes the work branch to the fork and opens the PR. Lineage: feature-dev (spec->implement flow) + z_ebson/pipeline (config single-source, closed-loop memory, worktree isolation, validate handoff). Config-driven for portability (impl-config.yml); defaults to Apache Iceberg.",
+  "author": {
+    "name": "Eunbin Son",
+    "email": "thsdmsqlsspdlqj@naver.com"
+  }
+}
