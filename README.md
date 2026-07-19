@@ -2,9 +2,9 @@
 
 ## 개요
 
-빅테크 AI 서비스(OpenAI, Anthropic, Google, Meta)의 최신 업데이트를 자동 추적하고 제공하는 Spring Boot RESTful API 서버입니다.
-CQRS 패턴, Kafka 이벤트 기반, Redis 활용 멱등성 보장, API Gateway 사용의 MSA 설계되었습니다.
-langchain4j 활용의 RAG 기반 LLM 멀티턴 챗봇과 Tool 기반 AI Agent 자율프로세싱 설계되었습니다.
+빅테크 AI 서비스(OpenAI, Anthropic, Google, Meta, xAI)의 공식 업데이트만 빠짐없이·구조화해 추적하고, 그 위에서 검증 가능한 수치로 트렌드를 집계·시각화하는 Spring Boot 기반 백엔드입니다. 범용 AI 챗봇을 지향하지 않고, 정해진 벤더군의 공식 소스만 다루는 좁은 인텔리전스 도구를 목표로 합니다.
+
+강점은 두 가지입니다. 화이트리스트로 고정한 공식 소스(GitHub 릴리스·RSS·블로그)를 하나의 스키마로 정규화해 쌓는 **수집 파이프라인**과, 그 코퍼스 위에서 통계·키워드 빈도를 LLM이 아니라 MongoDB Aggregation으로 계산하는 **결정적 집계**입니다. langchain4j RAG 챗봇은 이 코퍼스에 자연어로 접근하는 보조 창구입니다. 인프라는 CQRS(Aurora 쓰기 / MongoDB 읽기)를 Kafka 이벤트로 잇고 Redis로 멱등성을 보장하는 MSA로 구성했으며, 외부 요청은 API Gateway를 거칩니다.
 
 ## 초안 데모 영상
 
@@ -16,48 +16,44 @@ langchain4j 활용의 RAG 기반 LLM 멀티턴 챗봇과 Tool 기반 AI Agent �
 
 ### 문제
 
-최근 LLM(대규모 언어 모델)은 웹 검색 연동과 더 최신까지 반영된 학습 데이터 덕분에, 빅테크 AI 서비스의 최신 업데이트도 어느 정도 답할 수 있게 되었습니다. 그래서 "학습 시점까지의 정보만 안다"는 한계 자체는 예전보다 많이 줄었습니다. 하지만 이렇게 받은 답을 믿고 쓰려면 다음과 같은 문제가 여전히 남습니다:
+먼저 인정하고 시작합니다. 요즘 LLM은 웹 검색 연동과 더 최신까지 반영된 학습 데이터 덕분에, 빅테크 AI 서비스의 최신 소식을 자연어로 물어도 그럭저럭 답합니다. 그래서 "최신 AI 소식을 답하는 범용 챗봇"만 놓고 보면 이 프로젝트가 ChatGPT 검색이나 Perplexity를 이길 이유는 없습니다. 범용 검색이 더 넓게 답하기 때문입니다.
 
-- **출처 검증의 어려움**: LLM이나 웹 검색이 내놓은 답이 실제 공식 릴리스·블로그 내용과 맞는지 보장되지 않아, 잘못된 정보가 섞여도 걸러내기 어려움
-- **비정규 데이터 접근 불가**: AI 서비스 업데이트 정보 제공자의 일부 구조화되지 않은 비정규 데이터를 LLM이 직접 검색하거나 활용하는지 확인할 수 없음
-- **동적 정보 업데이트 불가**: 새로운 AI 업데이트가 발생해도 LLM의 지식 베이스에 자동으로 반영되지 않음
+그래서 이 프로젝트는 범용 대화 성능으로 경쟁하지 않습니다. 겨냥하는 것은 **정해진 빅테크 AI 벤더(OpenAI·Anthropic·Google·Meta·xAI)의 공식 업데이트만 빠짐없이·구조화해 추적하고, 그 위에서 정량 분석과 알림을 주는 일**입니다. 이렇게 범위를 좁히면, 범용 LLM·검색이 못 하는 것들이 드러납니다:
+
+- **완결성(빠짐없음)을 보장하지 못함**: 웹 검색은 인기·SEO 순으로 최적화돼 있어, 방금 올라온 릴리스 노트 한 줄이 아직 색인되지 않았거나 묻힐 수 있습니다. "이 5개사 업데이트를 하나도 빠뜨리지 않고"는 검색이 주지 못하는 값입니다.
+- **정량 집계를 신뢰할 수 없음**: "이번 분기에 어느 회사가 에이전트 관련 기능을 몇 개 냈나" 같은 수량을 LLM에 물으면 근거 없이 숫자를 지어냅니다(환각). 범용 검색엔진은 애초에 이런 집계 자체를 하지 못합니다.
+- **출처를 끝까지 통제하지 못함**: LLM·검색의 답이 실제 공식 릴리스·블로그와 맞는지 사용자가 확인하기 어렵고, 2차 블로그의 오역이나 SEO 스팸이 섞여도 걸러내기 힘듭니다.
+- **최신 상태를 자동으로 유지하지 않음**: 새 업데이트가 나와도 자동으로 반영·추적되지 않고, "무엇이 새로 생겼는지"를 상태로 남기지 못합니다.
 
 ### 해결
 
-이 프로젝트는 **RAG(Retrieval-Augmented Generation)** 기반 아키텍처와 **AI Agent 자동화 시스템**을 통해 이러한 문제를 해결합니다:
+핵심은 두 가지입니다. (1) 공식 소스만 수집해 **구조화된 코퍼스**로 쌓고, (2) 그 위에서 **결정적 쿼리로 집계·시각화**합니다. RAG 챗봇은 이 코퍼스에 자연어로 접근하는 보조 인터페이스입니다.
 
-1. **🤖 AI Agent 기반 자동 정보 수집 및 분석 시스템**
-   - **LangChain4j 기반 자율 Agent**: 자연어 목표만 입력하면 필요한 작업을 자동으로 판단하고 실행
-   - **GitHub API 통합**: OpenAI, Anthropic, Google, Meta, xAI의 SDK 릴리스를 자동 추적
-   - **웹 스크래핑**: 공식 블로그의 최신 AI 업데이트 자동 수집
-   - **데이터 분석**: Provider/SourceType/UpdateType별 통계 집계 및 키워드 빈도 분석
-   - **시각화**: Mermaid pie/bar 차트 및 Markdown 표로 분석 결과 시각화
-   - **중복 방지 및 검증**: 기존 데이터와 비교하여 중복 없이 새로운 정보만 저장
-   - **6시간 주기 스케줄링**: 정기적으로 최신 AI 업데이트 자동 확인 및 저장
+1. **구조화된 공식 코퍼스 구축 (완결성 + 출처 통제)**
+   - **수집 소스를 코드에 화이트리스트로 고정**: GitHub 릴리스, 각 사 RSS, 공식 블로그 스크래핑만 사용하고, 목록에 없는 저장소·호스트는 `ToolInputValidator`가 거부합니다(사설망 접근을 막는 SSRF 방어 포함). 그래서 답변의 출처가 항상 공식 소스로만 이어집니다.
+   - **이종 소스를 하나의 스키마로 정규화**: GitHub·RSS·스크래핑에서 온 데이터를 `EmergingTechDocument` 하나로 통합하고 provider·sourceType·updateType·status·publishedAt 같은 구조화 메타데이터를 붙입니다.
+   - **저장 단계에서 중복 차단**: 각 항목에 `externalId`(예: `github:{id}`, `rss:{hash}`)를 부여하고, 저장 서비스가 `externalId`→`url` 순으로 기존 도큐먼트를 조회해 이미 있으면 건너뜁니다(`external_id`에 unique 인덱스). 그래서 정기 수집을 반복해도 코퍼스에는 새 정보만 쌓입니다.
+   - **6시간 주기로 최신 상태 유지**: 배치와 에이전트가 정기적으로 수집을 돌립니다.
 
-2. **최신 정보 수집 서버 구축**
-   - **AI 서비스 업데이트 추적**: AI Agent를 통한 빅테크 AI 서비스 업데이트 자동 수집 (`api-agent`, `api-emerging-tech` 모듈)
-   - 정기적인 배치 작업을 통한 최신 정보 자동 업데이트
+2. **결정적 집계와 시각화 (신뢰할 수 있는 정량 응답)**
+   - **집계는 LLM이 아니라 MongoDB Aggregation이 서버에서 계산**: provider/sourceType/updateType별 건수는 `$match → $group(count) → $sort`로, 키워드 빈도는 `$split → $unwind → $group → $sort → $limit`로 나옵니다.
+   - **차트 수치도 집계 코드가 채움**: 집계 결과를 `ChartData`(chartType `pie`/`bar`, dataPoints `label`/`value`)로 변환하는 것도 LLM이 아니라 집계 코드입니다. 그래서 차트가 주장하는 수치가 코퍼스에서 곧장 나온 검증 가능한 값이고, "LLM이 숫자를 지어낸다"는 문제를 이 경로에서 실제로 없앱니다.
+   - **표·차트로 함께 제공**: 프론트엔드는 이 `ChartData`를 차트로 그리고, 같은 수치를 Markdown 표·Mermaid로도 보여줍니다.
 
-3. **비정규 데이터 임베딩 및 RAG 구축**
-   - MongoDB Atlas에 저장된 비정규 데이터(EmergingTechDocument)를 OpenAI text-embedding-3-small 모델로 임베딩
-   - MongoDB Atlas Vector Search를 활용한 벡터 검색 인덱스 구축 (1536차원, cosine similarity)
-   - langchain4j RAG 파이프라인을 통한 지식 검색 및 응답 생성
-   - 사용자 질문에 대한 관련 문서 검색 후, 검색된 컨텍스트를 기반으로 OpenAI GPT-4o-mini가 최신 정보를 포함한 응답 생성
+3. **RAG 챗봇 (코퍼스에 대한 자연어 접근, 보조)**
+   - 위 코퍼스를 OpenAI text-embedding-3-small로 임베딩해 MongoDB Atlas Vector Search(1536차원, cosine similarity)를 구성하고, status가 `PUBLISHED`인 문서만 대상으로 검색합니다.
+   - 사용자 질문에 관련 문서를 검색해 컨텍스트로 붙이고 GPT-4o-mini가 답을 생성합니다. 다만 **최종 답변 문자열은 LLM이 생성하므로 이 경로에는 환각 가능성이 남습니다.** 그래서 검증이 중요한 정량 정보는 챗봇의 서술이 아니라 위 2번의 결정적 집계·차트로 제공하는 것이 이 설계의 역할 분담입니다.
 
-4. **실시간 정보 제공**
-   - 수집된 최신 AI 업데이트를 MongoDB Atlas에 저장
-   - 사용자 질문 시 Vector Search를 통해 관련 최신 정보를 실시간으로 검색
-   - 검색된 최신 정보를 컨텍스트로 제공하여 LLM이 정확하고 최신의 응답을 생성
-
-이를 통해 사용자는 자연어로 최신 AI 서비스 업데이트를 검색하고 질문할 수 있으며, LLM이 학습 데이터에 없는 최신 정보도 정확하게 제공할 수 있습니다. 특히 **AI Agent 시스템**은 인간의 개입 없이 자율적으로 최신 AI 트렌드를 추적하고 정보를 업데이트합니다.
+정리하면 강점은 임베딩이 아니라 **공식 소스를 완결·구조화해 모으는 수집 파이프라인과 그 위의 결정적 집계**에 있습니다. 챗봇은 코퍼스를 자연어로 묻는 창구이고, 정확성은 집계가 보증합니다.
 
 
 ### 핵심 기능
 
-- **🤖 LangChain4j 기반 자율 AI Agent 시스템**: 자연어 목표 입력만으로 빅테크 AI 서비스 업데이트를 자동 추적, 수집하고 데이터 분석 및 시각화하는 완전 자율 Agent
-- **🌟 langchain4j RAG 기반 멀티턴 챗봇**: MongoDB Atlas Vector Search와 OpenAI GPT-4o-mini를 활용한 지식 검색 챗봇
-- **AI 업데이트 자동화 파이프라인**: GitHub Release 추적, 웹 스크래핑, 중복 검증, 데이터 분석 자동화 (6시간 주기)
+- **구조화된 공식 코퍼스**: GitHub 릴리스·RSS·공식 블로그 스크래핑을 하나의 `EmergingTechDocument` 스키마로 정규화하고, 수집 소스는 화이트리스트로 고정, 저장 시 `externalId`→`url` unique 제약으로 중복을 차단
+- **📊 결정적 집계·시각화**: provider/sourceType/updateType별 통계와 키워드 빈도를 LLM이 아니라 MongoDB Aggregation이 서버에서 계산하고, 그 수치를 `ChartData`(pie/bar)·Markdown 표·Mermaid로 제공 — 차트가 주장하는 수가 코퍼스에서 곧장 나온 검증 가능한 값
+- **🤖 LangChain4j 기반 AI Agent**: 자연어 목표를 받아 수집·조회·분석 툴을 스스로 선택해 실행. 화이트리스트·입력 검증·루프 감지·순차 툴 호출 상한 등 안전장치로 LLM의 잘못된 호출을 막음
+- **🌟 langchain4j RAG 멀티턴 챗봇 (보조)**: `PUBLISHED` 문서만 대상으로 한 MongoDB Atlas Vector Search 결과를 컨텍스트로 GPT-4o-mini가 답을 생성하는 자연어 질의 창구. 최종 답변은 LLM이 생성하므로 검증이 중요한 정량 정보는 위 결정적 집계로 제공
+- **AI 업데이트 자동화 파이프라인**: GitHub Release 추적, 웹 스크래핑, RSS 수집, 중복 차단, 데이터 분석을 6시간 주기로 실행
 - **CQRS 패턴 기반 아키텍처**: Command Side (Aurora MySQL)와 Query Side (MongoDB Atlas) 분리
 - **Kafka 기반 실시간 동기화**: 이벤트 기반 CQRS 동기화 (1초 이내 목표)
 - **OAuth 2.0 인증**: Google, Naver, Kakao 소셜 로그인 지원
@@ -706,7 +702,7 @@ Command Side (쓰기 전용)로 사용되는 Aurora MySQL의 주요 테이블:
 
 #### Aurora MySQL ERD
 
-![Aurora MySQL ERD](contents/aurora-erd-diagram.png)
+![Aurora MySQL ERD](contents/diagrams/aurora-erd-diagram.png)
 
 자세한 스키마 설계는 다음 문서를 참고하세요:
 - [Amazon Aurora MySQL 테이블 설계서](docs/prototype/step1/3.%20aurora-schema-design.md)
@@ -729,7 +725,7 @@ Query Side (읽기 전용)로 사용되는 MongoDB Atlas의 주요 컬렉션:
 
 #### MongoDB Atlas ERD
 
-![MongoDB Atlas ERD](contents/mongodb-erd-diagram.png)
+![MongoDB Atlas ERD](contents/diagrams/mongodb-erd-diagram.png)
 
 자세한 스키마 설계는 다음 문서를 참고하세요:
 - [MongoDB Atlas 도큐먼트 설계서](docs/prototype/step1/2.%20mongodb-schema-design.md)
