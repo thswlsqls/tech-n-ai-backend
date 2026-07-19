@@ -34,7 +34,7 @@ flowchart LR
         logs["CloudWatch Logs<br/>/aws/ecs/{env}/{service}"]
     end
 
-    mongo[("MongoDB Atlas<br/>external · CQRS read store")]
+    mongo[("MongoDB Atlas<br/>external · CQRS read store<br/>RAG DB · Vector Search")]
 
     client -->|HTTPS :443| alb
     alb --> gw & auth & et & chat & book & agent
@@ -58,7 +58,26 @@ flowchart LR
     %% 환경 차이: dev 에는 MSK 노드와 점선 연결이 없음. beta=MSK Serverless, prod=MSK Provisioned(3 broker).
     %% ALB 프로토콜: prod=HTTPS 443(+80 리다이렉트), dev/beta=HTTP 80. 위 그림은 prod 기준.
     %% 프런트(Amplify/CloudFront)는 모듈만 있고 미배포 → 진입점은 ALB 뿐.
+
+    %% 색상: 공식 브랜드·AWS 카테고리 색으로 계층을 한눈에 구분
+    classDef cons fill:#5F6B7A,stroke:#3B4453,color:#fff
+    classDef lb fill:#8C4FFF,stroke:#5B2FB0,color:#fff
+    classDef svc fill:#ED7100,stroke:#B35600,color:#fff
+    classDef rdb fill:#4479A1,stroke:#2D5570,color:#fff
+    classDef cache fill:#DC382D,stroke:#9E241C,color:#fff
+    classDef bus fill:#231F20,stroke:#000000,color:#fff
+    classDef mongodb fill:#00ED64,stroke:#00684A,color:#001E2B
+
+    class client cons
+    class alb lb
+    class gw,auth,et,chat,book,agent svc
+    class aurora rdb
+    class valkey cache
+    class msk bus
+    class mongo mongodb
 ```
+
+> 색상 구분: Client(회색) · ALB(AWS 네트워킹 보라 `#8C4FFF`) · ECS 서비스(AWS 컴퓨트 주황 `#ED7100`) · Aurora MySQL(MySQL 블루 `#4479A1`) · ElastiCache Valkey(캐시 레드 `#DC382D`) · MSK Kafka(Kafka 블랙 `#231F20`) · MongoDB Atlas(MongoDB 브랜드 그린 `#00ED64`). MongoDB Atlas는 챗봇의 **RAG 지식베이스**로 쓰며 **Vector Search**로 임베딩을 검색합니다.
 
 ## 2. Network Topology
 
