@@ -46,6 +46,30 @@
 
 정리하면 강점은 임베딩이 아니라 **공식 소스를 완결·구조화해 모으는 수집 파이프라인과 그 위의 결정적 집계**에 있습니다. 챗봇은 코퍼스를 자연어로 묻는 창구이고, 정확성은 집계가 보증합니다.
 
+### 문제 해결을 보여주는 실제 화면
+
+프런트엔드 두 앱(사용자 앱 · 관리자 앱)을 실제 백엔드에 연결해 캡처한 화면입니다. 위에서 설명한 해결책이 화면에서 어떻게 나타나는지 보여줍니다.
+
+**사용자 앱 — 로그인 후 최신 업데이트 목록**: 수집된 AI 업데이트를 Provider·UpdateType·SourceType로 걸러 볼 수 있고, 항목마다 원문 출처로 이어집니다.
+
+![사용자 앱 - 로그인 후 최신 AI 업데이트 목록](contents/frontend/app/app-login-home.png)
+
+**사용자 앱 — RAG 챗봇**: 답변과 함께 검색된 문서를 Sources로 제시해 출처를 확인할 수 있고, 이전 대화를 기억해 후속 질문에 이어서 답합니다.
+
+![사용자 앱 - RAG 챗봇 답변과 검색된 문서 출처](contents/frontend/app/app-chat-rag-answer.png)
+
+![사용자 앱 - 이전 맥락을 이어받는 멀티턴 대화](contents/frontend/app/app-chat-multiturn.png)
+
+**관리자 앱 — AI Agent**: 자연어 목표 하나로 Agent가 Tool을 자동 실행해 통계를 집계하고, Markdown 표와 Pie 차트로 시각화합니다. 같은 세션에서 이어지는 후속 목표도 맥락을 유지한 채 처리합니다.
+
+![관리자 앱 - Agent 통계 표](contents/frontend/admin/admin-agent-stats-top.png)
+
+![관리자 앱 - Agent Pie 차트 시각화](contents/frontend/admin/admin-agent-charts.png)
+
+![관리자 앱 - Agent 실행 요약(Tool 자동 호출)](contents/frontend/admin/admin-agent-toolcalls.png)
+
+![관리자 앱 - Agent 멀티턴 대화(이전 통계에 이어 UpdateType 통계 요청)](contents/frontend/admin/admin-agent-multiturn.png)
+
 
 ### 핵심 기능
 
@@ -729,6 +753,14 @@ Query Side (읽기 전용)로 사용되는 MongoDB Atlas의 주요 컬렉션:
 
 자세한 스키마 설계는 다음 문서를 참고하세요:
 - [MongoDB Atlas 도큐먼트 설계서](docs/prototype/step1/2.%20mongodb-schema-design.md)
+
+#### MongoDB Atlas 실제 화면
+
+실제 MongoDB Atlas에 적재된 `emerging_techs` 컬렉션과, RAG 챗봇이 쓰는 Vector Search 인덱스 화면입니다.
+
+![MongoDB Atlas - emerging_techs 컬렉션](contents/MongoDB%20Atlas/MongoDB%20Atlas%20-%20emerging_techs.png)
+
+![MongoDB Atlas - Vector Search 인덱스](contents/MongoDB%20Atlas/MongoDB%20Atlas%20Vector%20Search.png)
 
 ### 마이그레이션
 
