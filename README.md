@@ -191,11 +191,13 @@ CQRS 데이터 플로우와 전체 구조는 [AWS 배포 인프라 아키텍처]
 
 #### Admin 앱 Agent 채팅 실행 화면
 
-![Admin Agent 채팅 - 통계 응답](contents/api-agent/2026-04-01/admin%20agent%201.png)
+![Admin Agent 채팅 - 통계 표](contents/20260719091109/admin/admin-agent-stats-top.png)
 
-![Admin Agent 채팅 - 차트 시각화](contents/api-agent/2026-04-01/admin%20agent%202.png)
+![Admin Agent 채팅 - Pie 차트 시각화](contents/20260719091109/admin/admin-agent-charts.png)
 
-> Admin 앱에서 Agent에게 "Provider별 수집 현황을 통계로 보여주세요"를 요청한 결과입니다. Markdown 표와 Pie 차트로 Provider별 통계가 시각화됩니다.
+![Admin Agent 채팅 - 실행 요약(Tool 12회 자동 호출)](contents/20260719091109/admin/admin-agent-toolcalls.png)
+
+> Admin 앱에서 Agent에게 "Provider별 수집 현황을 통계로 보여주세요"를 요청한 결과입니다. Agent가 Tool을 12회 자동으로 호출해 통계를 집계하고, Markdown 표와 Pie 차트로 Provider·SourceType·UpdateType별 통계를 시각화합니다. (2026-07-19 캡처, 총 578건 기준)
 
 ### 3단계 자동화 파이프라인
 
