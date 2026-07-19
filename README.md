@@ -52,6 +52,34 @@ langchain4j 활용의 RAG 기반 LLM 멀티턴 챗봇과 Tool 기반 AI Agent �
 
 이를 통해 사용자는 자연어로 최신 AI 서비스 업데이트를 검색하고 질문할 수 있으며, LLM이 학습 데이터에 없는 최신 정보도 정확하게 제공할 수 있습니다. 특히 **AI Agent 시스템**은 인간의 개입 없이 자율적으로 최신 AI 트렌드를 추적하고 정보를 업데이트합니다.
 
+### 문제 해결을 보여주는 실제 화면
+
+프런트엔드 두 앱(사용자 앱 · 관리자 앱)을 실제 백엔드에 연결해 캡처한 화면입니다. 위에서 설명한 문제와 해결책이 화면에서 어떻게 나타나는지 보여줍니다. (전체 목록: [contents/20260719091109/](contents/20260719091109/README.md))
+
+**최신 AI 업데이트를 실시간으로 제공** — 수집된 업데이트를 목록으로 보여주고, 항목마다 원문 출처 링크가 있어 내용을 바로 확인할 수 있습니다. 이는 "출처 검증의 어려움" 문제에 대한 답이기도 합니다.
+
+![사용자 앱 - 최신 AI 업데이트 목록](contents/20260719091109/app/app-landing-feed.png)
+
+![사용자 앱 - 업데이트 상세와 원문 출처 링크](contents/20260719091109/app/app-detail-modal.png)
+
+**RAG 기반 멀티턴 챗봇** — 질문에 답하면서 검색된 문서를 Sources로 함께 보여주고(출처 확인), 이전 대화를 기억해 후속 질문에 이어서 답합니다.
+
+![사용자 앱 - RAG 챗봇 답변과 검색된 문서 출처](contents/20260719091109/app/app-chat-rag-answer.png)
+
+![사용자 앱 - 이전 맥락을 이어받는 멀티턴 대화](contents/20260719091109/app/app-chat-multiturn.png)
+
+**AI Agent 자율 분석·시각화** — 자연어 목표 하나로 Agent가 여러 Tool을 자동 실행해 통계를 집계하고, Markdown 표와 Pie 차트로 결과를 시각화합니다. (자세한 내용은 아래 [AI Agent 자동화 시스템](#-ai-agent-자동화-시스템) 참고)
+
+![관리자 앱 - Agent 통계 표](contents/20260719091109/admin/admin-agent-stats-top.png)
+
+![관리자 앱 - Agent Pie 차트 시각화](contents/20260719091109/admin/admin-agent-charts.png)
+
+**부가 기능** — 관심 있는 업데이트를 개인 북마크에 저장하고, Google OAuth로 로그인합니다.
+
+![사용자 앱 - 북마크 목록](contents/20260719091109/app/app-bookmarks.png)
+
+![사용자 앱 - 로그인 (이메일 + Google OAuth)](contents/20260719091109/app/app-signin.png)
+
 
 ### 핵심 기능
 
@@ -191,11 +219,13 @@ CQRS 데이터 플로우와 전체 구조는 [AWS 배포 인프라 아키텍처]
 
 #### Admin 앱 Agent 채팅 실행 화면
 
-![Admin Agent 채팅 - 통계 응답](contents/api-agent/2026-04-01/admin%20agent%201.png)
+![Admin Agent 채팅 - 통계 표](contents/20260719091109/admin/admin-agent-stats-top.png)
 
-![Admin Agent 채팅 - 차트 시각화](contents/api-agent/2026-04-01/admin%20agent%202.png)
+![Admin Agent 채팅 - Pie 차트 시각화](contents/20260719091109/admin/admin-agent-charts.png)
 
-> Admin 앱에서 Agent에게 "Provider별 수집 현황을 통계로 보여주세요"를 요청한 결과입니다. Markdown 표와 Pie 차트로 Provider별 통계가 시각화됩니다.
+![Admin Agent 채팅 - 실행 요약(Tool 12회 자동 호출)](contents/20260719091109/admin/admin-agent-toolcalls.png)
+
+> Admin 앱에서 Agent에게 "Provider별 수집 현황을 통계로 보여주세요"를 요청한 결과입니다. Agent가 Tool을 12회 자동으로 호출해 통계를 집계하고, Markdown 표와 Pie 차트로 Provider·SourceType·UpdateType별 통계를 시각화합니다. (2026-07-19 캡처, 총 578건 기준)
 
 ### 3단계 자동화 파이프라인
 
