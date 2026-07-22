@@ -117,11 +117,12 @@ Tradeoff: 이 지침은 속도보다 신중함에 무게를 둔다. 사소한 �
 ### CQRS 패턴 (두 개의 데이터 저장소로 분리)
 - **Command / 쓰기**: `datasource-aurora`를 통한 Aurora MySQL (패키지 `com.tech.n.ai.domain.aurora`)
 - **Query / 읽기**: `datasource-mongodb`를 통한 MongoDB Atlas (패키지 `com.tech.n.ai.domain.mongodb`)
-- **동기화**: Kafka 이벤트가 Aurora의 쓰기 내용을 MongoDB로 전파한다 (목표 지연 시간 < 1초)
+- **동기화**: Kafka 이벤트가 Aurora의 쓰기 내용을 MongoDB로 전파한다 (목표 지연 시간 < 1초).
+  현재 이벤트 계약은 conversation 세션/메시지 4종이며, `api-bookmark`는 Kafka를 쓰지 않는다 (Aurora 단독).
 
 이 물리적 쓰기/읽기 분리가 핵심 개념이다. `datasource-aurora` 안에서는:
-- `repository/writer/` — JPA + QueryDSL (쓰기 쪽)
-- `repository/reader/` — MyBatis (읽기 쪽, 복잡한 Aurora 쿼리에도 사용)
+- `repository/writer/` — `BaseWriterRepository` 기반 JPA 저장. soft delete와 함께 `HistoryService`를 호출해 이력을 남긴다.
+- `repository/reader/` — Spring Data JPA 인터페이스. MyBatis는 설정 빈만 있고 매퍼는 아직 없다. QueryDSL은 `JPAQueryFactory` 빈 제공 수준이다.
 
 ### 멀티모듈 구조
 `settings.gradle`이 `api/`, `batch/`, `common/`, `client/`, `datasource/`를 재귀적으로 훑어서
@@ -137,13 +138,16 @@ common/       공유 라이브러리: conversation, core, exception, kafka, secu
 datasource/   데이터 접근: aurora (command), mongodb (query)
 ```
 
-**의존 방향**: `api → datasource → common → client`. API 모듈은 필요한 `common-*`,
-`datasource-*`, `client-*` 프로젝트를 엮어서 쓴다 (각 모듈의 `build.gradle` 참고).
+**의존 방향**: `api`/`batch` 모듈이 필요한 `common-*`, `datasource-*`, `client-*`를
+엮어서 쓴다 (각 모듈의 `build.gradle` 참고). 트리 안 어떤 모듈에도 의존하지 않는 건
+`common-core` 하나뿐이다. `common-exception`·`common-kafka`는 `datasource-mongodb`에,
+`common-conversation`은 `datasource-aurora`·`datasource-mongodb`에 의존하고,
+`client-*`는 `common-core`(일부는 `common-exception`, feign은 `common-kafka`도)에 의존한다.
 
 ### 핵심 규칙
 - **Entity / Document 이름**: Aurora는 `domain/aurora/entity/`의 `*Entity`, MongoDB는 `domain/mongodb/document/`의 `*Document`.
 - **기본키**: `@Tsid` + `TsidGenerator`(`domain/aurora/generator`에 위치)를 통한 TSID (Time-Sorted Unique Identifier).
-- **이력 추적**: `HistoryEntityListener`가 채우는 `*HistoryEntity`.
+- **이력 추적**: `BaseWriterRepository`가 `HistoryService`를 호출해 저장하는 `*HistoryEntity` (User/Admin/Bookmark 3종).
 - **Gradle DSL**: Groovy (Kotlin DSL 아님). 공유 의존성 설정은 루트 `build.gradle`에, JPA/QueryDSL 추가분은 `jpa.gradle`에, REST Docs는 `docs.gradle`에 두고 모듈마다 `apply from:`으로 적용한다.
 
 ### API Gateway
@@ -153,6 +157,7 @@ JWT 처리는 `common-security`(`JwtTokenProvider`)에서 온다.
 ### RAG 챗봇 (`api-chatbot`)
 langchain4j 1.10.0을 사용하며, 검색에는 MongoDB Atlas Vector Search를, 기본 LLM
 제공자로는 OpenAI를, 재순위(re-ranking)에는 Cohere를 쓴다.
+Cohere 재순위와 Google 웹 검색은 기본 비활성이고 API 키를 설정하면 켜진다.
 
 ## 기술 스택
 - Java 21, Spring Boot 4.0.2 (`spring-boot-starter-classic`), Spring Cloud 2025.1.0
@@ -163,11 +168,11 @@ langchain4j 1.10.0을 사용하며, 검색에는 MongoDB Atlas Vector Search를,
 
 ## 설정
 - 프로필: `local`, `dev`, `beta`, `prod`. 테스트와 `bootRun`은 기본적으로 `local`을 쓴다.
-- 로컬 인프라(Kafka, Redis, MongoDB, 모니터링 스택)는 `docker-compose.yml`로 제공된다.
+- 로컬 인프라는 `docker-compose.yml`로 제공된다: Kafka(+Kafka UI), 모듈별 MySQL 4개
+  (batch 3307 / auth 3308 / bookmark 3309 / chatbot 3310 — `api-agent`는 chatbot 컨테이너를 함께 쓴다),
+  모니터링 스택. Redis와 MongoDB Atlas 컨테이너는 없으니 따로 준비한다.
 
 ## 인프라·배포·관측 (`devops/`, `monitoring/`)
-
-애플리케이션 코드와 별개로, 인프라와 관측 설정이 저장소 안에 함께 들어 있다.
 
 ### Terraform (IaC) — `devops/terraform/`
 AWS 인프라는 Terraform으로 관리한다. 세 부분으로 나뉜다.
@@ -181,151 +186,16 @@ AWS 인프라는 Terraform으로 관리한다. 세 부분으로 나뉜다.
 환경별로 네트워크 구성, 참조 아키텍처, 보안, 관측 다이어그램을 `.drawio`와 `.png`로 둔다. 인프라를 바꾸면 이 다이어그램도 같이 맞춘다.
 
 ### 관측(observability) — 로컬과 운영이 분리돼 있다
-헷갈리기 쉬우므로 둘을 구분한다.
-- **로컬**: 루트 `docker-compose.yml` 하나에 DB·Kafka와 함께 Prometheus, Pushgateway, Alertmanager, Jaeger(트레이스), Loki + Promtail(로그), Grafana가 들어 있다. 각 도구의 설정 파일은 `monitoring/` 아래에 있다. 브라우저 접속 방법은 `monitoring/README.md` 참고.
+- **로컬**: 루트 `docker-compose.yml` 하나에 DB·Kafka와 함께 Prometheus, Pushgateway, Alertmanager, Jaeger(트레이스), Loki + Promtail(로그), Grafana가 들어 있다. 각 도구의 설정 파일은 `monitoring/` 아래에 있고, 브라우저 접속 URL은 `monitoring/README.md` 참고 (전부 로컬 PC 주소다 — 운영 관측과 섞지 않는다).
 - **운영(AWS)**: CloudWatch + X-Ray + Amazon Managed Grafana로 설계돼 있고, 설명은 `devops/results/08-observability.md`에 있다.
 
-`monitoring/README.md`에 적힌 URL은 전부 로컬 PC 주소다. 운영 관측과 섞지 않는다.
-
 ## tmux 개발 환경
-`./scripts/tmux/tmux-backend.sh`가 3창 세션(project, module, test)을 띄운다.
-`scripts/tmux/tmux-dev-guide.md`, `scripts/tmux/tmux-recommended-layouts.md`, `scripts/tmux/tmux-overview.md` 참고.
-
+`./scripts/tmux/tmux-backend.sh`가 3창 세션(project, module, test)을 띄운다. 사용법은 `scripts/tmux/` 아래 md 문서 참고.
 <!-- rtk-instructions v2 -->
-# RTK (Rust Token Killer) - Token-Optimized Commands
+# RTK (Rust Token Killer)
 
-## Golden Rule
-
-**Always prefix commands with `rtk`**. If RTK has a dedicated filter, it uses it. If not, it passes through unchanged. This means RTK is always safe to use.
-
-**Important**: Even in command chains with `&&`, use `rtk`:
-```bash
-# ❌ Wrong
-git add . && git commit -m "msg" && git push
-
-# ✅ Correct
-rtk git add . && rtk git commit -m "msg" && rtk git push
-```
-
-## RTK Commands by Workflow
-
-### Build & Compile (80-90% savings)
-```bash
-rtk cargo build         # Cargo build output
-rtk cargo check         # Cargo check output
-rtk cargo clippy        # Clippy warnings grouped by file (80%)
-rtk tsc                 # TypeScript errors grouped by file/code (83%)
-rtk lint                # ESLint/Biome violations grouped (84%)
-rtk prettier --check    # Files needing format only (70%)
-rtk next build          # Next.js build with route metrics (87%)
-```
-
-### Test (60-99% savings)
-```bash
-rtk cargo test          # Cargo test failures only (90%)
-rtk go test             # Go test failures only (90%)
-rtk jest                # Jest failures only (99.5%)
-rtk vitest              # Vitest failures only (99.5%)
-rtk playwright test     # Playwright failures only (94%)
-rtk pytest              # Python test failures only (90%)
-rtk rake test           # Ruby test failures only (90%)
-rtk rspec               # RSpec test failures only (60%)
-rtk test <cmd>          # Generic test wrapper - failures only
-```
-
-### Git (59-80% savings)
-```bash
-rtk git status          # Compact status
-rtk git log             # Compact log (works with all git flags)
-rtk git diff            # Compact diff (80%)
-rtk git show            # Compact show (80%)
-rtk git add             # Ultra-compact confirmations (59%)
-rtk git commit          # Ultra-compact confirmations (59%)
-rtk git push            # Ultra-compact confirmations
-rtk git pull            # Ultra-compact confirmations
-rtk git branch          # Compact branch list
-rtk git fetch           # Compact fetch
-rtk git stash           # Compact stash
-rtk git worktree        # Compact worktree
-```
-
-Note: Git passthrough works for ALL subcommands, even those not explicitly listed.
-
-### GitHub (26-87% savings)
-```bash
-rtk gh pr view <num>    # Compact PR view (87%)
-rtk gh pr checks        # Compact PR checks (79%)
-rtk gh run list         # Compact workflow runs (82%)
-rtk gh issue list       # Compact issue list (80%)
-rtk gh api              # Compact API responses (26%)
-```
-
-### JavaScript/TypeScript Tooling (70-90% savings)
-```bash
-rtk pnpm list           # Compact dependency tree (70%)
-rtk pnpm outdated       # Compact outdated packages (80%)
-rtk pnpm install        # Compact install output (90%)
-rtk npm run <script>    # Compact npm script output
-rtk npx <cmd>           # Compact npx command output
-rtk prisma              # Prisma without ASCII art (88%)
-```
-
-### Files & Search (60-75% savings)
-```bash
-rtk ls <path>           # Tree format, compact (65%)
-rtk read <file>         # Code reading with filtering (60%)
-rtk grep <pattern>      # Search grouped by file (75%). Format flags (-c, -l, -L, -o, -Z) run raw.
-rtk find <pattern>      # Find grouped by directory (70%)
-```
-
-### Analysis & Debug (70-90% savings)
-```bash
-rtk err <cmd>           # Filter errors only from any command
-rtk log <file>          # Deduplicated logs with counts
-rtk json <file>         # JSON structure without values
-rtk deps                # Dependency overview
-rtk env                 # Environment variables compact
-rtk summary <cmd>       # Smart summary of command output
-rtk diff                # Ultra-compact diffs
-```
-
-### Infrastructure (85% savings)
-```bash
-rtk docker ps           # Compact container list
-rtk docker images       # Compact image list
-rtk docker logs <c>     # Deduplicated logs
-rtk kubectl get         # Compact resource list
-rtk kubectl logs        # Deduplicated pod logs
-```
-
-### Network (65-70% savings)
-```bash
-rtk curl <url>          # Compact HTTP responses (70%)
-rtk wget <url>          # Compact download output (65%)
-```
-
-### Meta Commands
-```bash
-rtk gain                # View token savings statistics
-rtk gain --history      # View command history with savings
-rtk discover            # Analyze Claude Code sessions for missed RTK usage
-rtk proxy <cmd>         # Run command without filtering (for debugging)
-rtk init                # Add RTK instructions to CLAUDE.md
-rtk init --global       # Add RTK to ~/.claude/CLAUDE.md
-```
-
-## Token Savings Overview
-
-| Category | Commands | Typical Savings |
-|----------|----------|-----------------|
-| Tests | vitest, playwright, cargo test | 90-99% |
-| Build | next, tsc, lint, prettier | 70-87% |
-| Git | status, log, diff, add, commit | 59-80% |
-| GitHub | gh pr, gh run, gh issue | 26-87% |
-| Package Managers | pnpm, npm, npx | 70-90% |
-| Files | ls, read, grep, find | 60-75% |
-| Infrastructure | docker, kubectl | 85% |
-| Network | curl, wget | 65-70% |
-
-Overall average: **60-90% token reduction** on common development operations.
+**모든 셸 명령 앞에 `rtk`를 붙인다.** 체인에서도 각 명령마다 붙인다 (`rtk git add . && rtk git commit -m "msg"`).
+전용 필터가 있는 명령(빌드·테스트·git·gh·docker·kubectl·curl 등)은 출력을 60~90% 압축하고,
+필터가 없으면 그대로 통과시키므로 항상 안전하다.
+`rtk gain`으로 절감 통계를 보고, 원본 출력이 필요하면 `rtk proxy <cmd>`를 쓴다.
 <!-- /rtk-instructions -->

@@ -1,6 +1,6 @@
 # common-security
 
-JWT 기반 인증·인가 모듈입니다. 토큰 생성·검증, 인증 필터, Spring Security 설정, 비밀번호 인코더를 제공합니다. Servlet 기반(`OncePerRequestFilter`)이며, WebFlux로 동작하는 `api-gateway`는 이 모듈을 쓰지 않습니다.
+JWT 기반 인증·인가 모듈입니다. 토큰 생성·검증, 인증 필터, Spring Security 설정, 비밀번호 인코더를 제공합니다. Servlet 기반(`OncePerRequestFilter`)입니다. WebFlux로 동작하는 `api-gateway`도 이 모듈에 의존하지만, Security 스타터를 전부 제외하고 `jwt` 패키지(`JwtTokenProvider`)만 골라 씁니다.
 
 ## JWT
 
@@ -41,6 +41,7 @@ LocalDateTime getRefreshTokenExpiresAt();             // getAdminRefreshTokenExp
 /api/v1/auth/admin/**      → hasRole("ADMIN")
 /api/v1/auth/**            → permitAll
 /actuator/**               → permitAll
+/api/v1/agent/**           → hasRole("ADMIN")
 그 외                       → authenticated
 ```
 
@@ -54,7 +55,7 @@ LocalDateTime getRefreshTokenExpiresAt();             // getAdminRefreshTokenExp
 
 ## 의존성
 
-`common-core`, Spring Security + OAuth2(authorization-server·client·resource-server) 스타터(`api` 스코프), jjwt 0.12.5(`jjwt-api`, 런타임 `jjwt-impl`·`jjwt-jackson`).
+`common-core`, Spring Security + OAuth2(authorization-server·client·resource-server) 스타터(`api` 스코프), jjwt 0.12.5(`jjwt-api`, 런타임 `jjwt-impl`·`jjwt-jackson`), `jackson-databind`(Jackson 2, jjwt-jackson이 필요).
 
 ## 참고 자료
 

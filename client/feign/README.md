@@ -8,7 +8,7 @@
 
 - **OAuth 연동 (`domain/oauth`)**: Google·Naver·Kakao. Authorization Code로 토큰을 교환하고(`exchangeAccessToken`) 사용자 정보를 조회합니다(`getUserInfo`). Naver·Kakao는 토큰 교환과 정보 조회 호스트가 달라 Feign Client를 2개씩 둡니다.
 - **GitHub 연동 (`domain/github`)**: 이벤트·릴리스 조회. 토큰이 있으면 `Authorization: Bearer` 헤더를 붙입니다.
-- **내부 호출 (`domain/internal`, `domain/agent`)**: EmergingTech 내부 API(생성·검색·조회·승인 5종, `X-Internal-Api-Key` 헤더 필요)와 Agent 실행(`/api/v1/agent/run`, `x-user-id`·`x-user-role` 헤더).
+- **내부 호출 (`domain/internal`, `domain/agent`)**: EmergingTech 내부 API(단건·배치 생성, 검색, 목록, 상세, 승인 6종, `X-Internal-Api-Key` 헤더 필요)와 Agent 실행(`/api/v1/agent/run`, `x-user-id`·`x-user-role` 헤더).
 - **Mock / REST 분기**: OAuth·GitHub는 `mode` 값으로 실제 호출(`rest`) 또는 Mock을 빈으로 등록합니다. 내부 API는 항상 실제 호출입니다.
 
 ## 패키지 구조
@@ -39,7 +39,7 @@ com.tech.n.ai.client.feign
 - **공통 모듈**: `common-core`, `common-kafka`, `common-exception`(`UnauthorizedException`)
 - `datasource-aurora`·`datasource-mongodb`는 전이 의존성으로 포함(이 모듈 코드에서 직접 사용 안 함)
 
-프로필별: local/dev/beta는 기본 타임아웃(connect 3초, read 30초, agent 60초), prod는 OkHttp + 커넥션 풀 확대(35,000), timeout 120초.
+타임아웃: GitHub·OAuth는 프로필별 선언으로 connect 3초·read 30초, 내부 API는 connect 5초·read 30초(agent는 read 60초). prod의 GitHub·OAuth 호출은 OkHttp + 커넥션 풀 확대(35,000), 커넥션 timeout 120초.
 
 ## 설정
 

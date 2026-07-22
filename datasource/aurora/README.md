@@ -41,6 +41,7 @@ datasource/aurora/src/main/
 │   │   ├── reader/                     # 읽기용 Spring Data JPA 인터페이스
 │   │   └── writer/                     # BaseWriterRepository + 도메인별 Writer + 히스토리 Writer
 │   ├── service/history/                # 변경 이력 추적 (HistoryService + Factory들)
+│   ├── util/                           # ApplicationContextProvider (EntityManager 정적 조회 헬퍼)
 │   └── utils/                          # CamelCase → snake_case 등 JPA 네이밍 전략
 └── resources/
     ├── application-api-domain.yml      # api-domain 데이터소스/JPA 설정
@@ -65,7 +66,7 @@ datasource/aurora/src/main/
 | `createdAt` / `createdBy` | `created_at` / `created_by` | 생성 시각·주체 |
 | `updatedAt` / `updatedBy` | `updated_at` / `updated_by` | 수정 시각·주체 |
 
-`@PrePersist`에서 생성/수정 시각을, `@PreUpdate`에서 수정 시각을 채웁니다. `ConversationMessageEntity`는 한 번 쓰면 바꾸지 않는 로그성 데이터라 `BaseEntity`를 상속하지 않고 `message_id`·`created_at`만 가집니다.
+`@PrePersist`에서 생성/수정 시각을, `@PreUpdate`에서 수정 시각을 채웁니다. `ConversationMessageEntity`는 한 번 쓰면 바꾸지 않는 로그성 데이터라 `BaseEntity`를 상속하지 않고, 공통 컬럼 중에서는 `message_id`(PK)·`created_at`만 가집니다.
 
 ## 엔티티
 
@@ -142,7 +143,7 @@ JDBC URL의 데이터베이스 이름은 `${module.aurora.schema}`로 비워 두
 
 ## 의존성
 
-`jpa.gradle`(HikariCP, QueryDSL, AWS MySQL JDBC 등)과 `docs.gradle`을 적용합니다. 직접 선언하는 주요 의존성: `tsid-creator`(TSID), `spring-boot-starter-data-jpa`, `jackson-datatype-hibernate7`(이력 JSON 직렬화 시 Hibernate 프록시 처리), `spring-boot-starter-data-mongodb`(EmergingTech 식별자 연동), `flyway-core`/`flyway-mysql`, `mybatis-spring-boot-starter`, `mariadb-java-client`(runtimeOnly).
+`jpa.gradle`(HikariCP, QueryDSL, AWS MySQL JDBC 등)과 `docs.gradle`을 적용합니다. 직접 선언하는 주요 의존성: `common-core`(프로젝트 모듈), `tsid-creator`(TSID), `spring-boot-starter-data-jpa`, `jackson-datatype-hibernate7`(이력 JSON 직렬화 시 Hibernate 프록시 처리), `spring-boot-starter-data-mongodb`(선언만 있고 이 모듈 코드에서는 MongoDB 클래스를 쓰지 않음 — EmergingTech ID는 문자열 컬럼으로만 보관), `flyway-core`/`flyway-mysql`, `mybatis-spring-boot-starter`, `mariadb-java-client`(runtimeOnly).
 
 ## CQRS에서의 위치
 

@@ -22,7 +22,7 @@ void deleteSession(String sessionId, String userId);
 
 - 세션 접근 시 `userId`가 다르면 `UnauthorizedException`. 삭제는 `isDeleted` 플래그를 세우는 soft delete.
 - `updateLastMessageAt`은 메시지가 오가면 비활성 세션을 다시 활성화합니다.
-- 세션 변경마다 `ConversationSessionCreated/Updated/DeletedEvent`를 발행합니다.
+- 세션 변경마다 `ConversationSessionCreated/Updated/DeletedEvent`를 발행합니다. 단, `deactivateInactiveSessions`는 Aurora만 갱신하고 이벤트를 발행하지 않습니다.
 
 **ConversationMessageService** — 메시지 저장과 조회.
 
@@ -33,7 +33,7 @@ List<ChatMessage> getMessagesForMemory(String sessionId, Integer maxTokens);
 ```
 
 - `saveMessage`는 Aurora 저장 후 `ConversationMessageCreatedEvent`를 발행하고, 같은 세션 안에서 시퀀스 번호를 1씩 늘립니다.
-- `getMessages`는 MongoDB를 먼저 보고 실패하면 Aurora로 폴백합니다.
+- `getMessages`는 MongoDB를 먼저 보고, 결과가 없거나 조회에 실패하면 Aurora로 폴백합니다.
 - `getMessagesForMemory`의 토큰 제한은 아직 미구현(TODO)입니다.
 
 ## MongoDbChatMemoryStore

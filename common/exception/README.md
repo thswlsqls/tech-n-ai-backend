@@ -11,17 +11,18 @@
 | ResourceNotFoundException | 404 | 4004 |
 | UnauthorizedException | 401 | 4001 |
 | ForbiddenException | 403 | 4003 |
-| ConflictException | 409 | 4005 |
+| ConflictException | 400 | 4006 |
 | RateLimitExceededException | 429 | 4029 |
 | ExternalApiException | 503 | 5003 |
-| MethodArgumentNotValid / HandlerMethodValidation / DataIntegrityViolation | 400 | 4006 |
-| MethodArgumentTypeMismatch / MissingServletRequestParameter / HttpMessageNotReadable / MissingRequestHeader | 400 | 4000 |
+| MethodArgumentNotValid / HandlerMethodValidation / MethodArgumentTypeMismatch / MissingServletRequestParameter / DataIntegrityViolation | 400 | 4006 |
+| HttpMessageNotReadable / MissingRequestHeader | 400 | 4000 |
+| NoResourceFound | 404 | 4004 |
 | HttpRequestMethodNotSupported | 405 | 4050 |
 | HttpMediaTypeNotSupported | 415 | 4150 |
 | Exception (그 외 전부) | 500 | 5000 |
 
 - `BaseException` 계열은 예외가 든 `errorCode`로 상태를 정합니다.
-- 검증(4006)·잘못된 요청(4000)은 필드별 메시지를 `Map<String,String>`으로 돌려줍니다.
+- 4006 응답은 필드별 메시지를 `Map<String,String>`으로 돌려줍니다. `ConflictException`은 예외 자체는 4005를 들고 있지만, 전용 핸들러가 검증 오류와 같은 형식(400·4006, `fieldName` 키의 필드 맵)으로 응답합니다.
 - 검증·서버 예외는 `ExceptionLoggingService`로 기록하고, 405/415 같은 단순 요청 오류는 경고 로그만 남깁니다.
 
 ## 예외 클래스
@@ -41,7 +42,7 @@
 
 **ExceptionLoggingService** — `@Async("exceptionLoggingExecutor")`로 예외를 MongoDB `exception_logs`에 저장. `logReadException`(source=READ)·`logWriteException`(source=WRITE) 두 메서드. `MongoTemplate`은 선택 주입(Optional)이라 없거나 저장 실패 시 로컬 로그로 폴백합니다. severity는 `IllegalArgument/IllegalStateException`=MEDIUM, 그 밖 `RuntimeException`=HIGH.
 
-**ExceptionContext** (record) — `source`, `exceptionType`, `exceptionMessage`, `stackTrace`, `occurredAt`, `severity`와 중첩 `ContextInfo`(`module`, `method`, `parameters`, `requestUri`, `userId`, `requestId`). 핸들러가 `module`=URI 첫 세그먼트, `userId`=`X-User-Id`, `requestId`=`X-Request-Id`로 채웁니다. `ExternalApiException`만 WRITE, 나머지는 READ.
+**ExceptionContext** (record) — `source`, `exceptionType`, `exceptionMessage`, `stackTrace`, `occurredAt`, `severity`와 중첩 `ContextInfo`(`module`, `method`, `parameters`, `requestUri`, `userId`, `requestId`). 핸들러가 `module`=URI 첫 세그먼트, `userId`=`X-User-Id`, `requestId`=`X-Request-Id`로 채웁니다. `ExternalApiException`과 `DataIntegrityViolation`은 WRITE, 나머지는 READ.
 
 **AsyncConfig** (`@EnableAsync`) — `exceptionLoggingExecutor`: core=2, max=5, queue=100, 접두사 `exception-log-`. 예외 로깅은 fire-and-forget이라 작은 풀로 요청 스레드와의 경쟁을 줄입니다.
 

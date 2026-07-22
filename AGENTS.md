@@ -117,11 +117,12 @@ Tradeoff: 이 지침은 속도보다 신중함에 무게를 둔다. 사소한 �
 ### CQRS 패턴 (두 개의 데이터 저장소로 분리)
 - **Command / 쓰기**: `datasource-aurora`를 통한 Aurora MySQL (패키지 `com.tech.n.ai.domain.aurora`)
 - **Query / 읽기**: `datasource-mongodb`를 통한 MongoDB Atlas (패키지 `com.tech.n.ai.domain.mongodb`)
-- **동기화**: Kafka 이벤트가 Aurora의 쓰기 내용을 MongoDB로 전파한다 (목표 지연 시간 < 1초)
+- **동기화**: Kafka 이벤트가 Aurora의 쓰기 내용을 MongoDB로 전파한다 (목표 지연 시간 < 1초).
+  현재 이벤트 계약은 conversation 세션/메시지 4종이며, `api-bookmark`는 Kafka를 쓰지 않는다 (Aurora 단독).
 
 이 물리적 쓰기/읽기 분리가 핵심 개념이다. `datasource-aurora` 안에서는:
-- `repository/writer/` — JPA + QueryDSL (쓰기 쪽)
-- `repository/reader/` — MyBatis (읽기 쪽, 복잡한 Aurora 쿼리에도 사용)
+- `repository/writer/` — `BaseWriterRepository` 기반 JPA 저장. soft delete와 함께 `HistoryService`를 호출해 이력을 남긴다.
+- `repository/reader/` — Spring Data JPA 인터페이스. MyBatis는 설정 빈만 있고 매퍼는 아직 없다. QueryDSL은 `JPAQueryFactory` 빈 제공 수준이다.
 
 ### 멀티모듈 구조
 `settings.gradle`이 `api/`, `batch/`, `common/`, `client/`, `datasource/`를 재귀적으로 훑어서
@@ -137,13 +138,16 @@ common/       공유 라이브러리: conversation, core, exception, kafka, secu
 datasource/   데이터 접근: aurora (command), mongodb (query)
 ```
 
-**의존 방향**: `api → datasource → common → client`. API 모듈은 필요한 `common-*`,
-`datasource-*`, `client-*` 프로젝트를 엮어서 쓴다 (각 모듈의 `build.gradle` 참고).
+**의존 방향**: `api`/`batch` 모듈이 필요한 `common-*`, `datasource-*`, `client-*`를
+엮어서 쓴다 (각 모듈의 `build.gradle` 참고). 트리 안 어떤 모듈에도 의존하지 않는 건
+`common-core` 하나뿐이다. `common-exception`·`common-kafka`는 `datasource-mongodb`에,
+`common-conversation`은 `datasource-aurora`·`datasource-mongodb`에 의존하고,
+`client-*`는 `common-core`(일부는 `common-exception`, feign은 `common-kafka`도)에 의존한다.
 
 ### 핵심 규칙
 - **Entity / Document 이름**: Aurora는 `domain/aurora/entity/`의 `*Entity`, MongoDB는 `domain/mongodb/document/`의 `*Document`.
 - **기본키**: `@Tsid` + `TsidGenerator`(`domain/aurora/generator`에 위치)를 통한 TSID (Time-Sorted Unique Identifier).
-- **이력 추적**: `HistoryEntityListener`가 채우는 `*HistoryEntity`.
+- **이력 추적**: `BaseWriterRepository`가 `HistoryService`를 호출해 저장하는 `*HistoryEntity` (User/Admin/Bookmark 3종).
 - **Gradle DSL**: Groovy (Kotlin DSL 아님). 공유 의존성 설정은 루트 `build.gradle`에, JPA/QueryDSL 추가분은 `jpa.gradle`에, REST Docs는 `docs.gradle`에 두고 모듈마다 `apply from:`으로 적용한다.
 
 ### API Gateway
@@ -153,6 +157,7 @@ JWT 처리는 `common-security`(`JwtTokenProvider`)에서 온다.
 ### RAG 챗봇 (`api-chatbot`)
 langchain4j 1.10.0을 사용하며, 검색에는 MongoDB Atlas Vector Search를, 기본 LLM
 제공자로는 OpenAI를, 재순위(re-ranking)에는 Cohere를 쓴다.
+Cohere 재순위와 Google 웹 검색은 기본 비활성이고 API 키를 설정하면 켜진다.
 
 ## 기술 스택
 - Java 21, Spring Boot 4.0.2 (`spring-boot-starter-classic`), Spring Cloud 2025.1.0
@@ -163,8 +168,26 @@ langchain4j 1.10.0을 사용하며, 검색에는 MongoDB Atlas Vector Search를,
 
 ## 설정
 - 프로필: `local`, `dev`, `beta`, `prod`. 테스트와 `bootRun`은 기본적으로 `local`을 쓴다.
-- 로컬 인프라(Kafka, Redis, MongoDB, 모니터링 스택)는 `docker-compose.yml`로 제공된다.
+- 로컬 인프라는 `docker-compose.yml`로 제공된다: Kafka(+Kafka UI), 모듈별 MySQL 4개
+  (batch 3307 / auth 3308 / bookmark 3309 / chatbot 3310 — `api-agent`는 chatbot 컨테이너를 함께 쓴다),
+  모니터링 스택. Redis와 MongoDB Atlas 컨테이너는 없으니 따로 준비한다.
+
+## 인프라·배포·관측 (`devops/`, `monitoring/`)
+
+### Terraform (IaC) — `devops/terraform/`
+AWS 인프라는 Terraform으로 관리한다. 세 부분으로 나뉜다.
+- `bootstrap/` — Terraform 상태 저장용 S3·KMS, ECR, GitHub Actions용 OIDC 역할처럼 다른 모든 것보다 먼저 있어야 하는 리소스. 한 번만 적용한다.
+- `modules/` — 재사용하는 리소스 묶음: `network`, `aurora-mysql`, `elasticache-valkey`, `msk-serverless`/`msk-provisioned`(Kafka), `ecs-service`, `cloudfront-spa`, `amplify-app`, `s3-bucket`, `iam-role-workload`, `observability`.
+- `envs/{dev,beta,prod}/` — 환경별로 위 모듈을 엮어 실제 인프라를 정의한다. 환경마다 상태가 분리돼 있다.
+
+리팩토링할 때는 `terraform plan`이 아무 변경도 만들지 않는지(no-op)로 동작이 그대로인지 확인한다.
+
+### AWS 아키텍처 다이어그램 — `devops/aws/{dev,beta,prod}/`
+환경별로 네트워크 구성, 참조 아키텍처, 보안, 관측 다이어그램을 `.drawio`와 `.png`로 둔다. 인프라를 바꾸면 이 다이어그램도 같이 맞춘다.
+
+### 관측(observability) — 로컬과 운영이 분리돼 있다
+- **로컬**: 루트 `docker-compose.yml` 하나에 DB·Kafka와 함께 Prometheus, Pushgateway, Alertmanager, Jaeger(트레이스), Loki + Promtail(로그), Grafana가 들어 있다. 각 도구의 설정 파일은 `monitoring/` 아래에 있고, 브라우저 접속 URL은 `monitoring/README.md` 참고 (전부 로컬 PC 주소다 — 운영 관측과 섞지 않는다).
+- **운영(AWS)**: CloudWatch + X-Ray + Amazon Managed Grafana로 설계돼 있고, 설명은 `devops/results/08-observability.md`에 있다.
 
 ## tmux 개발 환경
-`./scripts/tmux-backend.sh`가 3창 세션(project, module, test)을 띄운다.
-`scripts/tmux-dev-guide.md`, `scripts/tmux-recommended-layouts.md`, `scripts/tmux-overview.md` 참고.
+`./scripts/tmux/tmux-backend.sh`가 3창 세션(project, module, test)을 띄운다. 사용법은 `scripts/tmux/` 아래 md 문서 참고.

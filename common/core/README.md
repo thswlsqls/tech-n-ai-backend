@@ -28,6 +28,7 @@ ApiResponse.error(code, messageCode);  // message, data는 null
 | 4003 | FORBIDDEN | 5000 | INTERNAL_SERVER_ERROR |
 | 4004 | NOT_FOUND | 5001 | DATABASE_ERROR |
 | 4005 | CONFLICT | 5003 | SERVICE_UNAVAILABLE |
+| 5002 | EXTERNAL_API_ERROR | 5004 | TIMEOUT |
 
 - **ApiConstants** — `API_BASE_PATH`(`/api/v1`), 헤더 이름(`Authorization`, `X-Request-Id`, `X-User-Id` 등), 콘텐츠 타입.
 
@@ -41,6 +42,7 @@ ApiResponse.error(code, messageCode);  // message, data는 null
 
 - **JacksonConfig** — TSID(64비트 Long)가 JS `Number.MAX_SAFE_INTEGER`(2^53-1)를 넘어 정밀도가 깨지는 걸 막습니다. `JsonMapperBuilderCustomizer`로 `Long.class`·`Long.TYPE`를 `ToStringSerializer`에 등록해 전역에서 문자열로 직렬화합니다(Jackson 3, `tools.jackson.*`).
 - **RedisConfig** — `RedisTemplate` 두 개: `redisTemplate`(`<String,String>`, String 직렬화)와 `redisTemplateForObjects`(`<String,Object>`, 값은 `GenericJackson2JsonRedisSerializer`).
+- **application-common-core.yml** — Redis 접속, actuator 노출(health·metrics·prometheus), OTLP 트레이싱·메트릭 내보내기의 공통 기본값. 각 서비스가 `spring.profiles.include: common-core`로 불러옵니다.
 
 ## 의존성
 

@@ -24,7 +24,7 @@ CQRS의 쓰기(Aurora)와 읽기(MongoDB)를 잇는 Kafka 이벤트 모듈입니
 
 **EventConsumer** — `@KafkaListener` 하나가 토픽들을 받습니다.
 
-- topics: `spring.kafka.consumer.topics` (기본 conversation 토픽 4개)
+- topics: `spring.kafka.consumer.topics` (기본 conversation 토픽 4개: `tech-n-ai.conversation.session.created` / `session.updated` / `session.deleted` / `message.created`)
 - groupId: `spring.kafka.consumer.group-id` (기본 `tech-n-ai-group`)
 - 수동 커밋(`Acknowledgment`)
 
