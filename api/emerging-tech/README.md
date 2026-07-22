@@ -4,11 +4,44 @@
 
 ## 개요
 
-`api-emerging-tech`는 OpenAI, Anthropic, Google, Meta, xAI 같은 AI 제공자의 업데이트 정보를 MongoDB에 모아두고 조회·검색하는 API를 제공합니다. 데이터는 사용자가 직접 입력하지 않고, `batch-source`(GitHub Release 추적·웹 스크래핑)와 `api-agent`(LangChain4j 에이전트)가 내부 API로 밀어 넣습니다.
+`api-emerging-tech`는 OpenAI, Anthropic, Google, Meta, xAI 같은 AI 제공자의 업데이트 정보를 MongoDB에 모아두고 조회·검색하는 API를 제공합니다. 데이터는 직접 사용자가 입력하지 않고, `batch-source`(GitHub Release 추적·웹 스크래핑)와 `api-agent`(LangChain4j 에이전트)가 내부 API로 밀어 넣습니다.
 
-전체 CQRS 구조에서 이 모듈은 **읽기(Query) 쪽**에 속합니다. 저장소로 MongoDB Atlas만 사용하며(Aurora/JPA 없음 — 메인 클래스에서 JPA·DataSource 자동 설정을 제외), 문서를 저장할 때 제목·요약 등을 합쳐 OpenAI 임베딩 벡터를 같이 만들어 둡니다. 이 벡터는 챗봇·에이전트 모듈이 Vector Search 기반 RAG에서 검색 대상으로 씁니다.
+전체 CQRS 구조에서 이 모듈은 **읽기(Query) 쪽**에 속합니다. 저장소로 MongoDB Atlas만 사용하며, 문서를 저장할 때 제목·요약 등을 합쳐 OpenAI 임베딩 벡터를 같이 만들어 둡니다. 이 벡터는 나중에 챗봇·에이전트 모듈이 Vector Search 기반 RAG에서 검색 대상으로 씁니다.
 
-모듈 안에서도 쓰기/읽기를 나눕니다. `EmergingTechFacade`가 컨트롤러와 두 서비스 사이를 조율하며, 쓰기는 `EmergingTechCommandService`(중복 검사 + 임베딩 생성 + 저장), 읽기는 `EmergingTechQueryService`(`MongoTemplate` 동적 Criteria 필터, ID 조회, 제목 검색)가 맡습니다.
+서비스는 Aurora/JPA를 쓰지 않으므로 메인 클래스에서 JPA·DataSource 자동 설정을 모두 제외합니다.
+
+## 아키텍처
+
+```mermaid
+flowchart TB
+    subgraph External["외부 시스템"]
+        BatchJob["batch-source<br/>(GitHub/Scraper Job)"]
+        Agent["api-agent<br/>(LangChain4j Agent)"]
+    end
+
+    subgraph EmergingTechAPI["api-emerging-tech (Port 8082)"]
+        Controller["EmergingTechController"]
+        Facade["EmergingTechFacade"]
+        CommandService["EmergingTechCommandService<br/>(쓰기)"]
+        QueryService["EmergingTechQueryService<br/>(읽기)"]
+        Embedding["EmbeddingModel<br/>(OpenAI)"]
+    end
+
+    subgraph Storage["데이터 저장소"]
+        MongoDB[(MongoDB<br/>emerging_techs)]
+    end
+
+    BatchJob -->|"POST /internal, /internal/batch"| Controller
+    Agent -->|"POST /internal,<br/>POST /{id}/approve, /{id}/reject"| Controller
+    Controller --> Facade
+    Facade --> CommandService
+    Facade --> QueryService
+    CommandService -->|"임베딩 생성"| Embedding
+    CommandService --> MongoDB
+    QueryService --> MongoDB
+```
+
+모듈 안에서도 쓰기/읽기를 나눕니다. `EmergingTechFacade`가 컨트롤러와 두 서비스 사이를 조율합니다. 쓰기는 `EmergingTechCommandService`(중복 검사 + 임베딩 생성 + 저장), 읽기는 `EmergingTechQueryService`(`MongoTemplate` 동적 Criteria 필터, ID 조회, 제목 검색)가 맡습니다.
 
 ## 주요 기능
 
@@ -24,11 +57,28 @@
 
 ## 데이터 모델
 
-`EmergingTechDocument`(컬렉션 `emerging_techs`)와 Repository, enum은 이 모듈이 아니라 `datasource-mongodb`에 있습니다. MongoDB 필드명은 snake_case이고 응답 DTO에서는 camelCase로 내려갑니다.
+### EmergingTechDocument (MongoDB, 컬렉션 `emerging_techs`)
 
-주요 필드: `_id`(응답에서는 hex 문자열 `id`), `provider`, `update_type`, `title`, `summary`, `url`, `published_at`, `source_type`, `status`, `external_id`, `embedding_text`(provider·githubRepo·title·summary·tags 결합), `embedding_vector`(1536차원), `metadata`(version, tags, author, githubRepo, additionalInfo), `created_at`/`updated_at`.
+MongoDB 필드명은 snake_case이고, 응답 DTO에서는 camelCase로 내려갑니다.
 
-인덱스는 `datasource-mongodb`의 `MongoIndexConfig`가 만듭니다. `url`은 unique 인덱스이고, `provider`·`status`·`update_type` 각각에 `published_at`을 붙인 복합 인덱스가 있습니다. `external_id` 중복 검사는 인덱스 제약이 아니라 저장 전 조회로 처리합니다.
+| 필드 (DB) | 타입 | 설명 |
+|------|------|------|
+| `_id` | ObjectId | Primary Key (응답에서는 hex 문자열 `id`) |
+| `provider` | String | AI 제공자 (`TechProvider`) |
+| `update_type` | String | 업데이트 유형 (`EmergingTechType`) |
+| `title` | String | 제목 |
+| `summary` | String | 요약 |
+| `url` | String | 원본 URL (중복 검사에 사용) |
+| `published_at` | LocalDateTime | 게시 일시 |
+| `source_type` | String | 수집 소스 (`SourceType`) |
+| `status` | String | 상태 (`PostStatus`) |
+| `external_id` | String | 외부 식별자 (저장 전 조회로 중복 검사에 사용) |
+| `embedding_text` | String | 임베딩 대상 텍스트 (provider·githubRepo·title·summary·tags 결합) |
+| `embedding_vector` | List\<Float\> | 임베딩 벡터 (1536차원) |
+| `metadata` | Object | 부가 정보 (version, tags, author, githubRepo, additionalInfo) |
+| `created_at` / `updated_at` | LocalDateTime | 생성·수정 일시 |
+
+실제 인덱스는 `MongoIndexConfig`가 만듭니다: `url` unique 인덱스와 `provider`/`status`/`update_type` + `published_at` 복합 인덱스입니다. `external_id`의 `@Indexed(unique = true)` 애너테이션은 `auto-index-creation`이 꺼져 있어 실제 인덱스를 만들지 않으며, external_id 중복은 저장 전 조회로 검사합니다.
 
 ### Enum 값
 
@@ -43,7 +93,9 @@
 
 기본 경로는 `/api/v1/emerging-tech`입니다.
 
-### 공개 조회 API (외부 트래픽은 `api-gateway` 경유)
+### 공개 조회 API
+
+외부 트래픽은 `api-gateway`를 통해 들어옵니다.
 
 | Method | Path | 설명 |
 |--------|------|------|
@@ -51,7 +103,9 @@
 | GET | `/api/v1/emerging-tech/{id}` | 상세 조회 |
 | GET | `/api/v1/emerging-tech/search` | 제목 검색 |
 
-### 내부 API (`X-Internal-Api-Key` 헤더 인증 필요)
+### 내부 API
+
+`X-Internal-Api-Key` 헤더 인증이 필요합니다.
 
 | Method | Path | 설명 |
 |--------|------|------|
@@ -63,30 +117,159 @@
 ### 페이지네이션·필터 규칙
 
 - `page`는 1부터 시작하고 기본값 1, `size`는 기본값 20에 최대 100입니다.
-- 목록 조회의 `sort`는 `field,direction` 형식입니다. 허용 필드는 `publishedAt`, `createdAt`, `updatedAt`, `title`, `provider`이고 기본값은 `publishedAt,desc`입니다.
+- 목록 조회의 `sort`는 `field,direction` 형식입니다. 허용 필드는 `publishedAt`, `createdAt`, `updatedAt`, `title`, `provider`이고, 방향은 `asc` / `desc`입니다. 기본값은 `publishedAt,desc`입니다.
 - `startDate` / `endDate`는 `YYYY-MM-DD` 형식이며 `published_at` 기간 필터로 동작합니다.
 - 필터로 넘긴 enum 값이 정의되지 않은 값이면 400(BAD_REQUEST)으로 거부합니다.
 
-### 생성 요청 규칙
+### Request/Response 예시
 
-단건 생성에서 `provider`, `updateType`, `url`, `sourceType`, `status`, `title`은 필수입니다. 다건 생성은 항목별로 처리해 일부가 실패해도 나머지는 저장하며, 응답으로 `totalCount`/`successCount`/`newCount`/`duplicateCount`/`failureCount`/`failureMessages`를 집계해 돌려줍니다. `successCount`는 신규(`newCount`)와 중복으로 건너뛴 건(`duplicateCount`)을 합친 값입니다.
+**목록 조회 요청**
+
+```
+GET /api/v1/emerging-tech?page=1&size=20&provider=OPENAI&status=PUBLISHED&sort=publishedAt,desc
+```
+
+**단건 생성 요청**
+
+```
+POST /api/v1/emerging-tech/internal
+X-Internal-Api-Key: {api-key}
+```
+
+```json
+{
+  "provider": "OPENAI",
+  "updateType": "SDK_RELEASE",
+  "title": "OpenAI Python SDK v1.50.0",
+  "summary": "새로운 기능 및 버그 수정 포함",
+  "url": "https://github.com/openai/openai-python/releases/tag/v1.50.0",
+  "publishedAt": "2024-01-15T10:00:00",
+  "sourceType": "GITHUB_RELEASE",
+  "status": "DRAFT",
+  "externalId": "github:openai/openai-python:v1.50.0",
+  "metadata": {
+    "version": "v1.50.0",
+    "tags": ["sdk", "python"],
+    "githubRepo": "openai/openai-python"
+  }
+}
+```
+
+`provider`, `updateType`, `url`, `sourceType`, `status`, `title`은 필수입니다.
+
+**다건 생성 응답**
+
+다건 생성은 항목별로 처리하며 일부 항목이 실패해도 나머지는 저장합니다. 응답으로 처리 결과를 집계해 돌려줍니다.
+
+```json
+{
+  "totalCount": 10,
+  "successCount": 9,
+  "newCount": 7,
+  "duplicateCount": 2,
+  "failureCount": 1,
+  "failureMessages": ["Emerging Tech 저장 실패: title=..., error=..."]
+}
+```
+
+`successCount`는 신규(`newCount`)와 중복으로 건너뛴 건(`duplicateCount`)을 합친 값입니다.
 
 ## 동작 세부
 
-- **중복 검사**: 단건 저장 시 `externalId`로 먼저 조회하고, 없으면 `url`로 조회합니다. 이미 있으면 저장하지 않고 기존 문서를 반환하며(`isNew = false`), 다건 생성에서는 이 건을 `duplicateCount`로 셉니다.
-- **임베딩 생성**: 문서를 새로 저장할 때 `provider`, `githubRepo`, `title`, `summary`, `tags`를 공백으로 이어 붙여 `embedding_text`를 만들고, OpenAI `text-embedding-3-small`(1536차원)로 벡터를 생성해 `embedding_vector`에 저장합니다. 임베딩 생성에 실패해도 문서 저장 자체는 진행됩니다(에러는 로그로 남김).
-- **조회 쿼리**: 목록 조회는 `MongoTemplate`의 동적 `Criteria`로 필터를 조합하고, 검색은 `findByTitleContainingIgnoreCase`로 제목 부분 일치를 찾습니다.
-- `SlackNotifier`는 현재 로그만 출력하는 스텁이며 아직 어디에도 연결돼 있지 않습니다.
+### 중복 검사
+
+단건 저장 시 `externalId`로 먼저 조회하고, 없으면 `url`로 조회합니다. 이미 있으면 저장하지 않고 기존 문서를 반환하며(`isNew = false`), 다건 생성에서는 이 건을 `duplicateCount`로 셉니다.
+
+### 임베딩 생성
+
+문서를 새로 저장할 때 `provider`, `githubRepo`, `title`, `summary`, `tags`를 공백으로 이어 붙여 `embedding_text`를 만들고, OpenAI `text-embedding-3-small`(1536차원)로 벡터를 생성해 `embedding_vector`에 저장합니다. 임베딩 생성에 실패해도 문서 저장 자체는 진행됩니다(에러는 로그로 남김).
+
+### 조회 쿼리
+
+목록 조회는 `MongoTemplate`의 동적 `Criteria`로 필터를 조합해 처리합니다. 검색은 Repository의 `findByTitleContainingIgnoreCase`로 제목 부분 일치를 찾습니다.
+
+## 디렉토리 구조
+
+```
+api/emerging-tech/
+├── src/main/java/.../api/emergingtech/
+│   ├── ApiEmergingTechApplication.java
+│   ├── controller/
+│   │   └── EmergingTechController.java
+│   ├── facade/
+│   │   └── EmergingTechFacade.java
+│   ├── service/
+│   │   ├── EmergingTechCommandService.java
+│   │   ├── EmergingTechCommandServiceImpl.java
+│   │   ├── EmergingTechQueryService.java
+│   │   └── EmergingTechQueryServiceImpl.java
+│   ├── dto/
+│   │   ├── request/
+│   │   │   ├── EmergingTechCreateRequest.java
+│   │   │   ├── EmergingTechBatchRequest.java
+│   │   │   ├── EmergingTechListRequest.java
+│   │   │   └── EmergingTechSearchRequest.java
+│   │   └── response/
+│   │       ├── EmergingTechDetailResponse.java
+│   │       ├── EmergingTechPageResponse.java
+│   │       └── EmergingTechBatchResponse.java
+│   ├── config/
+│   │   ├── ServerConfig.java
+│   │   ├── EmbeddingConfig.java
+│   │   ├── EmergingTechConfig.java
+│   │   └── WebConfig.java
+│   └── common/
+│       ├── InternalApiKeyValidator.java
+│       └── SlackNotifier.java
+└── src/main/resources/
+    ├── application.yml
+    └── application-emerging-tech-api.yml
+```
+
+> `EmergingTechDocument`, `EmergingTechRepository`, enum들은 이 모듈이 아니라 `datasource-mongodb`에 있습니다.
+
+> `SlackNotifier`는 현재 로그만 출력하는 스텁이며 아직 어디에도 연결돼 있지 않습니다.
 
 ## 설정
 
-`application.yml`: 포트 8082, 프로필 include(`common-core`, `mongodb-domain`, `emerging-tech-api`).
+### application.yml
 
-`application-emerging-tech-api.yml` 핵심 키:
+```yaml
+server:
+  port: 8082
 
-- `emerging-tech.internal.api-key=${EMERGING_TECH_INTERNAL_API_KEY:default-emerging-tech-api-key}`
-- `langchain4j.open-ai.embedding-model`: `api-key=${OPENAI_API_KEY:}`, `model-name=text-embedding-3-small`, `dimensions=1536`, `timeout=30s`
-- `slack.emerging-tech`: `enabled=false`, `channel="#emerging-tech"` (현재 미사용)
+spring:
+  application:
+    name: emerging-tech-api
+  profiles:
+    include:
+      - common-core
+      - mongodb-domain
+      - emerging-tech-api
+```
+
+### application-emerging-tech-api.yml
+
+```yaml
+emerging-tech:
+  internal:
+    api-key: ${EMERGING_TECH_INTERNAL_API_KEY:default-emerging-tech-api-key}
+
+# 임베딩 설정 (OpenAI text-embedding-3-small)
+langchain4j:
+  open-ai:
+    embedding-model:
+      api-key: ${OPENAI_API_KEY:}
+      model-name: text-embedding-3-small
+      dimensions: 1536
+      timeout: 30s
+
+# Slack 알림 설정 (현재 미사용)
+slack:
+  emerging-tech:
+    enabled: false
+    channel: "#emerging-tech"
+```
 
 ### 환경 변수
 
@@ -94,18 +277,34 @@
 |--------|------|------|
 | `EMERGING_TECH_INTERNAL_API_KEY` | 내부 API 인증 키 | No (기본값 `default-emerging-tech-api-key`) |
 | `OPENAI_API_KEY` | 임베딩 생성용 OpenAI API 키 | 임베딩 생성 시 필요 |
-| `MONGODB_ATLAS_CONNECTION_STRING` | MongoDB Atlas 연결 URI (`mongodb-domain` 프로필) | Yes |
-| `MONGODB_ATLAS_DATABASE` | 데이터베이스 이름 | No (기본값 `tech_n_ai`) |
+| `MONGODB_ATLAS_CONNECTION_STRING` | MongoDB Atlas 연결 문자열 | Yes |
+| `MONGODB_ATLAS_DATABASE` | MongoDB 데이터베이스 이름 | No (기본값 `tech_n_ai`) |
 
-## 빌드·실행
+## 의존성
 
-```bash
-./gradlew :api-emerging-tech:build     # 빌드
-./gradlew :api-emerging-tech:bootRun   # 실행 (기본 local 프로필, 포트 8082)
-./gradlew :api-emerging-tech:test      # 테스트
+```gradle
+dependencies {
+    implementation 'dev.langchain4j:langchain4j:1.10.0'
+    implementation 'dev.langchain4j:langchain4j-open-ai:1.10.0'
+
+    implementation project(':common-core')
+    implementation project(':common-exception')
+    implementation project(':datasource-mongodb')
+}
 ```
 
-주요 의존성: `langchain4j`/`langchain4j-open-ai` 1.10.0, `common-core`, `common-exception`, `datasource-mongodb`.
+## 실행
+
+```bash
+# 빌드
+./gradlew :api-emerging-tech:build
+
+# 실행 (기본 local 프로필, 포트 8082)
+./gradlew :api-emerging-tech:bootRun
+
+# 테스트
+./gradlew :api-emerging-tech:test
+```
 
 ## 연동 모듈
 
@@ -115,4 +314,6 @@
 
 ## 참고 자료
 
-- [Spring Data MongoDB Reference](https://docs.spring.io/spring-data/mongodb/reference/) · [Spring Boot Reference](https://docs.spring.io/spring-boot/reference/) · [LangChain4j Documentation](https://docs.langchain4j.dev/)
+- [Spring Data MongoDB Reference](https://docs.spring.io/spring-data/mongodb/reference/)
+- [Spring Boot Reference](https://docs.spring.io/spring-boot/reference/)
+- [LangChain4j Documentation](https://docs.langchain4j.dev/)
