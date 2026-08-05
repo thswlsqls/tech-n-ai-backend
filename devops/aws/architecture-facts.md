@@ -174,12 +174,13 @@ ECS 모듈 호출은 6개. **`batch-source`는 ECS 서비스로 배포되지 않
 ### IAM
 - Task Execution Role: env당 1개 공유, `AmazonECSTaskExecutionRolePolicy` + 인라인(Secrets/SSM read `{project}/{env}/*`, KMS Decrypt data·s3-app). (`envs/prod/main.tf:81`, `:199`)
 - Task Role (서비스별 6개, trust `ecs-tasks.amazonaws.com` + `aws:SourceAccount` 조건): (`envs/prod/task_roles.tf`)
-  - api-gateway — SSM Parameter read만. (`:19`)
-  - api-auth — Aurora master secret + jwt-signing-key read, `rds-db:connect`(dbuser api_auth), KMS Decrypt auth·data. (`:48`)
-  - api-chatbot — openai-api-key·mongodb-uri read, KMS Decrypt ai. **Bedrock 권한 없음(D-12)**. (`:102`)
-  - api-agent — `kafka-cluster:*`(Connect/Describe/Read/WriteData 등), mongodb-uri read. (`:144`)
-  - api-bookmark — `rds-db:connect`(dbuser api_bookmark), elasticache-auth-token read, KMS Decrypt data. (`:195`)
-  - api-emerging-tech — openai-api-key read, KMS Decrypt ai. (`:240`)
+  - api-gateway — SSM Parameter read만. (`:28`)
+  - api-auth — Aurora master secret + jwt-signing-key read, `rds-db:connect`(dbuser api_auth), KMS Decrypt auth·data. (`:57`)
+  - api-chatbot — openai-api-key·mongodb-uri read, KMS Decrypt ai, `kafka-cluster:*`. **Bedrock 권한 없음(D-12)**. (`:113`)
+  - api-agent — `kafka-cluster:*`(Connect/Describe/Read/WriteData 등), mongodb-uri read. (`:172`)
+  - api-bookmark — `rds-db:connect`(dbuser api_bookmark), elasticache-auth-token read, KMS Decrypt data. (`:217`)
+  - api-emerging-tech — openai-api-key read, KMS Decrypt ai. (`:262`)
+- MSK IAM 권한을 받는 건 api-chatbot·api-agent 둘뿐이다. 대상 ARN(클러스터·토픽 `{project}.conversation.*`·그룹 `{project}.*`)은 두 역할이 `local.msk_iam_resources` 로 공유한다. 코드상 `common-kafka` 를 의존하는 모듈도 이 둘뿐이다(`api/chatbot/build.gradle`, `api/agent/build.gradle`). (`envs/prod/task_roles.tf:17`)
 - Workload Role 모듈(`iam-role-workload`): trust service + 조건 + managed/inline 정책을 입력으로 받는 범용 모듈. (`modules/iam-role-workload/main.tf:22`)
 - GitHub OIDC Role 4종 (bootstrap, `${project}-` 접두어): (`bootstrap/roles.tf`)
   - `gha-deploy-{env}` — sub `repo:{org}/{repo}:environment:{env}`. 권한: ECR push/pull(techai/*), ECS update/RegisterTaskDef, CodeDeploy create, PassRole(task/exec role), SSM/Secrets read, Amplify start-job, Signer sign. max session 3600. (`:24`, `:50`, `:161`)
@@ -208,7 +209,7 @@ ECS 모듈 호출은 6개. **`batch-source`는 ECS 서비스로 배포되지 않
 | MSK Provisioned | 9098(IAM), 9094(TLS), 11001-11002(monitoring), self all | 워크로드 SG들 | `modules/msk-provisioned/main.tf:54`, `:66`, `:90` |
 | MSK Serverless | 9098(IAM SASL) | 워크로드 SG들 | `modules/msk-serverless/main.tf:37` |
 | VPCE | 443 | private-app 서브넷 CIDR | `modules/network/vpc_endpoints.tf:23` |
-- services.tf의 데이터 SG 인바운드는 워크로드별로 선택 부여: aurora_consumers = auth/emerging-tech/bookmark/agent; cache_consumers = auth/chatbot/bookmark; msk_consumers = emerging-tech/bookmark/agent. (`envs/prod/services.tf:282`, `:290`, `:297`)
+- services.tf의 데이터 SG 인바운드는 워크로드별로 선택 부여: aurora_consumers = auth/emerging-tech/bookmark/agent; cache_consumers = auth/chatbot/bookmark; msk_consumers = chatbot/agent. (`envs/prod/services.tf:273`, `:281`, `:289`)
 
 ---
 
@@ -256,9 +257,9 @@ ECS 모듈 호출은 6개. **`batch-source`는 ECS 서비스로 배포되지 않
 
 - 인입: client → ALB(prod=HTTPS 443, dev/beta=HTTP 80, path-based) → 각 ECS 서비스(api-gateway 8081 fallback `/*`, api-auth 8083 `/auth/*`, api-emerging-tech 8082 `/emerging-tech/*`, api-chatbot 8084 `/chatbot/*`, api-bookmark 8085 `/bookmark/*`, api-agent 8086 `/agent/*`). prod는 HTTP 80 요청을 443으로 301 리다이렉트. ALB→Fargate 백엔드 레그는 모든 env에서 HTTP. (`envs/prod/services.tf`, `cluster.tf`)
 - 프런트(Amplify/CloudFront)는 코드상 비활성/미호출이라 현재 흐름에 포함되지 않음(§3).
-- ECS 서비스 → 데이터: Aurora(3306), Valkey(6379), MSK(9098/9094)로 SG 인바운드가 워크로드별 선택 부여. MongoDB Atlas는 외부 서비스로 시크릿 URI를 통해 연결. (`envs/prod/services.tf:282`~`:347`)
-- 이벤트 흐름: api-agent가 `kafka-cluster:*` 권한으로 MSK에 produce/consume(topic `{project}.conversation.*`, group `{project}.*`). MSK는 prod=Provisioned, beta=Serverless, dev=없음. (`envs/prod/task_roles.tf:158`)
-- 캐시 경로: api-auth/chatbot/bookmark가 Valkey 사용(auth_token 시크릿). (`envs/prod/services.tf:290`)
+- ECS 서비스 → 데이터: Aurora(3306), Valkey(6379), MSK(9098/9094)로 SG 인바운드가 워크로드별 선택 부여. MongoDB Atlas는 외부 서비스로 시크릿 URI를 통해 연결. (`envs/prod/services.tf:273`~`:338`)
+- 이벤트 흐름: api-chatbot·api-agent가 `kafka-cluster:*` 권한으로 MSK에 produce/consume(topic `{project}.conversation.*`, group `{project}.*`). 두 서비스가 공유하는 `common-conversation` 모듈이 세션·메시지 이벤트를 발행한다. MSK는 prod=Provisioned, beta=Serverless, dev=없음. (`envs/prod/task_roles.tf:17`, `:130`, `:188`)
+- 캐시 경로: api-auth/chatbot/bookmark가 Valkey 사용(auth_token 시크릿). (`envs/prod/services.tf:281`)
 - CQRS: 코드 주석/네트워크 표기상 쓰기=Aurora, 읽기=MongoDB Atlas, 동기화=Kafka(MSK)로 설계됨. Terraform은 인프라(Aurora·MSK·MongoDB 시크릿)만 제공하고 애플리케이션 동기화 로직은 코드 범위 밖. (`modules/network/main.tf:4`; backend CLAUDE.md 설계와 정합)
 
 ---

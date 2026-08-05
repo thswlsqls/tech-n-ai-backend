@@ -7,6 +7,7 @@
 ## 1. Reference Architecture
 
 ALB(prod=HTTPS 443, dev/beta=HTTP 80, path 라우팅) → ECS Fargate 서비스 6개 → 데이터 저장소. 이벤트 흐름은 점선.
+MSK에 붙는 서비스는 api-chatbot과 api-agent 둘뿐입니다 — 이 둘만 `common-kafka` 모듈을 의존해 대화 세션·메시지 이벤트를 주고받습니다.
 MSK는 env별로 다릅니다(prod=Provisioned, beta=Serverless, dev=없음). 아래는 prod 기준이며, dev는 MSK 노드와 연결이 빠집니다.
 
 ```mermaid
@@ -45,8 +46,7 @@ flowchart LR
     chat --> valkey
     book --> valkey
 
-    et -.->|produce/consume| msk
-    book -.->|produce/consume| msk
+    chat -.->|produce/consume| msk
     agent -.->|produce/consume| msk
 
     chat --> mongo
@@ -193,7 +193,7 @@ flowchart LR
         exec["ECS Task Execution Role<br/>(shared)"]
         t_gw["api-gateway → SSM read"]
         t_auth["api-auth → jwt + rds-db:connect"]
-        t_chat["api-chatbot → openai + mongodb-uri"]
+        t_chat["api-chatbot → openai + mongodb-uri<br/>+ kafka-cluster:*"]
         t_agent["api-agent → kafka-cluster:* + mongodb-uri"]
         t_book["api-bookmark → rds-db:connect + cache token"]
         t_et["api-emerging-tech → openai"]
@@ -234,7 +234,7 @@ flowchart LR
 
     %% 경계 통제: private-data 인터넷 격리, ECR IMMUTABLE+scan, S3 Object Lock GOVERNANCE, VPC Flow Logs
     %% 전송 구간: (prod) client→ALB HTTPS:443(ACM, TLS 종료), ALB→Fargate HTTP:80(백엔드), Aurora IAM DB auth, Valkey TLS+token, MSK TLS+IAM SASL
-    %% dev/beta 는 client→ALB 가 HTTP:80. dev 에서는 MSK가 없어 api-agent 의 kafka-cluster 권한이 미사용.
+    %% dev/beta 는 client→ALB 가 HTTP:80. dev 에서는 MSK가 없어 api-chatbot·api-agent 의 kafka-cluster 권한이 미사용.
 ```
 
 ## 4. 환경 차이 요약

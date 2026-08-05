@@ -284,10 +284,10 @@ locals {
     module.api_bookmark.security_group_id,
   ]
 
-  # MSK 에 접근하는 워크로드 (api-emerging-tech, api-bookmark, api-agent)
+  # MSK 에 접근하는 워크로드 (api-chatbot, api-agent)
+  # 두 서비스만 common-kafka 를 의존해 conversation 이벤트를 발행·구독한다.
   msk_consumers = [
-    module.api_emerging_tech.security_group_id,
-    module.api_bookmark.security_group_id,
+    module.api_chatbot.security_group_id,
     module.api_agent.security_group_id,
   ]
 }

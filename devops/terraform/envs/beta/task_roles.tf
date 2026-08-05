@@ -10,6 +10,15 @@ locals {
       values   = [data.aws_caller_identity.current.account_id]
     }
   ]
+
+  # MSK IAM 인증 대상 ARN. 클러스터·토픽·컨슈머 그룹 3종. api-chatbot·api-agent 가 공유한다.
+  # MSK Serverless ARN 은 동적이라 try 로 감싼다.
+  # enable_msk=false(dev) 면 빈 리스트가 되고, resources 가 빈 statement 는 IAM 이 거부한다.
+  msk_iam_resources = compact([
+    try(module.msk[0].cluster_arn, ""),
+    try("${module.msk[0].cluster_arn}/topic/${var.project}.conversation.*", ""),
+    try("${module.msk[0].cluster_arn}/group/${var.project}.*", ""),
+  ])
 }
 
 # ----------------------------------------------------------------------------
@@ -96,7 +105,9 @@ data "aws_iam_policy_document" "api_auth_secrets" {
 }
 
 # ----------------------------------------------------------------------------
-# api-chatbot — OpenAI/Cohere secrets, KMS(ai). Bedrock 권한 미부여 (D-12).
+# api-chatbot — OpenAI/Cohere secrets, KMS(ai), MSK kafka-cluster.
+#   Bedrock 권한 미부여 (D-12).
+#   api-agent 와 함께 common-kafka 로 conversation 이벤트를 발행·구독한다.
 # ----------------------------------------------------------------------------
 
 module "task_role_api_chatbot" {
@@ -110,6 +121,23 @@ module "task_role_api_chatbot" {
 
   inline_policies = {
     ai-secrets = data.aws_iam_policy_document.api_chatbot_secrets.json
+    msk        = data.aws_iam_policy_document.api_chatbot_msk.json
+  }
+}
+
+data "aws_iam_policy_document" "api_chatbot_msk" {
+  statement {
+    sid = "MskClusterIam"
+    actions = [
+      "kafka-cluster:Connect",
+      "kafka-cluster:DescribeCluster",
+      "kafka-cluster:DescribeTopic",
+      "kafka-cluster:DescribeGroup",
+      "kafka-cluster:AlterGroup",
+      "kafka-cluster:ReadData",
+      "kafka-cluster:WriteData",
+    ]
+    resources = local.msk_iam_resources
   }
 }
 
@@ -138,7 +166,7 @@ data "aws_iam_policy_document" "api_chatbot_secrets" {
 
 # ----------------------------------------------------------------------------
 # api-agent — MSK kafka-cluster, MongoDB secret
-#   MSK 권한은 enable_msk=true 일 때만 의미. Resource ARN 은 클러스터 미생성 시 wildcard 임시.
+#   MSK 권한은 enable_msk=true 일 때만 의미. 대상 ARN 은 local.msk_iam_resources 참고.
 # ----------------------------------------------------------------------------
 
 module "task_role_api_agent" {
@@ -167,13 +195,7 @@ data "aws_iam_policy_document" "api_agent_perms" {
       "kafka-cluster:ReadData",
       "kafka-cluster:WriteData",
     ]
-    # MSK Serverless ARN 은 동적. 미활성 시 wildcard.
-    resources = compact([
-      try(module.msk[0].cluster_arn, ""),
-      try("${module.msk[0].cluster_arn}/topic/${var.project}.conversation.*", ""),
-      try("${module.msk[0].cluster_arn}/group/${var.project}.*", ""),
-    ])
-    # 비활성 시 빈 리스트라 정책 statement 가 비어 — IAM 거부. 미활성 시 dummy 한 statement 둠.
+    resources = local.msk_iam_resources
   }
 
   statement {
