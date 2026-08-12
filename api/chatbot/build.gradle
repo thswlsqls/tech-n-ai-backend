@@ -10,16 +10,16 @@ apply from: "${rootDir.absolutePath}/jpa.gradle"
 
 dependencies {
     // langchain4j Core
-    implementation 'dev.langchain4j:langchain4j:1.10.0'
+    implementation 'dev.langchain4j:langchain4j'
 
     // langchain4j MongoDB Atlas (Integration module - beta version)
-    implementation 'dev.langchain4j:langchain4j-mongodb-atlas:1.10.0-beta18'
+    implementation 'dev.langchain4j:langchain4j-mongodb-atlas'
 
     // langchain4j OpenAI (LLM Provider - 기본 선택)
-    implementation 'dev.langchain4j:langchain4j-open-ai:1.10.0'
+    implementation 'dev.langchain4j:langchain4j-open-ai'
 
     // langchain4j Cohere (Re-Ranking, Integration module - beta version)
-    implementation 'dev.langchain4j:langchain4j-cohere:1.10.0-beta18'
+    implementation 'dev.langchain4j:langchain4j-cohere'
     
     // 프로젝트 모듈 의존성
     implementation project(':common-core')
