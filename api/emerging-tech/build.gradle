@@ -9,8 +9,8 @@ apply from: "${rootDir.absolutePath}/docs.gradle"
 
 dependencies {
 	// langchain4j (임베딩 생성용)
-	implementation 'dev.langchain4j:langchain4j:1.10.0'
-	implementation 'dev.langchain4j:langchain4j-open-ai:1.10.0'
+	implementation 'dev.langchain4j:langchain4j'
+	implementation 'dev.langchain4j:langchain4j-open-ai'
 
 	implementation project(':common-core')
 	implementation project(':common-exception')
