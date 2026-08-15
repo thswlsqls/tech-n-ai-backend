@@ -114,7 +114,8 @@ public class QuestionRunner {
             searchOutcome.recencyQueryFailed(),
             excludedReason == null,
             excludedReason,
-            noEvidenceType
+            // fallback·예외로 빠진 질문은 후보가 비어도 "맞혔다"가 아니다. 집계와 판정 순서를 맞춘다.
+            noEvidenceType && EXCLUDED_NO_EVIDENCE_TYPE.equals(excludedReason)
                 ? new EvalReport.NoEvidence(candidatesEmpty, candidatesEmpty)
                 : null,
             new EvalReport.LatencyMs(searchMs, refineMs, null),

@@ -1,70 +1,544 @@
 {
-  "version": "draft-schema-only",
+  "version": "2026-08-15.2",
   "collection": "emerging_techs",
   "items": [
     {
-      "id": "SF-001",
-      "question": "OpenAI가 발표한 최신 임베딩 모델의 기본 차원은 몇인가요?",
-      "type": "SINGLE_FACT",
-      "expectedExternalIds": ["PLACEHOLDER-external-id-1"],
-      "latestExternalId": null,
-      "note": "스키마 확인용 자리표시. 실제 external_id는 Atlas 문서에서 채운다."
-    },
-    {
-      "id": "SF-002",
-      "question": "Anthropic이 공개한 모델의 컨텍스트 길이 정보를 알려주세요.",
-      "type": "SINGLE_FACT",
-      "expectedExternalIds": ["PLACEHOLDER-external-id-2"],
-      "latestExternalId": null,
-      "note": "스키마 확인용 자리표시."
-    },
-    {
-      "id": "PS-001",
-      "question": "OpenAI SDK 업데이트 내용을 알려주세요.",
+      "id": "G001",
+      "question": "OpenAI Daybreak 사이버 보안 도구 소식을 알려줘",
       "type": "PROVIDER_SCOPED",
-      "expectedExternalIds": ["PLACEHOLDER-external-id-3"],
+      "expectedExternalIds": [
+        "rss:5d3aff0aba5d0b8a",
+        "rss:29b0e61ec6cd1ed3",
+        "rss:081601c279be28d3",
+        "rss:3696e67c2c9e8aaa",
+        "rss:b63e5cb33bb0ec81"
+      ],
       "latestExternalId": null,
-      "note": "provider 필터가 OPENAI로 잡히는지 확인하는 자리표시."
+      "note": "OPENAI 프리필터가 걸린 상태에서 Daybreak 문서군을 찾는지 본다. Daybreak를 다루는 문서는 코퍼스 전체에서 이 다섯 건뿐이다."
     },
     {
-      "id": "TS-001",
-      "question": "모델 릴리스 소식만 모아서 알려주세요.",
+      "id": "G002",
+      "question": "OpenAI가 미시간과 조지아에 짓는 데이터센터 인프라 투자가 궁금해요",
+      "type": "PROVIDER_SCOPED",
+      "expectedExternalIds": [
+        "rss:04c1d26ba61347ee",
+        "rss:082c4173c70b0451"
+      ],
+      "latestExternalId": null,
+      "note": "미시간 Stargate와 조지아 Effingham 카운티 두 건. 지역을 적어야 텍사스 서한·Stargate Community 문서와 갈린다."
+    },
+    {
+      "id": "G003",
+      "question": "OpenAI Codex를 도입한 Samsung Electronics와 Nextdoor 사례를 알려줘",
+      "type": "PROVIDER_SCOPED",
+      "expectedExternalIds": [
+        "rss:4a975b89e4a0f0fb",
+        "rss:5b802ccebc3cd954"
+      ],
+      "latestExternalId": null,
+      "note": "Codex 도입 사례 문서가 코퍼스에 40건 넘어서 회사 이름으로 두 건을 겨냥했다. provider 키워드는 openai."
+    },
+    {
+      "id": "G004",
+      "question": "앨버타주 정부가 Claude로 보안 취약점을 찾아 고친 사례를 알려줘",
+      "type": "PROVIDER_SCOPED",
+      "expectedExternalIds": [
+        "scraper:33ff9177ca69de68"
+      ],
+      "latestExternalId": null,
+      "note": "claude 키워드로 ANTHROPIC 필터가 걸린다. Anthropic 보안 문서는 여덟 건이라 사례 하나로 좁혔다."
+    },
+    {
+      "id": "G005",
+      "question": "Anthropic의 한국 시장 진출 소식을 알려줘",
+      "type": "PROVIDER_SCOPED",
+      "expectedExternalIds": [
+        "scraper:47e96fb85bcbcad4",
+        "scraper:cd97e33f2d57807a"
+      ],
+      "latestExternalId": null,
+      "note": "서울 사무소 개설과 한국 대표 선임 두 건이 정확히 대응한다. 한국을 다루는 문서는 이 둘뿐이다."
+    },
+    {
+      "id": "G006",
+      "question": "Anthropic이 규제 산업을 겨냥해 맺은 파트너십 소식이 궁금해요",
+      "type": "PROVIDER_SCOPED",
+      "expectedExternalIds": [
+        "scraper:7f42ae0d5b44a6ef",
+        "scraper:bf5c018b2741ad1d",
+        "scraper:89c09d6960f28f3f"
+      ],
+      "latestExternalId": null,
+      "note": "TCS, DXC, Infosys 세 건이 규제 산업을 제목에 적는다. 파트너십 문서 전체는 13건이라 규제 산업으로 좁혔다."
+    },
+    {
+      "id": "G007",
+      "question": "Google Vids에 추가된 영상 제작·편집 기능을 알려줘",
+      "type": "PROVIDER_SCOPED",
+      "expectedExternalIds": [
+        "rss:6a0f44aaf2f61b4c",
+        "rss:e5a53e0f2f88840a"
+      ],
+      "latestExternalId": null,
+      "note": "google 키워드로 GOOGLE 필터. Google Vids를 다룬 문서는 이 두 건뿐이다."
+    },
+    {
+      "id": "G008",
+      "question": "Google 검색의 AI Mode에 추가된 기능을 알려줘",
+      "type": "PROVIDER_SCOPED",
+      "expectedExternalIds": [
+        "rss:dc323d8334b79ae7",
+        "rss:029429de97cbcb9e",
+        "rss:3ca822eb09c804c7",
+        "rss:9159a6a31316611a"
+      ],
+      "latestExternalId": null,
+      "note": "검색 관련 문서는 17건이라 AI Mode로 좁혔다. 검색 안 AI Mode를 다룬 문서 네 건."
+    },
+    {
+      "id": "G009",
+      "question": "Google의 의료 AI 시스템 AMIE 연구 결과를 알려줘",
+      "type": "PROVIDER_SCOPED",
+      "expectedExternalIds": [
+        "rss:012e30e2c241e587",
+        "rss:866972b9be74b221"
+      ],
+      "latestExternalId": null,
+      "note": "AMIE를 다룬 문서 두 건. 실시간 화상 진료 연구와 만성질환 관리 연구다."
+    },
+    {
+      "id": "G010",
+      "question": "Meta의 Segment Anything 모델이 쓰인 사례를 알려줘",
+      "type": "PROVIDER_SCOPED",
+      "expectedExternalIds": [
+        "scraper:82e6c96d6bf7571c",
+        "scraper:6ff8d0a02b675263",
+        "scraper:36a4be9edb2ece4a"
+      ],
+      "latestExternalId": null,
+      "note": "meta 키워드로 META 필터. SAM 활용 사례 세 건(홍수 대응, 야생동물 모니터링, 의료 분류)."
+    },
+    {
+      "id": "G011",
+      "question": "Llama Stack SDK 릴리스에서 고친 보안 문제가 있나요?",
+      "type": "PROVIDER_SCOPED",
+      "expectedExternalIds": [
+        "github:288384459"
+      ],
+      "latestExternalId": null,
+      "note": "llama 키워드로 META 필터. 릴리스 18건 중 보안 수정을 적은 것은 v0.5.1 하나다."
+    },
+    {
+      "id": "G012",
+      "question": "Meta가 뇌 신호를 글자로 바꾸는 연구를 했나요?",
+      "type": "PROVIDER_SCOPED",
+      "expectedExternalIds": [
+        "scraper:70fcb64abb763696"
+      ],
+      "latestExternalId": null,
+      "note": "Brain2Qwerty 문서 한 건. META 문서 중 내용이 뚜렷한 몇 안 되는 블로그다."
+    },
+    {
+      "id": "G013",
+      "question": "avatarin이 리테일 에이전트를 만든 사례를 다룬 블로그 포스트를 알려줘",
       "type": "TYPE_SCOPED",
-      "expectedExternalIds": ["PLACEHOLDER-external-id-4"],
+      "expectedExternalIds": [
+        "rss:da425c76a8c018d0"
+      ],
       "latestExternalId": null,
-      "note": "update_type 필터가 MODEL_RELEASE로 잡히는지 확인하는 자리표시."
+      "note": "'블로그 포스트'로 BLOG_POST 필터가 걸리는지 본다. 에이전트 도입 사례 블로그가 20건 넘어 회사 하나로 좁혔다."
     },
     {
-      "id": "RC-001",
-      "question": "최신 AI 모델 출시 소식을 알려주세요.",
-      "type": "RECENCY",
-      "expectedExternalIds": ["PLACEHOLDER-external-id-5", "PLACEHOLDER-external-id-6"],
-      "latestExternalId": "PLACEHOLDER-external-id-5",
-      "note": "최신성 키워드 감지와 latestExternalId 채점을 확인하는 자리표시."
+      "id": "G014",
+      "question": "Google이 2026년 7월 AI 소식을 정리한 블로그 포스트를 보여줘",
+      "type": "TYPE_SCOPED",
+      "expectedExternalIds": [
+        "rss:58ba351a21396b43"
+      ],
+      "latestExternalId": null,
+      "note": "BLOG_POST + GOOGLE 두 필터가 함께 걸린다. 월간 정리 시리즈가 6건이라 한 달로 좁혔다."
     },
     {
-      "id": "MH-001",
-      "question": "OpenAI와 Anthropic의 최근 모델 출시를 비교해서 알려주세요.",
+      "id": "G015",
+      "question": "OpenAI 파이썬 SDK v2.26.0 릴리스에 어떤 기능이 추가됐나요?",
+      "type": "TYPE_SCOPED",
+      "expectedExternalIds": [
+        "github:293723555"
+      ],
+      "latestExternalId": null,
+      "note": "sdk 키워드로 SDK_RELEASE 필터. openai-python 릴리스가 35건이라 버전 하나로 좁혔다."
+    },
+    {
+      "id": "G016",
+      "question": "Anthropic 파이썬 SDK v0.95.0 릴리스에 어떤 변경이 있었는지 알려줘",
+      "type": "TYPE_SCOPED",
+      "expectedExternalIds": [
+        "github:309003494"
+      ],
+      "latestExternalId": null,
+      "note": "SDK_RELEASE + ANTHROPIC. 이 조합이 49건이라 anthropic-sdk-python 버전 하나로 좁혔다."
+    },
+    {
+      "id": "G017",
+      "question": "Google의 이미지·영상 생성 모델 출시 소식을 알려줘",
+      "type": "TYPE_SCOPED",
+      "expectedExternalIds": [
+        "rss:096dac0b19bfa477",
+        "rss:3e80827698400978"
+      ],
+      "latestExternalId": null,
+      "note": "'모델 출시'로 MODEL_RELEASE 필터. GOOGLE MODEL_RELEASE 6건 중 이미지·영상 생성은 Veo 3.1 Lite와 Nano Banana 2 둘이다."
+    },
+    {
+      "id": "G018",
+      "question": "Claude Sonnet 5 모델 출시 소식이 궁금해요",
+      "type": "TYPE_SCOPED",
+      "expectedExternalIds": [
+        "scraper:fdd9745edc3aad4e"
+      ],
+      "latestExternalId": null,
+      "note": "MODEL_RELEASE + ANTHROPIC. 이 조합이 10건이라 모델 하나로 좁혔다."
+    },
+    {
+      "id": "G019",
+      "question": "OpenAI의 기업용 제품 출시 소식을 알려줘",
+      "type": "TYPE_SCOPED",
+      "expectedExternalIds": [
+        "rss:e7455462824dd896",
+        "rss:5f8ae94d3d52ae74"
+      ],
+      "latestExternalId": null,
+      "note": "'제품 출시'로 PRODUCT_LAUNCH 필터. 이 조합 6건 중 기업용은 DeployCo와 HP Frontier 둘이다."
+    },
+    {
+      "id": "G020",
+      "question": "Google의 음악 생성 관련 제품 출시 소식을 알려줘",
+      "type": "TYPE_SCOPED",
+      "expectedExternalIds": [
+        "rss:c53fde1af24fcbf7"
+      ],
+      "latestExternalId": null,
+      "note": "PRODUCT_LAUNCH + GOOGLE 4건 중 음악은 Lyria 3 Pro 한 건이다."
+    },
+    {
+      "id": "G021",
+      "question": "OpenAI 플랫폼 업데이트 중 기업 지출 관리와 사용량 분석 기능을 알려줘",
+      "type": "TYPE_SCOPED",
+      "expectedExternalIds": [
+        "rss:450d5ccfb1602dc2"
+      ],
+      "latestExternalId": null,
+      "note": "PLATFORM_UPDATE 문서가 적어 질문을 문서에 맞췄다. ChatGPT Enterprise 지출 관리 한 건."
+    },
+    {
+      "id": "G022",
+      "question": "Google 플랫폼 업데이트 중 번역 기능 개선 내용을 알려줘",
+      "type": "TYPE_SCOPED",
+      "expectedExternalIds": [
+        "rss:d6c4cedafda8db41"
+      ],
+      "latestExternalId": null,
+      "note": "PLATFORM_UPDATE + GOOGLE 4건 중 번역은 한 건이다."
+    },
+    {
+      "id": "G023",
+      "question": "Mistral의 Le Chat 모델 업데이트 내용을 알려줘",
+      "type": "NO_EVIDENCE",
+      "expectedExternalIds": [],
+      "latestExternalId": null,
+      "note": "Mistral은 코퍼스 전체에서 0건. '모델', '업데이트'로 RAG 분류는 통과한다."
+    },
+    {
+      "id": "G024",
+      "question": "Cohere Command 모델의 API 가격 정책이 어떻게 되나요?",
+      "type": "NO_EVIDENCE",
+      "expectedExternalIds": [],
+      "latestExternalId": null,
+      "note": "Cohere 0건. 'api', '모델'로 RAG 분류 통과."
+    },
+    {
+      "id": "G025",
+      "question": "DeepSeek R2 모델 출시 소식이 있나요?",
+      "type": "NO_EVIDENCE",
+      "expectedExternalIds": [],
+      "latestExternalId": null,
+      "note": "DeepSeek 0건. MODEL_RELEASE 필터가 걸려도 근거가 없어야 정답이다."
+    },
+    {
+      "id": "G026",
+      "question": "Alibaba Qwen 3 모델의 컨텍스트 길이가 얼마인가요?",
+      "type": "NO_EVIDENCE",
+      "expectedExternalIds": [],
+      "latestExternalId": null,
+      "note": "Alibaba, Qwen 모두 0건."
+    },
+    {
+      "id": "G027",
+      "question": "Stability AI가 내놓은 새 이미지 생성 모델 정보를 알려줘",
+      "type": "NO_EVIDENCE",
+      "expectedExternalIds": [],
+      "latestExternalId": null,
+      "note": "Stability AI, Stable Diffusion 0건. 최신성 키워드는 피하려고 '새로운' 대신 '새'를 썼다."
+    },
+    {
+      "id": "G028",
+      "question": "IBM watsonx 플랫폼 업데이트 소식이 궁금해요",
+      "type": "NO_EVIDENCE",
+      "expectedExternalIds": [],
+      "latestExternalId": null,
+      "note": "watsonx 0건. PLATFORM_UPDATE 필터가 걸린 상태에서도 결과가 없어야 한다."
+    },
+    {
+      "id": "G029",
+      "question": "네이버 HyperCLOVA X 모델의 SDK 릴리스 정보를 알려줘",
+      "type": "NO_EVIDENCE",
+      "expectedExternalIds": [],
+      "latestExternalId": null,
+      "note": "HyperCLOVA, CLOVA 0건. SDK_RELEASE 필터가 걸려도 근거가 없어야 한다."
+    },
+    {
+      "id": "G030",
+      "question": "카카오 Kanana 모델의 기술 문서를 알려줘",
+      "type": "NO_EVIDENCE",
+      "expectedExternalIds": [],
+      "latestExternalId": null,
+      "note": "Kanana 0건. '기술', '모델'로 RAG 분류 통과."
+    },
+    {
+      "id": "G031",
+      "question": "NVIDIA NeMo 프레임워크의 SDK 업데이트를 알려줘",
+      "type": "NO_EVIDENCE",
+      "expectedExternalIds": [],
+      "latestExternalId": null,
+      "note": "NeMo 0건."
+    },
+    {
+      "id": "G032",
+      "question": "Perplexity의 검색 AI 모델 업데이트를 알려줘",
+      "type": "NO_EVIDENCE",
+      "expectedExternalIds": [],
+      "latestExternalId": null,
+      "note": "Perplexity 0건. 'ai', '모델'로 RAG 분류 통과."
+    },
+    {
+      "id": "G033",
+      "question": "OpenAI의 Codex Security 미리보기와 Anthropic이 방어자에게 사이버 보안 기능을 공개한 소식을 비교해줘",
       "type": "MULTI_HOP",
-      "expectedExternalIds": ["PLACEHOLDER-external-id-7", "PLACEHOLDER-external-id-8"],
+      "expectedExternalIds": [
+        "rss:5becf449a527f5c9",
+        "scraper:fe5168dbfadecfd8"
+      ],
       "latestExternalId": null,
-      "note": "문서 두 건을 함께 찾아야 하는 자리표시."
+      "note": "provider 두 개가 함께 감지돼야 양쪽 문서를 다 가져올 수 있다. 각 제목이 코퍼스에 하나씩만 있다."
     },
     {
-      "id": "NE-001",
-      "question": "1998년에 발표된 인공지능 기술 업데이트를 알려주세요.",
-      "type": "NO_EVIDENCE",
-      "expectedExternalIds": [],
+      "id": "G034",
+      "question": "OpenAI의 K–12 교사 대상 AI 교육 프로그램과 Anthropic의 Claude for Teachers를 알려줘",
+      "type": "MULTI_HOP",
+      "expectedExternalIds": [
+        "rss:3447f8d32f7ed63d",
+        "scraper:ad504bbdb221cc44"
+      ],
       "latestExternalId": null,
-      "note": "컬렉션에 근거가 없어야 정답인 자리표시."
+      "note": "교육 관련 문서가 13건이라 프로그램 이름으로 두 건을 겨냥했다."
     },
     {
-      "id": "NE-002",
-      "question": "존재하지 않는 제공자 Zetacorp의 SDK 릴리스를 알려주세요.",
-      "type": "NO_EVIDENCE",
-      "expectedExternalIds": [],
+      "id": "G035",
+      "question": "Google의 Lyria 3 음악 생성 모델과 관련 제품 소식을 함께 알려줘",
+      "type": "MULTI_HOP",
+      "expectedExternalIds": [
+        "rss:44069ef88222673f",
+        "rss:c53fde1af24fcbf7"
+      ],
       "latestExternalId": null,
-      "note": "컬렉션에 근거가 없어야 정답인 자리표시."
+      "note": "같은 provider지만 update_type이 MODEL_RELEASE와 PRODUCT_LAUNCH로 갈린다. Lyria 문서는 이 둘뿐이다."
+    },
+    {
+      "id": "G036",
+      "question": "OpenAI 파이썬 SDK v2.26.0과 Anthropic SDK v0.95.0 릴리스를 비교해줘",
+      "type": "MULTI_HOP",
+      "expectedExternalIds": [
+        "github:293723555",
+        "github:309003494"
+      ],
+      "latestExternalId": null,
+      "note": "SDK_RELEASE 필터에 provider 두 개가 함께 걸린다. 버전을 적어 릴리스 84건 중 두 건만 겨냥한다."
+    },
+    {
+      "id": "G037",
+      "question": "RingCentral이 OpenAI를 도입한 사례와 UST가 Claude를 도입한 사례를 알려줘",
+      "type": "MULTI_HOP",
+      "expectedExternalIds": [
+        "rss:9bafa93fe08b847d",
+        "scraper:2421a78a2bf886f8"
+      ],
+      "latestExternalId": null,
+      "note": "기업 도입 사례 문서가 워낙 많아 회사 이름으로 두 건을 겨냥했다. provider와 update_type이 모두 갈린다."
+    },
+    {
+      "id": "G038",
+      "question": "OpenAI의 ChatGPT Business 프리미엄 좌석과 Google AI Plus 요금제 확대를 알려줘",
+      "type": "MULTI_HOP",
+      "expectedExternalIds": [
+        "rss:2a5c0cad5d8b2f9d",
+        "rss:f0a1183e90c876e7"
+      ],
+      "latestExternalId": null,
+      "note": "제품 이름을 적어야 요금·좌석을 언급하는 다른 문서와 갈린다."
+    },
+    {
+      "id": "G039",
+      "question": "Meta의 Canopy Height Maps v2와 Google의 SpeciesNet 오픈소스 모델을 알려줘",
+      "type": "MULTI_HOP",
+      "expectedExternalIds": [
+        "scraper:5809e7b6195acf8f",
+        "rss:866a0103d93ea329"
+      ],
+      "latestExternalId": null,
+      "note": "provider 두 개가 함께 감지돼야 한다. 두 모델 이름은 코퍼스에 한 건씩만 있다."
+    },
+    {
+      "id": "G040",
+      "question": "OpenAI GPT-5.6 Sol의 Ultrafast 모드와 Model ML 사례를 함께 알려줘",
+      "type": "MULTI_HOP",
+      "expectedExternalIds": [
+        "rss:c0986f6628d189a1",
+        "rss:95f74aeac90a93bb"
+      ],
+      "latestExternalId": null,
+      "note": "같은 provider지만 BLOG_POST와 MODEL_RELEASE로 갈린다. GPT-5.6 문서가 9건이라 두 건을 이름으로 겨냥했다."
+    },
+    {
+      "id": "G041",
+      "question": "Claude Design과 Gemini 3 Deep Think가 각각 어떤 기능인지 알려줘",
+      "type": "MULTI_HOP",
+      "expectedExternalIds": [
+        "scraper:0dba0c3d7be35ac4",
+        "rss:720d05f84e1686bb"
+      ],
+      "latestExternalId": null,
+      "note": "claude와 gemini 두 키워드로 ANTHROPIC, GOOGLE이 함께 걸린다. 두 이름 모두 코퍼스에 한 건씩만 있다."
+    },
+    {
+      "id": "G042",
+      "question": "Meta가 숲과 녹지를 지도로 만든 컴퓨터 비전 모델 사례를 알려줘",
+      "type": "MULTI_HOP",
+      "expectedExternalIds": [
+        "scraper:5809e7b6195acf8f",
+        "scraper:6135a1e6ea30ef04"
+      ],
+      "latestExternalId": null,
+      "note": "MODEL_RELEASE와 BLOG_POST가 섞인 META 문서군. 숲·녹지로 좁혀 야생동물·홍수 사례와 갈랐다."
+    },
+    {
+      "id": "G043",
+      "question": "OpenAI의 최신 모델 출시 소식을 알려줘",
+      "type": "RECENCY",
+      "expectedExternalIds": [
+        "rss:5d3aff0aba5d0b8a",
+        "rss:95f74aeac90a93bb",
+        "rss:29b0e61ec6cd1ed3"
+      ],
+      "latestExternalId": "rss:5d3aff0aba5d0b8a",
+      "note": "'최신' 감지 + OPENAI + MODEL_RELEASE 필터. 이 필터 안에서 published_at 내림차순 1·2·3위 문서다."
+    },
+    {
+      "id": "G044",
+      "question": "Google의 최신 AI 업데이트 소식이 궁금해요",
+      "type": "RECENCY",
+      "expectedExternalIds": [
+        "rss:d00944e12348f9f2",
+        "rss:012e30e2c241e587",
+        "rss:6b59545a1676c64d"
+      ],
+      "latestExternalId": "rss:d00944e12348f9f2",
+      "note": "GOOGLE 필터 안에서 최근 6개월 published_at 내림차순 1·2·3위 문서다."
+    },
+    {
+      "id": "G045",
+      "question": "Anthropic의 최근 발표 소식을 알려줘",
+      "type": "RECENCY",
+      "expectedExternalIds": [
+        "scraper:ad504bbdb221cc44",
+        "scraper:0221b1d0649ec5f2",
+        "scraper:2421a78a2bf886f8"
+      ],
+      "latestExternalId": "scraper:ad504bbdb221cc44",
+      "note": "ANTHROPIC 필터 안에서 최근 6개월 published_at 내림차순 1·2·3위 문서다."
+    },
+    {
+      "id": "G046",
+      "question": "최신 GPT-5.6 관련 소식을 알려줘",
+      "type": "RECENCY",
+      "expectedExternalIds": [
+        "rss:6f8368ac763b7373",
+        "rss:c0986f6628d189a1",
+        "rss:95f74aeac90a93bb"
+      ],
+      "latestExternalId": "rss:6f8368ac763b7373",
+      "note": "provider 키워드 없이 최신성만 걸리는 경우를 본다. GPT-5.6 문서 9건 중 가장 최근 세 건이고, 필터 없는 최신 5건에도 든다."
+    },
+    {
+      "id": "G047",
+      "question": "Claude Code SDK 릴리스에 새로운 기능이 뭐가 추가됐나요?",
+      "type": "RECENCY",
+      "expectedExternalIds": [
+        "github:309146537",
+        "github:309009167",
+        "github:308667350"
+      ],
+      "latestExternalId": "github:309146537",
+      "note": "'새로운'이 최신성 키워드, 'sdk'가 SDK_RELEASE 필터다. ANTHROPIC + SDK_RELEASE 최신 5건 안의 Claude Code 릴리스 세 건."
+    },
+    {
+      "id": "G048",
+      "question": "Anthropic Claude Code에서 프롬프트 캐시를 1시간으로 늘리는 환경 변수 이름이 뭔가요?",
+      "type": "SINGLE_FACT",
+      "expectedExternalIds": [
+        "github:309009167"
+      ],
+      "latestExternalId": null,
+      "note": "v2.1.108 릴리스 노트에만 ENABLE_PROMPT_CACHING_1H 설명이 있다."
+    },
+    {
+      "id": "G049",
+      "question": "OpenAI가 Cerebras와 함께 선보인 Ultrafast 모드는 GPT-5.6 Sol을 얼마나 빠르게 돌리나요?",
+      "type": "SINGLE_FACT",
+      "expectedExternalIds": [
+        "rss:c0986f6628d189a1"
+      ],
+      "latestExternalId": null,
+      "note": "Ultrafast 미리보기 문서 한 건에만 배속과 초당 토큰 수가 있다."
+    },
+    {
+      "id": "G050",
+      "question": "Google Veo 3.1 Lite는 어디에서 써볼 수 있나요?",
+      "type": "SINGLE_FACT",
+      "expectedExternalIds": [
+        "rss:096dac0b19bfa477"
+      ],
+      "latestExternalId": null,
+      "note": "Gemini API 유료 프리뷰와 Google AI Studio라는 답이 이 문서에만 있다."
+    },
+    {
+      "id": "G051",
+      "question": "Meta의 Canopy Height Maps v2는 무엇을 하는 모델인가요?",
+      "type": "SINGLE_FACT",
+      "expectedExternalIds": [
+        "scraper:5809e7b6195acf8f"
+      ],
+      "latestExternalId": null,
+      "note": "숲 높이 지도 모델 문서 한 건을 정확히 겨냥한다."
+    },
+    {
+      "id": "G052",
+      "question": "OpenAI가 미시간에 짓는 데이터센터 규모가 얼마나 되나요?",
+      "type": "SINGLE_FACT",
+      "expectedExternalIds": [
+        "rss:04c1d26ba61347ee"
+      ],
+      "latestExternalId": null,
+      "note": "1GW 규모라는 답이 미시간 Stargate 문서에만 있다."
     }
   ]
 }
