@@ -11,6 +11,14 @@ management:
     redis:
       enabled: false
 
+# 평가는 같은 질문을 다시 돌렸을 때 같은 답이 나와야 비교가 되므로 생성 모델 temperature를 0으로 둔다.
+# application.yml이 include하는 chatbot-api 프로필에는 0.7이 들어 있지만,
+# Spring Boot는 include된 프로필을 active 프로필(local)보다 앞에 놓기 때문에 이 값이 이긴다.
+langchain4j:
+  open-ai:
+    chat-model:
+      temperature: 0
+
 # eval.report.dir 은 기본값을 두지 않는다. 체크아웃 위치마다 달라서 기본값을 박아 두면
 # 다른 곳에 클론한 사람이 돌릴 때 엉뚱한 디렉터리에 파일이 떨어진다.
 # 실행할 때 --eval.report.dir=... 로 준다.
