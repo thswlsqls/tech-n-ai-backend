@@ -135,7 +135,8 @@ public class QuestionRunner {
             question,
             outcome(item, true, fallbackPath, searchFailed, candidatesEmpty, byVectorRank, expected),
             outcome(item, true, fallbackPath, searchFailed, candidatesEmpty, byFusionRank, expected),
-            outcome(item, true, fallbackPath, searchFailed, candidatesEmpty, byChainOutput, expected)
+            outcome(item, true, fallbackPath, searchFailed, candidatesEmpty, byChainOutput, expected),
+            refined
         );
     }
 
@@ -165,7 +166,7 @@ public class QuestionRunner {
         );
         QuestionOutcome outcome =
             outcome(item, false, false, false, true, List.of(), expected);
-        return new QuestionRunResult(question, outcome, outcome, outcome);
+        return new QuestionRunResult(question, outcome, outcome, outcome, List.of());
     }
 
     private QuestionOutcome outcome(GoldenSetItem item, boolean intentRagRequired,

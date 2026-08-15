@@ -20,8 +20,12 @@ public record EvalReport(
     Config config,
     List<Question> questions,
     Aggregate aggregate,
-    Excluded excluded
+    Excluded excluded,
+    AnswerQuality answerQuality
 ) {
+
+    /** answerQuality 블록이 생기면서 올린 버전. 앞선 실행의 리포트와 구분한다 */
+    public static final String SCHEMA_VERSION = "2";
 
     /**
      * 실행 당시 설정 스냅샷
@@ -60,7 +64,19 @@ public record EvalReport(
         List<RankedCandidate> candidates,
         List<ChainOutputItem> chainOutput,
         Metrics metrics
-    ) {}
+    ) {
+
+        /**
+         * 검색까지 기록해 둔 항목에 답변 생성 구간의 시간과 토큰을 채워 넣는다.
+         * 답변 품질 잡은 검색을 QuestionRunner에 맡기고 생성만 따로 하므로 두 결과를 합칠 자리가 필요하다.
+         */
+        public Question withGeneration(LatencyMs latencyMs, Tokens tokens) {
+            return new Question(
+                id, type, question, intent, searchPath, recencyQueryFailed, scored, excludedReason,
+                noEvidence, latencyMs, tokens, expectedExternalIds, latestExternalId,
+                candidates, chainOutput, metrics);
+        }
+    }
 
     /**
      * "근거 없음" 유형 질문의 판정 결과. 다른 유형이면 null
@@ -71,7 +87,8 @@ public record EvalReport(
     ) {}
 
     /**
-     * 구간별 소요 시간(ms). 생성 모델을 부르지 않으므로 generation은 항상 null
+     * 구간별 소요 시간(ms). 검색 기준선 잡은 생성 모델을 부르지 않아 generation이 null이고,
+     * 답변 품질 잡은 답변을 만들면서 잰 시간을 채운다
      */
     public record LatencyMs(
         Long search,
@@ -80,7 +97,8 @@ public record EvalReport(
     ) {}
 
     /**
-     * 토큰 사용량. 생성 모델을 부르지 않으므로 출력 토큰과 호출 수는 0
+     * 토큰 사용량. 검색 기준선 잡은 생성 모델을 부르지 않아 출력 토큰과 호출 수가 0이고,
+     * 답변 품질 잡은 답변을 만든 만큼 채운다
      */
     public record Tokens(
         int inputTokens,
@@ -147,5 +165,57 @@ public record EvalReport(
         int total,
         int correctlyEmpty,
         int wronglyNonEmpty
+    ) {}
+
+    /**
+     * 답변 품질 잡만 채운다. 검색 기준선 잡은 이 블록을 null로 남긴다.
+     */
+    public record AnswerQuality(
+        String judgeModelName,
+        double judgeModelTemperature,
+        int judgeCallLimit,
+        int judgeCallCount,
+        boolean judgeCallLimitReached,
+        int questionLimit,
+        List<AnswerQualityQuestion> questions,
+        AnswerQualityAxis groundedness,
+        AnswerQualityAxis answerRelevance,
+        JudgeFlip flip
+    ) {}
+
+    /**
+     * 질문 한 건의 답변과 두 축 판정. 판정을 못 한 질문은 점수가 null이고 skippedReason에 이유가 남는다
+     */
+    public record AnswerQualityQuestion(
+        String id,
+        String answer,
+        int evidenceCount,
+        List<String> evidenceExternalIds,
+        Integer groundedness,
+        String groundednessReason,
+        Integer answerRelevance,
+        String answerRelevanceReason,
+        String skippedReason
+    ) {}
+
+    /**
+     * 축 하나의 집계. 분모는 판정 모델의 응답을 제대로 읽은 건수다
+     */
+    public record AnswerQualityAxis(
+        int denominator,
+        int passCount,
+        Double passRate,
+        int parseFailedCount
+    ) {}
+
+    /**
+     * 같은 답변을 두 번 채점했을 때 점수가 갈리는 비율.
+     * 집계에 쓰는 점수는 1차 결과이고 2차는 판정이 얼마나 흔들리는지 재는 용도다.
+     * 측정을 끄면 건수는 0, flipRate는 null이다
+     */
+    public record JudgeFlip(
+        int sampledCount,
+        int flippedCount,
+        Double flipRate
     ) {}
 }

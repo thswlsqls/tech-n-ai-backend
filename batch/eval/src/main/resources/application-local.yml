@@ -19,6 +19,12 @@ langchain4j:
     chat-model:
       temperature: 0
 
+# 답변 품질 잡 설정 세 가지는 기본값을 코드(@Value)에만 두고 여기에 값을 박지 않는다.
+# 실행할 때 필요한 것만 골라 넘긴다.
+#   --eval.answer-quality.judge-call-limit=200   판정 모델 호출 상한. 기본 200이면 42건 × 두 축을 다 돌고도 남는다.
+#   --eval.answer-quality.question-limit=10      골든셋 앞 N건만 돌린다. 0이면 전량. 개발 중에는 10 정도로 둔다.
+#   --eval.answer-quality.measure-judge-flip=true  같은 답변을 한 번 더 채점해 점수가 갈리는 비율을 잰다. 비용이 대략 두 배가 된다.
+#
 # eval.report.dir 은 기본값을 두지 않는다. 체크아웃 위치마다 달라서 기본값을 박아 두면
 # 다른 곳에 클론한 사람이 돌릴 때 엉뚱한 디렉터리에 파일이 떨어진다.
 # 실행할 때 --eval.report.dir=... 로 준다.
