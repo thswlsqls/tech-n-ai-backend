@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: batch-eval
+  profiles:
+    include:
+      - common-core
+      - mongodb-domain
+      - chatbot-api
+
+  autoconfigure:
+    exclude:
+      # Spring Cloud MVC/Web 관련
+      - org.springframework.cloud.autoconfigure.LifecycleMvcEndpointAutoConfiguration
+      # Spring Cloud Config Refresh 관련
+      - org.springframework.cloud.autoconfigure.RefreshAutoConfiguration
+      - org.springframework.cloud.autoconfigure.RefreshEndpointAutoConfiguration
+      - org.springframework.cloud.autoconfigure.ConfigurationPropertiesRebinderAutoConfiguration
+      # Spring Cloud Discovery 관련 (Batch에서 불필요)
+      - org.springframework.cloud.client.discovery.simple.SimpleDiscoveryClientAutoConfiguration
+      - org.springframework.cloud.client.discovery.composite.CompositeDiscoveryClientAutoConfiguration
+      - org.springframework.cloud.client.serviceregistry.ServiceRegistryAutoConfiguration
+      - org.springframework.cloud.client.serviceregistry.AutoServiceRegistrationAutoConfiguration
+      # Spring Cloud LoadBalancer 관련 (Batch에서 불필요)
+      - org.springframework.cloud.client.loadbalancer.LoadBalancerAutoConfiguration
+      - org.springframework.cloud.client.loadbalancer.reactive.LoadBalancerBeanPostProcessorAutoConfiguration
+      # Spring Cloud Reactive Discovery 관련 (Batch에서 불필요, WebFlux 의존성 없음)
+      - org.springframework.cloud.client.discovery.simple.reactive.SimpleReactiveDiscoveryClientAutoConfiguration
+      # Flyway 관련 (DataSource를 쓰지 않으므로 불필요)
+      - org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration

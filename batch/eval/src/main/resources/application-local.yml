@@ -1,0 +1,16 @@
+spring:
+  config.activate.on-profile: local
+  main.web-application-type: none
+  batch:
+    job:
+      enabled: true
+      name: ${job.name:NONE}
+
+management:
+  health:
+    redis:
+      enabled: false
+
+# eval.report.dir 은 기본값을 두지 않는다. 체크아웃 위치마다 달라서 기본값을 박아 두면
+# 다른 곳에 클론한 사람이 돌릴 때 엉뚱한 디렉터리에 파일이 떨어진다.
+# 실행할 때 --eval.report.dir=... 로 준다.

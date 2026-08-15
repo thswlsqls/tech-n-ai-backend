@@ -21,10 +21,8 @@ import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.memory.ChatMemory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -50,16 +48,8 @@ public class ChatbotServiceImpl implements ChatbotService {
     private final AgentDelegationService agentDelegationService;
     private final MessageFormatConverter messageConverter;
     private final SessionTitleGenerationService titleGenerationService;
-    
-    @Value("${chatbot.rag.max-search-results:5}")
-    private int maxSearchResults;
-    
-    @Value("${chatbot.rag.min-similarity-score:0.7}")
-    private double minSimilarityScore;
+    private final SearchOptionsFactory searchOptionsFactory;
 
-    @Value("${chatbot.rag.recency-months:6}")
-    private int recencyMonths;
-    
     @Override
     public ChatResponse generateResponse(ChatRequest request, Long userId, String userRole) {
         boolean isNewSession = request.conversationId() == null || request.conversationId().isBlank();
@@ -159,10 +149,10 @@ public class ChatbotServiceImpl implements ChatbotService {
 
     private RAGResult handleRAGPipeline(ChatRequest request, String sessionId, Long userId) {
         SearchQuery searchQuery = inputChain.interpret(request.message());
-        SearchOptions searchOptions = buildSearchOptions(searchQuery);
+        SearchOptions searchOptions = searchOptionsFactory.create(searchQuery);
 
         List<SearchResult> searchResults =
-            vectorSearchService.search(searchQuery.query(), userId, searchOptions);
+            vectorSearchService.search(searchQuery.query(), userId, searchOptions).results();
         log.info("RAG search completed: {} results for query: {}", searchResults.size(), searchQuery.query());
 
         boolean recencyDetected = searchQuery.context().isRecencyDetected();
@@ -203,22 +193,6 @@ public class ChatbotServiceImpl implements ChatbotService {
             .collect(Collectors.toList());
     }
 
-    private SearchOptions buildSearchOptions(SearchQuery searchQuery) {
-        boolean recency = searchQuery.context().isRecencyDetected();
-        LocalDateTime dateFrom = recency ? LocalDateTime.now().minusMonths(recencyMonths) : null;
-
-        return SearchOptions.builder()
-            .includeEmergingTechs(searchQuery.context().includesEmergingTechs())
-            .maxResults(maxSearchResults)
-            .minSimilarityScore(minSimilarityScore)
-            .providerFilters(searchQuery.context().getDetectedProviders())
-            .updateTypeFilters(searchQuery.context().getDetectedUpdateTypes())
-            .recencyDetected(recency)
-            .dateFrom(dateFrom)
-            .enableScoreFusion(true)
-            .build();
-    }
-    
     /**
      * 히스토리를 ChatMemory에 로드 (한 번만 호출)
      */

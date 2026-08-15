@@ -3,7 +3,7 @@ version = '0.0.1-SNAPSHOT'
 description = 'api-chatbot'
 
 bootJar.enabled = true
-jar.enabled = false
+jar.enabled = true
 
 apply from: "${rootDir.absolutePath}/docs.gradle"
 apply from: "${rootDir.absolutePath}/jpa.gradle"
