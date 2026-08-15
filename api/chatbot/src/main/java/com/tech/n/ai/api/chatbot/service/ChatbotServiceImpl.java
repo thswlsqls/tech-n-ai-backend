@@ -19,6 +19,9 @@ import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.memory.ChatMemory;
+import io.micrometer.core.instrument.DistributionSummary;
+import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -31,7 +34,10 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class ChatbotServiceImpl implements ChatbotService {
-    
+
+    /** RAG 검색이 몇 건을 물고 왔는지. 0건이 늘면 검색이 비어 가는 것이다 */
+    private static final String METER_SEARCH_RESULTS = "chatbot.search.results";
+
     private final ConversationSessionService sessionService;
     private final ConversationMessageService messageService;
     private final ConversationChatMemoryProvider memoryProvider;
@@ -49,6 +55,13 @@ public class ChatbotServiceImpl implements ChatbotService {
     private final MessageFormatConverter messageConverter;
     private final SessionTitleGenerationService titleGenerationService;
     private final SearchOptionsFactory searchOptionsFactory;
+    private final MeterRegistry meterRegistry;
+
+    // 첫 호출을 기다리지 않고 실행 직후부터 /actuator/prometheus에 나오도록 여기서 등록한다
+    @PostConstruct
+    void registerMeters() {
+        DistributionSummary.builder(METER_SEARCH_RESULTS).register(meterRegistry);
+    }
 
     @Override
     public ChatResponse generateResponse(ChatRequest request, Long userId, String userRole) {
@@ -154,6 +167,7 @@ public class ChatbotServiceImpl implements ChatbotService {
         List<SearchResult> searchResults =
             vectorSearchService.search(searchQuery.query(), userId, searchOptions).results();
         log.info("RAG search completed: {} results for query: {}", searchResults.size(), searchQuery.query());
+        meterRegistry.summary(METER_SEARCH_RESULTS).record(searchResults.size());
 
         boolean recencyDetected = searchQuery.context().isRecencyDetected();
         boolean scoreFusionApplied = Boolean.TRUE.equals(searchOptions.enableScoreFusion());

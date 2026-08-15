@@ -28,7 +28,10 @@ receivers:
 
   # Slack 연동 시 아래 주석 해제 후 SLACK_WEBHOOK_URL을 실제 값으로 교체
   - name: 'slack-critical'
-    webhook_configs: []
+    # 로컬에서 알림이 수신자까지 도달하는지 확인하려고 docker-compose의 alert-webhook 컨테이너로 보낸다
+    webhook_configs:
+      - url: 'http://alert-webhook:8080/'
+        send_resolved: true
     # slack_configs:
     #   - api_url: 'https://hooks.slack.com/services/YOUR/WEBHOOK/URL'
     #     channel: '#alerts-critical'

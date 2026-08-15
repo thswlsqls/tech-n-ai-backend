@@ -5,6 +5,7 @@ import com.tech.n.ai.api.agent.metrics.ToolExecutionMetrics;
 import com.tech.n.ai.api.agent.tool.EmergingTechAgentTools;
 import com.tech.n.ai.client.slack.domain.slack.contract.SlackContract;
 import com.tech.n.ai.common.conversation.memory.MongoDbChatMemoryStore;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -43,10 +44,14 @@ class EmergingTechAgentImplTest {
 
     private EmergingTechAgentImpl agentImpl;
 
+    private SimpleMeterRegistry meterRegistry;
+
     @BeforeEach
     void setUp() {
         // chatModel은 initAssistant에서만 사용되므로 null 전달 후 assistant를 직접 주입
-        agentImpl = new EmergingTechAgentImpl(null, tools, promptConfig, slackContract, mongoDbChatMemoryStore);
+        meterRegistry = new SimpleMeterRegistry();
+        agentImpl = new EmergingTechAgentImpl(
+            null, tools, promptConfig, slackContract, mongoDbChatMemoryStore, meterRegistry);
         ReflectionTestUtils.setField(agentImpl, "assistant", assistant);
     }
 
@@ -138,6 +143,20 @@ class EmergingTechAgentImplTest {
 
             // Then
             verify(tools).unbindMetrics();
+        }
+
+        @Test
+        @DisplayName("실행 한 번마다 Tool 호출 횟수를 미터에 기록")
+        void execute_툴호출횟수_미터기록() {
+            // Given
+            when(promptConfig.buildPrompt(anyString())).thenReturn("프롬프트");
+            when(assistant.chat(anyString(), anyString())).thenReturn("완료");
+
+            // When
+            agentImpl.execute("목표", "session");
+
+            // Then
+            assertThat(meterRegistry.summary("agent.tool.calls").count()).isEqualTo(1);
         }
 
         @Test

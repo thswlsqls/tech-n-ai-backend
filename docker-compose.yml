@@ -220,6 +220,17 @@ services:
       - monitoring-network
     restart: unless-stopped
 
+  alert-webhook:
+    image: mendhak/http-https-echo:36
+    container_name: alert-webhook
+    environment:
+      HTTP_PORT: 8080
+    ports:
+      - "9096:8080"
+    networks:
+      - monitoring-network
+    restart: unless-stopped
+
   jaeger:
     image: jaegertracing/jaeger:2.6.0
     container_name: jaeger

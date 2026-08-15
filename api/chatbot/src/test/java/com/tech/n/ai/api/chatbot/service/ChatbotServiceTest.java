@@ -17,6 +17,8 @@ import com.tech.n.ai.api.chatbot.service.dto.SearchQuery;
 import com.tech.n.ai.api.chatbot.service.dto.SearchResult;
 import com.tech.n.ai.api.chatbot.service.dto.WebSearchDocument;
 import dev.langchain4j.memory.ChatMemory;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -24,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -88,6 +91,10 @@ class ChatbotServiceTest {
 
     @Mock
     private ChatMemory chatMemory;
+
+    // 목이면 summary(...)가 null을 돌려줘 NPE가 난다. 실제 레지스트리를 쓴다.
+    @Spy
+    private MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
     @InjectMocks
     private ChatbotServiceImpl chatbotService;
@@ -200,6 +207,9 @@ class ChatbotServiceTest {
             verify(vectorSearchService).search(anyString(), anyLong(), any());
             verify(refinementChain).refine(anyString(), anyList(), anyBoolean(), anyBoolean());
             verify(answerChain).generate(anyString(), anyList());
+            // 검색이 몇 건을 물고 왔는지 미터에 남는다
+            assertThat(meterRegistry.summary("chatbot.search.results").count()).isEqualTo(1);
+            assertThat(meterRegistry.summary("chatbot.search.results").totalAmount()).isEqualTo(1.0);
         }
     }
 

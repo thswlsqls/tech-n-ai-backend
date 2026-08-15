@@ -158,7 +158,48 @@ brew services info jenkins-lts       # 상태 확인
 
 ---
 
-## 5. 자주 겪는 문제
+## 5. 애플리케이션 커스텀 미터
+
+앱이 직접 등록한 미터 네 개다. Spring Boot의 기본 미터(JVM·HTTP)로는 챗봇과 에이전트가
+안에서 무엇을 하는지 알 수 없어 따로 만들었다. 태그는 붙이지 않았고, 서비스 이름을 구분하는
+`application` 태그만 [`../common/core/src/main/resources/application-common-core.yml`](../common/core/src/main/resources/application-common-core.yml)이
+자동으로 붙인다. 값은 Prometheus에서 아래 이름으로 보인다(Micrometer가 점을 밑줄로 바꾼다).
+
+### `chatbot.llm.duration` — LLM 호출 지연시간 (api-chatbot)
+
+Prometheus 이름: `chatbot_llm_duration_seconds_count` / `_sum` / `_max`
+
+- **누가 언제 보나**: 챗봇이 느리다는 얘기가 나올 때, 그리고 모델이나 프롬프트를 바꿔 배포한 직후에 백엔드 담당자가 본다.
+- **어떤 값이면 이상인가**: `_sum / _count`로 낸 평균이 30초를 넘으면 이상이다. 모델 호출 타임아웃이 60초라 평균이 그 절반까지 올라갔다면 상당수 호출이 타임아웃으로 떨어지고 있다는 뜻이다.
+- **넘으면 무엇을 하나**: 같은 시간대의 `chatbot_llm_errors_total`이 함께 올랐는지 보고, 올랐으면 OpenAI 장애를, 아니면 프롬프트가 길어졌는지(근거 문서 개수·`chatbot.rag.max-context-tokens`)를 확인한다.
+
+### `chatbot.llm.errors` — LLM 호출 실패 건수 (api-chatbot)
+
+Prometheus 이름: `chatbot_llm_errors_total`
+
+- **누가 언제 보나**: 평소에는 알림이 대신 본다. `ChatbotLlmHighFailureRate` 알림이 오면 백엔드 담당자가 확인한다.
+- **어떤 값이면 이상인가**: 최근 5분 실패 비율(`rate(chatbot_llm_errors_total[5m]) / rate(chatbot_llm_duration_seconds_count[5m])`)이 10%를 넘으면 이상이다. 실패한 호출도 지연시간 미터에 세므로 이 나눗셈이 곧 실패율이다.
+- **넘으면 무엇을 하나**: 앱 로그에서 `Failed to generate LLM response`를 찾아 원인(인증 실패·요금 한도·타임아웃)을 가른다. 키나 한도 문제면 설정을, 제공자 장애면 복구를 기다린다.
+
+### `chatbot.search.results` — RAG 검색 결과 건수 (api-chatbot)
+
+Prometheus 이름: `chatbot_search_results_count` / `_sum` / `_max`
+
+- **누가 언제 보나**: "답변에 출처가 안 붙는다", "엉뚱한 답을 한다"는 제보가 들어왔을 때 본다.
+- **어떤 값이면 이상인가**: `_sum / _count`로 낸 질문당 평균이 1건 밑으로 떨어지면 이상이다. 한 번에 최대 5건(`chatbot.rag.max-search-results`)까지 가져오게 돼 있는데 평균이 1건도 안 된다면 검색이 사실상 비어서 돌아오고 있다는 뜻이다.
+- **넘으면 무엇을 하나**: MongoDB Atlas의 Vector Search 인덱스가 살아 있는지, 임베딩 모델 호출이 실패하고 있지 않은지, 유사도 하한(`chatbot.rag.min-similarity-score`)이 너무 높지 않은지 순서대로 확인한다.
+
+### `agent.tool.calls` — 에이전트 실행당 Tool 호출 횟수 (api-agent)
+
+Prometheus 이름: `agent_tool_calls_count` / `_sum` / `_max`
+
+- **누가 언제 보나**: 에이전트 실행이 오래 걸리거나 OpenAI 비용이 튀었을 때 본다.
+- **어떤 값이면 이상인가**: `_sum / _count`로 낸 실행당 평균이 15회를 넘으면 이상이다. 한 실행에서 허용하는 최대 Tool 호출이 30회(`EmergingTechAgentImpl.MAX_TOOL_INVOCATIONS`)인데 평균이 그 절반이면 같은 Tool을 반복해 부르는 루프가 섞여 있다고 본다.
+- **넘으면 무엇을 하나**: 해당 시간대 에이전트 로그에서 `루프 감지`·`최대 Tool 호출 횟수 초과` 메시지를 찾아 어느 Tool이 반복되는지 보고, 그 Tool의 응답이나 프롬프트 지시를 고친다.
+
+---
+
+## 6. 자주 겪는 문제
 
 | 증상 | 확인할 것 |
 |---|---|
