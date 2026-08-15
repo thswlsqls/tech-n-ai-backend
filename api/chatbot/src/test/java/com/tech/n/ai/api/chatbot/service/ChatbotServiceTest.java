@@ -11,6 +11,8 @@ import com.tech.n.ai.common.conversation.service.ConversationMessageService;
 import com.tech.n.ai.common.conversation.service.ConversationSessionService;
 import com.tech.n.ai.api.chatbot.service.dto.Intent;
 import com.tech.n.ai.api.chatbot.service.dto.SearchContext;
+import com.tech.n.ai.api.chatbot.service.dto.SearchOutcome;
+import com.tech.n.ai.api.chatbot.service.dto.SearchPath;
 import com.tech.n.ai.api.chatbot.service.dto.SearchQuery;
 import com.tech.n.ai.api.chatbot.service.dto.SearchResult;
 import com.tech.n.ai.api.chatbot.service.dto.WebSearchDocument;
@@ -95,9 +97,12 @@ class ChatbotServiceTest {
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(chatbotService, "maxSearchResults", 5);
-        ReflectionTestUtils.setField(chatbotService, "minSimilarityScore", 0.7);
-        ReflectionTestUtils.setField(chatbotService, "recencyMonths", 6);
+        // SearchOptionsFactory는 실물을 주입한다. 목으로 두면 create()가 null을 돌려준다.
+        SearchOptionsFactory searchOptionsFactory = new SearchOptionsFactory();
+        ReflectionTestUtils.setField(searchOptionsFactory, "maxSearchResults", 5);
+        ReflectionTestUtils.setField(searchOptionsFactory, "minSimilarityScore", 0.7);
+        ReflectionTestUtils.setField(searchOptionsFactory, "recencyMonths", 6);
+        ReflectionTestUtils.setField(chatbotService, "searchOptionsFactory", searchOptionsFactory);
     }
 
     // ========== LLM_DIRECT Intent 테스트 ==========
@@ -176,7 +181,12 @@ class ChatbotServiceTest {
                     .collectionType("EMERGING_TECH")
                     .build()
             );
-            when(vectorSearchService.search(anyString(), anyLong(), any())).thenReturn(searchResults);
+            when(vectorSearchService.search(anyString(), anyLong(), any())).thenReturn(
+                SearchOutcome.builder()
+                    .path(SearchPath.HYBRID)
+                    .candidates(searchResults)
+                    .results(searchResults)
+                    .build());
             when(refinementChain.refine(anyString(), anyList(), anyBoolean(), anyBoolean())).thenReturn(searchResults);
             when(answerChain.generate(anyString(), anyList())).thenReturn("대회 정보에 대한 답변입니다.");
 

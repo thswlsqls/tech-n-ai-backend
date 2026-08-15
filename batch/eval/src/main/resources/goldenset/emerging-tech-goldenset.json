@@ -1,0 +1,70 @@
+{
+  "version": "draft-schema-only",
+  "collection": "emerging_techs",
+  "items": [
+    {
+      "id": "SF-001",
+      "question": "OpenAI가 발표한 최신 임베딩 모델의 기본 차원은 몇인가요?",
+      "type": "SINGLE_FACT",
+      "expectedExternalIds": ["PLACEHOLDER-external-id-1"],
+      "latestExternalId": null,
+      "note": "스키마 확인용 자리표시. 실제 external_id는 Atlas 문서에서 채운다."
+    },
+    {
+      "id": "SF-002",
+      "question": "Anthropic이 공개한 모델의 컨텍스트 길이 정보를 알려주세요.",
+      "type": "SINGLE_FACT",
+      "expectedExternalIds": ["PLACEHOLDER-external-id-2"],
+      "latestExternalId": null,
+      "note": "스키마 확인용 자리표시."
+    },
+    {
+      "id": "PS-001",
+      "question": "OpenAI SDK 업데이트 내용을 알려주세요.",
+      "type": "PROVIDER_SCOPED",
+      "expectedExternalIds": ["PLACEHOLDER-external-id-3"],
+      "latestExternalId": null,
+      "note": "provider 필터가 OPENAI로 잡히는지 확인하는 자리표시."
+    },
+    {
+      "id": "TS-001",
+      "question": "모델 릴리스 소식만 모아서 알려주세요.",
+      "type": "TYPE_SCOPED",
+      "expectedExternalIds": ["PLACEHOLDER-external-id-4"],
+      "latestExternalId": null,
+      "note": "update_type 필터가 MODEL_RELEASE로 잡히는지 확인하는 자리표시."
+    },
+    {
+      "id": "RC-001",
+      "question": "최신 AI 모델 출시 소식을 알려주세요.",
+      "type": "RECENCY",
+      "expectedExternalIds": ["PLACEHOLDER-external-id-5", "PLACEHOLDER-external-id-6"],
+      "latestExternalId": "PLACEHOLDER-external-id-5",
+      "note": "최신성 키워드 감지와 latestExternalId 채점을 확인하는 자리표시."
+    },
+    {
+      "id": "MH-001",
+      "question": "OpenAI와 Anthropic의 최근 모델 출시를 비교해서 알려주세요.",
+      "type": "MULTI_HOP",
+      "expectedExternalIds": ["PLACEHOLDER-external-id-7", "PLACEHOLDER-external-id-8"],
+      "latestExternalId": null,
+      "note": "문서 두 건을 함께 찾아야 하는 자리표시."
+    },
+    {
+      "id": "NE-001",
+      "question": "1998년에 발표된 인공지능 기술 업데이트를 알려주세요.",
+      "type": "NO_EVIDENCE",
+      "expectedExternalIds": [],
+      "latestExternalId": null,
+      "note": "컬렉션에 근거가 없어야 정답인 자리표시."
+    },
+    {
+      "id": "NE-002",
+      "question": "존재하지 않는 제공자 Zetacorp의 SDK 릴리스를 알려주세요.",
+      "type": "NO_EVIDENCE",
+      "expectedExternalIds": [],
+      "latestExternalId": null,
+      "note": "컬렉션에 근거가 없어야 정답인 자리표시."
+    }
+  ]
+}

@@ -1,6 +1,8 @@
 package com.tech.n.ai.api.chatbot.service;
 
 import com.tech.n.ai.api.chatbot.service.dto.SearchOptions;
+import com.tech.n.ai.api.chatbot.service.dto.SearchOutcome;
+import com.tech.n.ai.api.chatbot.service.dto.SearchPath;
 import com.tech.n.ai.api.chatbot.service.dto.SearchResult;
 import com.tech.n.ai.domain.mongodb.util.VectorSearchUtil;
 import com.mongodb.client.AggregateIterable;
@@ -100,7 +102,7 @@ class VectorSearchServiceImplTest {
             ));
 
             // When
-            List<SearchResult> results = vectorSearchService.search("테스트 쿼리", 1L, options);
+            List<SearchResult> results = vectorSearchService.search("테스트 쿼리", 1L, options).results();
 
             // Then
             assertThat(results).hasSize(1);
@@ -124,7 +126,7 @@ class VectorSearchServiceImplTest {
             ));
 
             // When
-            List<SearchResult> results = vectorSearchService.search("테스트 쿼리", 1L, options);
+            List<SearchResult> results = vectorSearchService.search("테스트 쿼리", 1L, options).results();
 
             // Then
             assertThat(results).isNotEmpty();
@@ -147,7 +149,7 @@ class VectorSearchServiceImplTest {
             ));
 
             // When
-            List<SearchResult> results = vectorSearchService.search("테스트 쿼리", 1L, options);
+            List<SearchResult> results = vectorSearchService.search("테스트 쿼리", 1L, options).results();
 
             // Then
             assertThat(results).hasSize(1);
@@ -180,7 +182,7 @@ class VectorSearchServiceImplTest {
             ));
 
             // When
-            List<SearchResult> results = vectorSearchService.search("테스트 쿼리", 1L, options);
+            List<SearchResult> results = vectorSearchService.search("테스트 쿼리", 1L, options).results();
 
             // Then: OID_DOC2가 양쪽에 모두 등장 → RRF 점수 합산 → 상위 정렬
             assertThat(results).isNotEmpty();
@@ -722,7 +724,7 @@ class VectorSearchServiceImplTest {
                 )));
 
             // When
-            List<SearchResult> results = vectorSearchService.search("테스트", 1L, options);
+            List<SearchResult> results = vectorSearchService.search("테스트", 1L, options).results();
 
             // Then: fallback 결과 반환
             assertThat(results).isNotEmpty();
@@ -746,7 +748,7 @@ class VectorSearchServiceImplTest {
                 .thenThrow(new RuntimeException("MongoDB find error"));
 
             // When
-            List<SearchResult> results = vectorSearchService.search("최신 AI", 1L, options);
+            List<SearchResult> results = vectorSearchService.search("최신 AI", 1L, options).results();
 
             // Then: 벡터 검색 결과만으로 반환 (에러 없이)
             assertThat(results).isNotEmpty();
@@ -775,7 +777,7 @@ class VectorSearchServiceImplTest {
             ));
 
             // When
-            List<SearchResult> results = vectorSearchService.search("테스트", 1L, options);
+            List<SearchResult> results = vectorSearchService.search("테스트", 1L, options).results();
 
             // Then: 최신성 결과만으로도 결과 반환
             assertThat(results).isNotEmpty();
@@ -797,7 +799,7 @@ class VectorSearchServiceImplTest {
             ));
 
             // When
-            List<SearchResult> results = vectorSearchService.search("테스트", 1L, options);
+            List<SearchResult> results = vectorSearchService.search("테스트", 1L, options).results();
 
             // Then
             assertThat(results).hasSize(2);
@@ -819,7 +821,7 @@ class VectorSearchServiceImplTest {
             setupFindResults(List.of());
 
             // When
-            List<SearchResult> results = vectorSearchService.search("테스트", 1L, options);
+            List<SearchResult> results = vectorSearchService.search("테스트", 1L, options).results();
 
             // Then: combinedScore 값이 사용됨 (RRF 적용 후 score 변경 가능)
             assertThat(results).isNotEmpty();
@@ -851,7 +853,7 @@ class VectorSearchServiceImplTest {
             ));
 
             // When
-            List<SearchResult> results = vectorSearchService.search("최신 OpenAI 업데이트", 1L, options);
+            List<SearchResult> results = vectorSearchService.search("최신 OpenAI 업데이트", 1L, options).results();
 
             // Then: doc_latest가 결과에 포함됨
             boolean containsLatest = results.stream()
@@ -880,10 +882,188 @@ class VectorSearchServiceImplTest {
             ));
 
             // When
-            List<SearchResult> results = vectorSearchService.search("최신 AI", 1L, options);
+            List<SearchResult> results = vectorSearchService.search("최신 AI", 1L, options).results();
 
             // Then: doc_common이 양쪽 점수 합산으로 1위
             assertThat(results.get(0).documentId()).isEqualTo(OID_DOC_COMMON);
+        }
+    }
+
+    // ========== SearchOutcome (검색 경로 + RRF 직전 후보) ==========
+
+    @Nested
+    @DisplayName("search - SearchOutcome 반환")
+    class SearchOutcomeReturn {
+
+        @Test
+        @DisplayName("하이브리드 검색 성공 → path=HYBRID")
+        void hybridSuccess_pathIsHybrid() {
+            // Given
+            SearchOptions options = SearchOptions.builder()
+                .enableScoreFusion(true)
+                .maxResults(5)
+                .recencyDetected(false)
+                .build();
+            setupAggregateResults(List.of(
+                createMongoDocumentWithCombinedScore(OID_DOC1, 0.92, "텍스트1")
+            ));
+            setupFindResults(List.of(
+                createMongoDocument(OID_DOC2, null, "최신문서")
+            ));
+
+            // When
+            SearchOutcome outcome = vectorSearchService.search("테스트", 1L, options);
+
+            // Then
+            assertThat(outcome.path()).isEqualTo(SearchPath.HYBRID);
+            assertThat(outcome.recencyQueryFailed()).isFalse();
+            assertThat(outcome.results()).isNotEmpty();
+        }
+
+        @Test
+        @DisplayName("하이브리드 실패 후 일반 검색 성공 → path=HYBRID_FALLBACK_STANDARD")
+        void hybridFailure_pathIsFallbackStandard() {
+            // Given: 첫 aggregate는 예외, 두 번째(fallback)는 정상
+            SearchOptions options = SearchOptions.builder()
+                .enableScoreFusion(true)
+                .maxResults(5)
+                .recencyDetected(false)
+                .build();
+            when(mongoTemplate.getCollection(VectorSearchUtil.COLLECTION_EMERGING_TECHS))
+                .thenReturn(mongoCollection);
+            when(mongoCollection.aggregate(anyList()))
+                .thenThrow(new RuntimeException("Score Fusion pipeline error"))
+                .thenReturn(aggregateIterable);
+            when(aggregateIterable.into(any()))
+                .thenReturn(new ArrayList<>(List.of(
+                    createMongoDocument(OID_FALLBACK, 0.85, "fallback 결과")
+                )));
+
+            // When
+            SearchOutcome outcome = vectorSearchService.search("테스트", 1L, options);
+
+            // Then
+            assertThat(outcome.path()).isEqualTo(SearchPath.HYBRID_FALLBACK_STANDARD);
+            assertThat(outcome.candidates()).isEmpty();
+            assertThat(outcome.results()).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("하이브리드 실패 후 fallback 일반 검색도 실패 → path=HYBRID_FALLBACK_FAILED")
+        void hybridAndFallbackFailure_pathIsFallbackFailed() {
+            // Given: aggregate가 두 번 모두 예외
+            SearchOptions options = SearchOptions.builder()
+                .enableScoreFusion(true)
+                .maxResults(5)
+                .recencyDetected(false)
+                .build();
+            when(mongoTemplate.getCollection(VectorSearchUtil.COLLECTION_EMERGING_TECHS))
+                .thenReturn(mongoCollection);
+            when(mongoCollection.aggregate(anyList()))
+                .thenThrow(new RuntimeException("Score Fusion pipeline error"))
+                .thenThrow(new RuntimeException("standard search error"));
+
+            // When
+            SearchOutcome outcome = vectorSearchService.search("테스트", 1L, options);
+
+            // Then
+            assertThat(outcome.path()).isEqualTo(SearchPath.HYBRID_FALLBACK_FAILED);
+            assertThat(outcome.results()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Score Fusion 비활성 + 일반 검색 성공 → path=STANDARD")
+        void scoreFusionOff_pathIsStandard() {
+            // Given
+            SearchOptions options = SearchOptions.builder()
+                .enableScoreFusion(false)
+                .maxResults(5)
+                .build();
+            setupAggregateResultsForLegacy(List.of(
+                createMongoDocument(OID_DOC1, 0.92, "텍스트1")
+            ));
+
+            // When
+            SearchOutcome outcome = vectorSearchService.search("테스트", 1L, options);
+
+            // Then
+            assertThat(outcome.path()).isEqualTo(SearchPath.STANDARD);
+            assertThat(outcome.candidates()).isEmpty();
+            assertThat(outcome.results()).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("Score Fusion 비활성 + 일반 검색 예외 → path=STANDARD_FAILED")
+        void scoreFusionOff_searchFails_pathIsStandardFailed() {
+            // Given
+            SearchOptions options = SearchOptions.builder()
+                .enableScoreFusion(false)
+                .maxResults(5)
+                .build();
+            when(mongoTemplate.getCollection(VectorSearchUtil.COLLECTION_EMERGING_TECHS))
+                .thenReturn(mongoCollection);
+            when(mongoCollection.aggregate(anyList()))
+                .thenThrow(new RuntimeException("standard search error"));
+
+            // When
+            SearchOutcome outcome = vectorSearchService.search("테스트", 1L, options);
+
+            // Then
+            assertThat(outcome.path()).isEqualTo(SearchPath.STANDARD_FAILED);
+            assertThat(outcome.results()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("최신성 직접 쿼리 예외 → recencyQueryFailed=true, 경로는 HYBRID 유지")
+        void recencyQueryFails_flagIsTrue() {
+            // Given
+            SearchOptions options = SearchOptions.builder()
+                .enableScoreFusion(true)
+                .maxResults(5)
+                .recencyDetected(true)
+                .build();
+            setupAggregateResults(List.of(
+                createMongoDocumentWithCombinedScore(OID_DOC1, 0.92, "벡터결과")
+            ));
+            when(mongoTemplate.find(any(), eq(Document.class), eq(VectorSearchUtil.COLLECTION_EMERGING_TECHS)))
+                .thenThrow(new RuntimeException("MongoDB find error"));
+
+            // When
+            SearchOutcome outcome = vectorSearchService.search("최신 AI", 1L, options);
+
+            // Then
+            assertThat(outcome.path()).isEqualTo(SearchPath.HYBRID);
+            assertThat(outcome.recencyQueryFailed()).isTrue();
+            assertThat(outcome.results()).isNotEmpty();
+        }
+
+        @Test
+        @DisplayName("후보는 RRF 직전 벡터 결과이고 vectorScore·combinedScore를 함께 담는다")
+        void candidatesCarryVectorAndCombinedScore() {
+            // Given: 파이프라인이 내려주는 두 점수를 모두 담은 문서
+            SearchOptions options = SearchOptions.builder()
+                .enableScoreFusion(true)
+                .maxResults(5)
+                .recencyDetected(false)
+                .build();
+            Document doc = createMongoDocumentWithCombinedScore(OID_DOC1, 0.88, "텍스트1");
+            doc.append("vectorScore", 0.91);
+            setupAggregateResults(List.of(doc));
+            setupFindResults(List.of(
+                createMongoDocument(OID_DOC2, null, "최신문서")
+            ));
+
+            // When
+            SearchOutcome outcome = vectorSearchService.search("테스트", 1L, options);
+
+            // Then
+            assertThat(outcome.candidates()).hasSize(1);
+            SearchResult candidate = outcome.candidates().get(0);
+            assertThat(candidate.documentId()).isEqualTo(OID_DOC1);
+            assertThat(candidate.metadata()).isInstanceOf(Document.class);
+            Document metadata = (Document) candidate.metadata();
+            assertThat(metadata.getDouble("vectorScore")).isEqualTo(0.91);
+            assertThat(metadata.getDouble("combinedScore")).isEqualTo(0.88);
         }
     }
 

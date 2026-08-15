@@ -1,0 +1,16 @@
+spring:
+  config.activate.on-profile: local
+  main.web-application-type: none
+  batch:
+    job:
+      enabled: true
+      name: ${job.name:NONE}
+
+management:
+  health:
+    redis:
+      enabled: false
+
+eval:
+  report:
+    dir: ${user.home}/workspace/tech-n-ai/tech-n-ai-backend/eval-reports

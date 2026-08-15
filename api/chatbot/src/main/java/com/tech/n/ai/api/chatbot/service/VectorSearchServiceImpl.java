@@ -1,6 +1,8 @@
 package com.tech.n.ai.api.chatbot.service;
 
 import com.tech.n.ai.api.chatbot.service.dto.SearchOptions;
+import com.tech.n.ai.api.chatbot.service.dto.SearchOutcome;
+import com.tech.n.ai.api.chatbot.service.dto.SearchPath;
 import com.tech.n.ai.api.chatbot.service.dto.SearchResult;
 import com.tech.n.ai.domain.mongodb.util.VectorSearchOptions;
 import com.tech.n.ai.domain.mongodb.util.VectorSearchUtil;
@@ -39,30 +41,43 @@ public class VectorSearchServiceImpl implements VectorSearchService {
     private final MongoTemplate mongoTemplate;
 
     @Override
-    public List<SearchResult> search(String query, Long userId, SearchOptions options) {
+    public SearchOutcome search(String query, Long userId, SearchOptions options) {
         // 1. 쿼리 임베딩 생성 (OpenAI text-embedding-3-small은 document/query 구분 없음)
         Embedding embedding = embeddingModel.embed(query).content();
         List<Float> queryVector = embedding.vectorAsList();
 
         // 2. Score Fusion 활성화 여부에 따라 분기
-        List<SearchResult> results;
+        SearchOutcome outcome;
         if (Boolean.TRUE.equals(options.enableScoreFusion())) {
-            results = searchEmergingTechsHybrid(queryVector, options);
+            outcome = searchEmergingTechsHybrid(queryVector, options);
         } else {
-            results = searchEmergingTechs(queryVector, options);
+            StandardSearchOutcome standard = searchEmergingTechs(queryVector, options);
+            outcome = SearchOutcome.builder()
+                .path(standard.failed() ? SearchPath.STANDARD_FAILED : SearchPath.STANDARD)
+                .candidates(Collections.emptyList())
+                .recencyQueryFailed(false)
+                .results(standard.results())
+                .build();
         }
 
         // 3. 유사도 점수로 정렬 및 최종 결과 수 제한
-        return results.stream()
+        List<SearchResult> results = outcome.results().stream()
             .sorted((a, b) -> Double.compare(b.score(), a.score()))
             .limit(options.maxResults())
             .collect(Collectors.toList());
+
+        return SearchOutcome.builder()
+            .path(outcome.path())
+            .candidates(outcome.candidates())
+            .recencyQueryFailed(outcome.recencyQueryFailed())
+            .results(results)
+            .build();
     }
 
     /**
      * 하이브리드 검색: Score Fusion 파이프라인 + 최신성 직접 쿼리 + RRF 결합
      */
-    private List<SearchResult> searchEmergingTechsHybrid(
+    private SearchOutcome searchEmergingTechsHybrid(
             List<Float> queryVector, SearchOptions options) {
         try {
             // 소스 A: Score Fusion 벡터 검색
@@ -73,12 +88,14 @@ public class VectorSearchServiceImpl implements VectorSearchService {
             boolean isRecency = Boolean.TRUE.equals(options.recencyDetected());
             int recencyLimit = isRecency ? 5 : 3;
             List<SearchResult> recencyResults;
+            boolean recencyQueryFailed = false;
             try {
                 recencyResults = queryRecentDocuments(options, recencyLimit);
                 log.info("Recency query completed: {} results", recencyResults.size());
             } catch (Exception e) {
                 log.warn("Recency query failed, using vector results only: {}", e.getMessage());
                 recencyResults = Collections.emptyList();
+                recencyQueryFailed = true;
             }
 
             // RRF 결합
@@ -86,12 +103,25 @@ public class VectorSearchServiceImpl implements VectorSearchService {
             List<SearchResult> combined = applyRRF(vectorResults, recencyResults, isRecency, maxResults);
             log.info("RRF combination completed: {} results (recencyDetected={})", combined.size(), isRecency);
 
-            return combined;
+            return SearchOutcome.builder()
+                .path(SearchPath.HYBRID)
+                .candidates(vectorResults)
+                .recencyQueryFailed(recencyQueryFailed)
+                .results(combined)
+                .build();
 
         } catch (Exception e) {
             log.error("Hybrid search failed, falling back to standard search: {}",
                 e.getMessage(), e);
-            return searchEmergingTechs(queryVector, options);
+            StandardSearchOutcome fallback = searchEmergingTechs(queryVector, options);
+            return SearchOutcome.builder()
+                .path(fallback.failed()
+                    ? SearchPath.HYBRID_FALLBACK_FAILED
+                    : SearchPath.HYBRID_FALLBACK_STANDARD)
+                .candidates(Collections.emptyList())
+                .recencyQueryFailed(false)
+                .results(fallback.results())
+                .build();
         }
     }
 
@@ -327,7 +357,7 @@ public class VectorSearchServiceImpl implements VectorSearchService {
      * MongoDB Atlas Vector Search의 $vectorSearch aggregation stage를 사용합니다.
      * status: "PUBLISHED" pre-filter가 기본 적용됩니다.
      */
-    private List<SearchResult> searchEmergingTechs(List<Float> queryVector, SearchOptions options) {
+    private StandardSearchOutcome searchEmergingTechs(List<Float> queryVector, SearchOptions options) {
         try {
             // pre-filter 생성 (provider + 날짜)
             Document combinedFilter = buildProviderFilter(options);
@@ -358,15 +388,20 @@ public class VectorSearchServiceImpl implements VectorSearchService {
                 .aggregate(pipeline)
                 .into(new ArrayList<>());
 
-            return results.stream()
+            return new StandardSearchOutcome(results.stream()
                 .map(doc -> convertToSearchResult(doc, "EMERGING_TECH"))
-                .collect(Collectors.toList());
+                .collect(Collectors.toList()), false);
 
         } catch (Exception e) {
             log.error("Vector search for emerging techs failed: {}", e.getMessage(), e);
-            return new ArrayList<>();
+            return new StandardSearchOutcome(new ArrayList<>(), true);
         }
     }
+
+    /**
+     * 일반 벡터 검색 결과와 예외 발생 여부
+     */
+    private record StandardSearchOutcome(List<SearchResult> results, boolean failed) {}
 
     /**
      * provider + update_type + 날짜 pre-filter 생성
