@@ -74,6 +74,7 @@ subprojects {
 		imports {
 			mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
 			mavenBom "dev.langchain4j:langchain4j-bom:${langchain4jVersion}"
+			mavenBom "dev.langchain4j:langchain4j-community-bom:1.10.0-beta18"
 		}
 	}
 
