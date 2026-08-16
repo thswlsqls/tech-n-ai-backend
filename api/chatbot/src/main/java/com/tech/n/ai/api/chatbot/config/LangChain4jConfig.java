@@ -27,7 +27,10 @@ public class LangChain4jConfig {
     
     @Value("${langchain4j.open-ai.chat-model.model-name:gpt-4o-mini}")
     private String chatModelName;
-    
+
+    @Value("${langchain4j.open-ai.chat-model.temperature:0.7}")
+    private Double chatModelTemperature;
+
     @Value("${langchain4j.open-ai.embedding-model.api-key}")
     private String embeddingApiKey;
     
@@ -46,7 +49,7 @@ public class LangChain4jConfig {
         return OpenAiChatModel.builder()
             .apiKey(openAiApiKey)
             .modelName(chatModelName)
-            .temperature(0.7)
+            .temperature(chatModelTemperature)
             .maxTokens(2000)
             .timeout(Duration.ofSeconds(60))
             .logRequests(true)

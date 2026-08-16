@@ -11,15 +11,17 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 
 /**
- * 평가 잡 두 개
+ * 평가 잡 세 개
  *
- * searchBaselineEvalJob은 기준선 수치를 재고, goldenSetVerifyJob은 골든셋이 실제 데이터와
- * 맞는지 확인한다. 둘 다 단일 스텝 Tasklet이다.
+ * searchBaselineEvalJob은 검색 기준선 수치를 재고, answerQualityEvalJob은 답변을 만들어
+ * 두 축으로 채점하고, goldenSetVerifyJob은 골든셋이 실제 데이터와 맞는지 확인한다.
+ * 모두 단일 스텝 Tasklet이다.
  */
 @Configuration
 public class EvalJobConfig {
 
     public static final String SEARCH_BASELINE_EVAL_JOB = "searchBaselineEvalJob";
+    public static final String ANSWER_QUALITY_EVAL_JOB = "answerQualityEvalJob";
     public static final String GOLDEN_SET_VERIFY_JOB = "goldenSetVerifyJob";
 
     /**
@@ -40,6 +42,23 @@ public class EvalJobConfig {
     @Bean
     public Step searchBaselineStep(JobRepository jobRepository, SearchBaselineTasklet tasklet) {
         return new StepBuilder("searchBaselineStep", jobRepository)
+            .tasklet(tasklet, transactionManager)
+            .build();
+    }
+
+    @Bean(name = ANSWER_QUALITY_EVAL_JOB)
+    public Job answerQualityEvalJob(JobRepository jobRepository,
+                                     Step answerQualityStep,
+                                     EmbeddingApiKeyGuardListener guardListener) {
+        return new JobBuilder(ANSWER_QUALITY_EVAL_JOB, jobRepository)
+            .start(answerQualityStep)
+            .listener(guardListener)
+            .build();
+    }
+
+    @Bean
+    public Step answerQualityStep(JobRepository jobRepository, AnswerQualityTasklet tasklet) {
+        return new StepBuilder("answerQualityStep", jobRepository)
             .tasklet(tasklet, transactionManager)
             .build();
     }

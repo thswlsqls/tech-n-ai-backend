@@ -3,21 +3,17 @@ package com.tech.n.ai.batch.eval.job;
 import com.tech.n.ai.batch.eval.goldenset.GoldenSet;
 import com.tech.n.ai.batch.eval.goldenset.GoldenSetItem;
 import com.tech.n.ai.batch.eval.goldenset.GoldenSetLoader;
+import com.tech.n.ai.batch.eval.report.EvalConfigSnapshotFactory;
 import com.tech.n.ai.batch.eval.report.EvalReport;
 import com.tech.n.ai.batch.eval.report.EvalReportWriter;
 import com.tech.n.ai.batch.eval.scoring.AggregateMetrics;
 import com.tech.n.ai.batch.eval.scoring.AggregateScorer;
 import com.tech.n.ai.batch.eval.scoring.QuestionOutcome;
 import lombok.extern.slf4j.Slf4j;
-import org.bson.Document;
 import org.springframework.batch.core.scope.context.ChunkContext;
 import org.springframework.batch.core.step.StepContribution;
 import org.springframework.batch.core.step.tasklet.Tasklet;
 import org.springframework.batch.infrastructure.repeat.RepeatStatus;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -32,44 +28,19 @@ import java.util.List;
 @Component
 public class SearchBaselineTasklet implements Tasklet {
 
-    private static final String SCHEMA_VERSION = "1";
-    private static final String COLLECTION_EMERGING_TECHS = "emerging_techs";
-    private static final String TOKEN_ESTIMATION = "OpenAiTokenCountEstimator (추정치, 실측 아님)";
-
     private final GoldenSetLoader goldenSetLoader;
     private final QuestionRunner questionRunner;
     private final EvalReportWriter reportWriter;
-    private final MongoTemplate mongoTemplate;
-
-    @Value("${chatbot.rag.max-search-results:5}")
-    private int maxSearchResults;
-
-    @Value("${chatbot.rag.min-similarity-score:0.7}")
-    private double minSimilarityScore;
-
-    @Value("${chatbot.rag.recency-months:6}")
-    private int recencyMonths;
-
-    @Value("${chatbot.reranking.enabled:false}")
-    private boolean rerankingEnabled;
-
-    @Value("${langchain4j.open-ai.chat-model.temperature:0.7}")
-    private double chatModelTemperature;
-
-    @Value("${langchain4j.open-ai.embedding-model.model-name:text-embedding-3-small}")
-    private String embeddingModelName;
-
-    @Value("${langchain4j.open-ai.embedding-model.dimensions:1536}")
-    private int embeddingDimensions;
+    private final EvalConfigSnapshotFactory configSnapshotFactory;
 
     public SearchBaselineTasklet(GoldenSetLoader goldenSetLoader,
                                   QuestionRunner questionRunner,
                                   EvalReportWriter reportWriter,
-                                  MongoTemplate mongoTemplate) {
+                                  EvalConfigSnapshotFactory configSnapshotFactory) {
         this.goldenSetLoader = goldenSetLoader;
         this.questionRunner = questionRunner;
         this.reportWriter = reportWriter;
-        this.mongoTemplate = mongoTemplate;
+        this.configSnapshotFactory = configSnapshotFactory;
     }
 
     @Override
@@ -93,10 +64,10 @@ public class SearchBaselineTasklet implements Tasklet {
         AggregateMetrics vectorRankMetrics = AggregateScorer.aggregate(byVectorRank, QuestionRunner.K_VALUES);
 
         EvalReport report = new EvalReport(
-            SCHEMA_VERSION,
+            EvalReport.SCHEMA_VERSION,
             executedAt.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
             goldenSet.version(),
-            config(),
+            configSnapshotFactory.create(false),
             questions,
             new EvalReport.Aggregate(
                 toBlock(vectorRankMetrics),
@@ -109,32 +80,12 @@ public class SearchBaselineTasklet implements Tasklet {
                 vectorRankMetrics.excluded().fallbackPath(),
                 vectorRankMetrics.excluded().searchFailed(),
                 vectorRankMetrics.excluded().noEvidenceType()
-            )
+            ),
+            null
         );
 
         reportWriter.write(report, executedAt);
         return RepeatStatus.FINISHED;
-    }
-
-    private EvalReport.Config config() {
-        return new EvalReport.Config(
-            maxSearchResults,
-            minSimilarityScore,
-            recencyMonths,
-            true,
-            rerankingEnabled,
-            chatModelTemperature,
-            embeddingModelName,
-            embeddingDimensions,
-            publishedDocumentCount(),
-            TOKEN_ESTIMATION,
-            false
-        );
-    }
-
-    private long publishedDocumentCount() {
-        Query query = new Query(Criteria.where("status").is("PUBLISHED"));
-        return mongoTemplate.count(query, Document.class, COLLECTION_EMERGING_TECHS);
     }
 
     private EvalReport.AggregateBlock toBlock(AggregateMetrics metrics) {

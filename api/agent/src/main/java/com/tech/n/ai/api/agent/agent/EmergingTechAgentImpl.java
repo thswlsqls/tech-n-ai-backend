@@ -13,6 +13,8 @@ import dev.langchain4j.memory.chat.ChatMemoryProvider;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.service.AiServices;
+import io.micrometer.core.instrument.DistributionSummary;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -45,8 +47,14 @@ public class EmergingTechAgentImpl implements EmergingTechAgent {
     private final SlackContract slackContract;
     private final MongoDbChatMemoryStore mongoDbChatMemoryStore;
 
+    // 첫 실행을 기다리지 않고 실행 직후부터 /actuator/prometheus에 나오도록 여기서 등록한다
+    private final DistributionSummary toolCalls;
+
     private static final int MAX_MESSAGES = 30;
     private static final int MAX_TOOL_INVOCATIONS = 30;
+
+    /** 실행 한 번이 Tool을 몇 번 불렀는지. 합계와 건수로 실행당 평균을 봐야 루프인지 판단할 수 있다 */
+    private static final String METER_TOOL_CALLS = "agent.tool.calls";
 
     /** 싱글턴 AgentAssistant - 세션별 ChatMemory를 공유하여 멀티 턴 대화 지원 */
     private AgentAssistant assistant;
@@ -56,12 +64,14 @@ public class EmergingTechAgentImpl implements EmergingTechAgent {
             EmergingTechAgentTools tools,
             AgentPromptConfig promptConfig,
             SlackContract slackContract,
-            MongoDbChatMemoryStore mongoDbChatMemoryStore) {
+            MongoDbChatMemoryStore mongoDbChatMemoryStore,
+            MeterRegistry meterRegistry) {
         this.chatModel = chatModel;
         this.tools = tools;
         this.promptConfig = promptConfig;
         this.slackContract = slackContract;
         this.mongoDbChatMemoryStore = mongoDbChatMemoryStore;
+        this.toolCalls = DistributionSummary.builder(METER_TOOL_CALLS).register(meterRegistry);
     }
 
     @PostConstruct
@@ -152,6 +162,7 @@ public class EmergingTechAgentImpl implements EmergingTechAgent {
                     List.of(errorMsg)
             );
         } finally {
+            toolCalls.record(metrics.getToolCallCount());
             // ThreadLocal 메트릭 해제 (메모리 누수 방지)
             tools.unbindMetrics();
         }

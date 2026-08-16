@@ -1,10 +1,13 @@
 package com.tech.n.ai.batch.eval.config;
 
+import com.tech.n.ai.api.chatbot.chain.AnswerGenerationChain;
 import com.tech.n.ai.api.chatbot.chain.InputInterpretationChain;
 import com.tech.n.ai.api.chatbot.chain.ResultRefinementChain;
 import com.tech.n.ai.api.chatbot.config.LangChain4jConfig;
 import com.tech.n.ai.api.chatbot.service.CohereReRankingServiceImpl;
 import com.tech.n.ai.api.chatbot.service.IntentClassificationServiceImpl;
+import com.tech.n.ai.api.chatbot.service.LLMServiceImpl;
+import com.tech.n.ai.api.chatbot.service.PromptServiceImpl;
 import com.tech.n.ai.api.chatbot.service.SearchOptionsFactory;
 import com.tech.n.ai.api.chatbot.service.TokenServiceImpl;
 import com.tech.n.ai.api.chatbot.service.VectorSearchServiceImpl;
@@ -32,7 +35,10 @@ import org.springframework.context.annotation.Import;
     ResultRefinementChain.class,
     CohereReRankingServiceImpl.class,
     TokenServiceImpl.class,
-    SearchOptionsFactory.class
+    SearchOptionsFactory.class,
+    AnswerGenerationChain.class,
+    PromptServiceImpl.class,
+    LLMServiceImpl.class
 })
 public class ChatbotBridgeConfig {
 

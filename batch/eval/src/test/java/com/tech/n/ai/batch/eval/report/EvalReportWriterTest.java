@@ -69,7 +69,7 @@ class EvalReportWriterTest {
             // Then
             assertThat(root.propertyNames()).containsExactlyInAnyOrder(
                 "schemaVersion", "executedAt", "goldenSetVersion",
-                "config", "questions", "aggregate", "excluded");
+                "config", "questions", "aggregate", "excluded", "answerQuality");
         }
 
         @Test
@@ -111,6 +111,103 @@ class EvalReportWriterTest {
             assertThat(root.get("aggregate").get("byFusionRank").get("recallAtK").get("5").asDouble())
                 .isEqualTo(1.0);
         }
+    }
+
+    @Nested
+    @DisplayName("write - 답변 품질 블록")
+    class AnswerQualityBlock {
+
+        @Test
+        @DisplayName("검색 기준선 리포트는 키만 남기고 값을 비운다")
+        void keepsNullAnswerQualityKey() throws Exception {
+            // Given
+            EvalReportWriter writer = new EvalReportWriter(tempDir.toString());
+
+            // When
+            Path path = writer.write(report(), LocalDateTime.now());
+            JsonNode root = OBJECT_MAPPER.readTree(Files.readString(path, UTF_8));
+
+            // Then
+            assertThat(root.has("answerQuality")).isTrue();
+            assertThat(root.get("answerQuality").isNull()).isTrue();
+        }
+
+        @Test
+        @DisplayName("답변 품질 리포트는 두 축의 분모·통과 건수·통과 비율을 담는다")
+        void writesBothAxes() throws Exception {
+            // Given
+            EvalReportWriter writer = new EvalReportWriter(tempDir.toString());
+
+            // When
+            Path path = writer.write(answerQualityReport(), LocalDateTime.now(), "answer-quality-");
+            JsonNode answerQuality = OBJECT_MAPPER
+                .readTree(Files.readString(path, UTF_8))
+                .get("answerQuality");
+
+            // Then
+            assertThat(path.getFileName().toString()).startsWith("answer-quality-");
+            for (String axis : List.of("groundedness", "answerRelevance")) {
+                assertThat(answerQuality.get(axis).get("denominator").asInt()).isEqualTo(2);
+                assertThat(answerQuality.get(axis).get("passCount").asInt()).isEqualTo(1);
+                assertThat(answerQuality.get(axis).get("passRate").asDouble()).isEqualTo(0.5);
+            }
+            assertThat(answerQuality.get("questions").get(0).get("groundednessReason").asString())
+                .isEqualTo("문서로 뒷받침된다");
+        }
+
+        @Test
+        @DisplayName("answerQuality 하위 키 집합이 고정이다")
+        void answerQualityKeysAreFixed() throws Exception {
+            // Given
+            EvalReportWriter writer = new EvalReportWriter(tempDir.toString());
+
+            // When
+            Path path = writer.write(answerQualityReport(), LocalDateTime.now(), "answer-quality-");
+            JsonNode answerQuality = OBJECT_MAPPER
+                .readTree(Files.readString(path, UTF_8))
+                .get("answerQuality");
+
+            // Then
+            assertThat(answerQuality.propertyNames()).containsExactlyInAnyOrder(
+                "judgeModelName", "judgeModelTemperature", "judgeCallLimit", "judgeCallCount",
+                "judgeCallLimitReached", "questionLimit", "questions",
+                "groundedness", "answerRelevance", "flip");
+        }
+
+        @Test
+        @DisplayName("뒤집힘 측정을 안 해도 flip 하위 키를 빼지 않는다")
+        void flipKeysArePresentWhenNotMeasured() throws Exception {
+            // Given: 측정을 끈 실행이라 건수가 0이고 비율이 null이다
+            EvalReportWriter writer = new EvalReportWriter(tempDir.toString());
+
+            // When
+            Path path = writer.write(answerQualityReport(), LocalDateTime.now(), "answer-quality-");
+            JsonNode flip = OBJECT_MAPPER
+                .readTree(Files.readString(path, UTF_8))
+                .get("answerQuality").get("flip");
+
+            // Then
+            assertThat(flip.propertyNames())
+                .containsExactlyInAnyOrder("sampledCount", "flippedCount", "flipRate");
+            assertThat(flip.get("sampledCount").asInt()).isZero();
+            assertThat(flip.get("flippedCount").asInt()).isZero();
+            assertThat(flip.get("flipRate").isNull()).isTrue();
+        }
+    }
+
+    private EvalReport answerQualityReport() {
+        EvalReport base = report();
+        EvalReport.AnswerQualityAxis axis = new EvalReport.AnswerQualityAxis(2, 1, 0.5, 0);
+        EvalReport.AnswerQualityQuestion judged = new EvalReport.AnswerQualityQuestion(
+            "SF-001", "답변 본문", 1, List.of("ext-1"),
+            1, "문서로 뒷받침된다", 0, "질문과 다른 내용이다", null);
+
+        return new EvalReport(
+            base.schemaVersion(), base.executedAt(), base.goldenSetVersion(), base.config(),
+            base.questions(), null, base.excluded(),
+            new EvalReport.AnswerQuality(
+                "gpt-4o", 0.0, 200, 4, false, 0, List.of(judged), axis, axis,
+                new EvalReport.JudgeFlip(0, 0, null)));
     }
 
     private EvalReport report() {
@@ -158,6 +255,7 @@ class EvalReportWriterTest {
                 "text-embedding-3-small", 1536, 1234L, "추정치", false),
             List.of(question),
             new EvalReport.Aggregate(block, block, block),
-            new EvalReport.Excluded(0, 0, 0, 0));
+            new EvalReport.Excluded(0, 0, 0, 0),
+            null);
     }
 }

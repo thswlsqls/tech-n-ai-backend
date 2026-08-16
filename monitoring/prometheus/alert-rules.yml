@@ -64,3 +64,17 @@ groups:
         annotations:
           summary: "{{ $labels.application }} Heap 사용률 높음"
           description: "{{ $labels.application }}의 Heap 사용률이 85% 초과. 현재: {{ $value | humanizePercentage }}"
+
+  - name: chatbot-llm-alerts
+    rules:
+      # ─── LLM 호출 실패율 높음 ───
+      - alert: ChatbotLlmHighFailureRate
+        expr: |
+          sum by (application) (rate(chatbot_llm_errors_total[5m]))
+            / sum by (application) (rate(chatbot_llm_duration_seconds_count[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.application }} LLM 호출 실패율 높음"
+          description: "최근 5분 LLM 호출의 10% 넘게 실패. 현재: {{ $value | humanizePercentage }}"

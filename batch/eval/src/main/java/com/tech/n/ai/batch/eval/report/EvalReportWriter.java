@@ -37,7 +37,14 @@ public class EvalReportWriter {
     }
 
     public Path write(EvalReport report, LocalDateTime executedAt) {
-        Path path = Path.of(reportDir).resolve(executedAt.format(FILE_NAME_FORMAT) + ".json");
+        return write(report, executedAt, "");
+    }
+
+    /**
+     * 잡마다 다른 접두사를 붙여 쓴다. 같은 디렉터리에 쌓여도 어느 잡의 결과인지 파일명으로 구분된다.
+     */
+    public Path write(EvalReport report, LocalDateTime executedAt, String prefix) {
+        Path path = Path.of(reportDir).resolve(prefix + executedAt.format(FILE_NAME_FORMAT) + ".json");
         try {
             Files.createDirectories(path.getParent());
             Files.writeString(path, OBJECT_MAPPER.writeValueAsString(report), UTF_8);
