@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * 의도 분류 서비스 구현체
@@ -17,16 +18,21 @@ public class IntentClassificationServiceImpl implements IntentClassificationServ
         "안녕", "안녕하세요", "하이", "hi", "hello", "헬로"
     );
 
-    private static final Set<String> RAG_KEYWORDS = Set.of(
-        "대회", "contest", "뉴스", "news", "기사",
+    // 한국어 키워드는 조사가 붙어 단어 경계가 생기지 않으므로 부분 문자열(contains)로 찾는다
+    private static final Set<String> RAG_KEYWORDS_KO = Set.of(
+        "대회", "뉴스", "기사",
         "검색", "찾아", "알려", "정보", "어떤", "무엇",
-        "kaggle", "codeforces", "leetcode", "hackathon",
         // Emerging Tech 키워드
-        "ai", "인공지능", "llm", "gpt", "claude", "gemini", "모델",
-        "api", "sdk", "릴리즈", "release", "업데이트", "update",
-        "openai", "anthropic", "google", "meta", "xai",
-        "기술", "tech", "트렌드", "trend", "동향",
+        "인공지능", "모델", "릴리즈", "업데이트",
+        "기술", "트렌드", "동향",
         "출시", "발표", "버전"
+    );
+
+    // 영어 키워드는 단어 경계로 찾는다 — contains로 찾으면 "ai"가 explain·email·available·plain 안에 걸린다
+    private static final Pattern RAG_KEYWORDS_EN = Pattern.compile(
+        "\\b(contest|news|kaggle|codeforces|leetcode|hackathon"
+            + "|ai|llm|gpt|claude|gemini|api|sdk|release|update"
+            + "|openai|anthropic|google|meta|xai|tech|trend)\\b"
     );
 
     // Web 검색이 필요한 최신/실시간 정보 키워드
@@ -83,7 +89,8 @@ public class IntentClassificationServiceImpl implements IntentClassificationServ
     }
 
     private boolean containsRagKeywords(String input) {
-        return RAG_KEYWORDS.stream().anyMatch(input::contains);
+        return RAG_KEYWORDS_KO.stream().anyMatch(input::contains)
+            || RAG_KEYWORDS_EN.matcher(input).find();
     }
 
     private boolean containsWebSearchKeywords(String input) {
