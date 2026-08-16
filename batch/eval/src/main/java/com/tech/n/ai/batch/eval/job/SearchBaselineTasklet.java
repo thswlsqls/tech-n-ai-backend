@@ -52,6 +52,7 @@ public class SearchBaselineTasklet implements Tasklet {
         List<QuestionOutcome> byVectorRank = new ArrayList<>();
         List<QuestionOutcome> byFusionRank = new ArrayList<>();
         List<QuestionOutcome> byChainOutput = new ArrayList<>();
+        List<QuestionOutcome> byMergedRank = new ArrayList<>();
 
         for (GoldenSetItem item : goldenSet.items()) {
             QuestionRunResult result = questionRunner.run(item);
@@ -59,6 +60,7 @@ public class SearchBaselineTasklet implements Tasklet {
             byVectorRank.add(result.byVectorRank());
             byFusionRank.add(result.byFusionRank());
             byChainOutput.add(result.byChainOutput());
+            byMergedRank.add(result.byMergedRank());
         }
 
         AggregateMetrics vectorRankMetrics = AggregateScorer.aggregate(byVectorRank, QuestionRunner.K_VALUES);
@@ -72,9 +74,10 @@ public class SearchBaselineTasklet implements Tasklet {
             new EvalReport.Aggregate(
                 toBlock(vectorRankMetrics),
                 toBlock(AggregateScorer.aggregate(byFusionRank, QuestionRunner.K_VALUES)),
-                toBlock(AggregateScorer.aggregate(byChainOutput, QuestionRunner.K_VALUES))
+                toBlock(AggregateScorer.aggregate(byChainOutput, QuestionRunner.K_VALUES)),
+                toBlock(AggregateScorer.aggregate(byMergedRank, QuestionRunner.K_VALUES))
             ),
-            // 제외 판정은 순위 기준과 무관해 세 블록이 모두 같다
+            // 제외 판정은 순위 기준과 무관해 네 블록이 모두 같다
             new EvalReport.Excluded(
                 vectorRankMetrics.excluded().intentNotRag(),
                 vectorRankMetrics.excluded().fallbackPath(),

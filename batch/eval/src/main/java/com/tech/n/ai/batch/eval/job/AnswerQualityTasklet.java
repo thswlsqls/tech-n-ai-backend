@@ -163,7 +163,8 @@ public class AnswerQualityTasklet implements Tasklet {
 
             questions.set(i, question.withGeneration(
                 new EvalReport.LatencyMs(
-                    question.latencyMs().search(), question.latencyMs().refine(), generationMs),
+                    question.latencyMs().search(), question.latencyMs().refine(), generationMs,
+                    question.latencyMs().graph()),
                 new EvalReport.Tokens(inputTokens, tokenService.estimateTokens(answer), 1)));
 
             JudgeVerdict groundedness =

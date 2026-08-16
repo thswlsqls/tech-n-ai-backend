@@ -86,6 +86,7 @@ class EvalReportWriterTest {
             // Then
             assertThat(question.get("latencyMs").has("generation")).isTrue();
             assertThat(question.get("latencyMs").get("generation").isNull()).isTrue();
+            assertThat(question.get("latencyMs").has("graph")).isTrue();
             assertThat(question.has("noEvidence")).isTrue();
             assertThat(question.get("noEvidence").isNull()).isTrue();
         }
@@ -103,13 +104,50 @@ class EvalReportWriterTest {
             // Then
             JsonNode questionMetrics = root.get("questions").get(0).get("metrics");
             assertThat(questionMetrics.propertyNames())
-                .containsExactlyInAnyOrder("byVectorRank", "byFusionRank", "byChainOutput");
+                .containsExactlyInAnyOrder(
+                    "byVectorRank", "byFusionRank", "byChainOutput", "byMergedRank");
             assertThat(root.get("aggregate").propertyNames())
-                .containsExactlyInAnyOrder("byVectorRank", "byFusionRank", "byChainOutput");
+                .containsExactlyInAnyOrder(
+                    "byVectorRank", "byFusionRank", "byChainOutput", "byMergedRank");
             assertThat(questionMetrics.get("byVectorRank").get("recallAtK").get("5").asDouble())
                 .isEqualTo(1.0);
             assertThat(root.get("aggregate").get("byFusionRank").get("recallAtK").get("5").asDouble())
                 .isEqualTo(1.0);
+        }
+
+        @Test
+        @DisplayName("그래프 블록 하위 키 집합이 고정이다")
+        void graphKeysAreFixed() throws Exception {
+            // Given
+            EvalReportWriter writer = new EvalReportWriter(tempDir.toString());
+
+            // When
+            Path path = writer.write(report(), LocalDateTime.now());
+            JsonNode graph = OBJECT_MAPPER
+                .readTree(Files.readString(path, UTF_8))
+                .get("questions").get(0).get("graph");
+
+            // Then
+            assertThat(graph.propertyNames()).containsExactlyInAnyOrder(
+                "enabled", "seedKeys", "expandedKeys", "externalIds",
+                "documentCount", "capped", "latencyMs");
+        }
+
+        @Test
+        @DisplayName("합친 목록 항목의 키 집합이 고정이다")
+        void mergedOutputKeysAreFixed() throws Exception {
+            // Given
+            EvalReportWriter writer = new EvalReportWriter(tempDir.toString());
+
+            // When
+            Path path = writer.write(report(), LocalDateTime.now());
+            JsonNode mergedItem = OBJECT_MAPPER
+                .readTree(Files.readString(path, UTF_8))
+                .get("questions").get(0).get("mergedOutput").get(0);
+
+            // Then
+            assertThat(mergedItem.propertyNames()).containsExactlyInAnyOrder(
+                "externalId", "documentId", "rank", "score", "expected", "source");
         }
     }
 
@@ -228,13 +266,17 @@ class EvalReportWriterTest {
             true,
             null,
             null,
-            new EvalReport.LatencyMs(120L, 15L, null),
+            new EvalReport.LatencyMs(120L, 15L, null, null),
             new EvalReport.Tokens(18, 0, 0),
             List.of("ext-1"),
             null,
             List.of(new RankedCandidate("ext-1", "doc1", 1, 1, 0.91, 0.88, true)),
             List.of(new EvalReport.ChainOutputItem("ext-1", "doc1", 1, 0.88, true)),
-            new EvalReport.Metrics(metrics, metrics, metrics));
+            List.of(new EvalReport.MergedItem("ext-1", "doc1", 1, 0.88, true, "VECTOR")),
+            new EvalReport.Graph(true, List.of("Model|gpt-4o"), List.of("Provider|openai"),
+                List.of("ext-1"), 1, false, 42L),
+            "BOTH",
+            new EvalReport.Metrics(metrics, metrics, metrics, metrics));
 
         EvalReport.AggregateBlock block = new EvalReport.AggregateBlock(
             1, 1,
@@ -252,9 +294,10 @@ class EvalReportWriterTest {
             "2026-08-15T09:30:00",
             "draft-schema-only",
             new EvalReport.Config(5, 0.7, 6, true, false, 0.7,
-                "text-embedding-3-small", 1536, 1234L, "추정치", false),
+                "text-embedding-3-small", 1536, 1234L, "추정치", false,
+                true, 10, 20, 2000L),
             List.of(question),
-            new EvalReport.Aggregate(block, block, block),
+            new EvalReport.Aggregate(block, block, block, block),
             new EvalReport.Excluded(0, 0, 0, 0),
             null);
     }

@@ -2,6 +2,7 @@ package com.tech.n.ai.batch.graph.key;
 
 import com.tech.n.ai.domain.mongodb.enums.GraphNodeType;
 import com.tech.n.ai.domain.mongodb.enums.GraphRelationType;
+import com.tech.n.ai.domain.mongodb.key.GraphKeys;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;

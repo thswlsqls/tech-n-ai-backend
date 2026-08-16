@@ -90,7 +90,8 @@ class AnswerQualityTaskletTest {
     void setUp() {
         when(configSnapshotFactory.create(true)).thenReturn(new EvalReport.Config(
             5, 0.7, 6, true, false, 0.0,
-            "text-embedding-3-small", 1536, 1234L, TOKEN_ESTIMATION, true));
+            "text-embedding-3-small", 1536, 1234L, TOKEN_ESTIMATION, true,
+            false, 10, 20, 2000L));
         when(tokenService.truncateResults(any(), anyInt())).thenReturn(List.of(evidence));
         when(promptService.buildPrompt(anyString(), any())).thenReturn("PROMPT");
         when(answerChain.generate(anyString(), any())).thenReturn("답변 본문");
@@ -130,16 +131,18 @@ class AnswerQualityTaskletTest {
         EvalReport.Question question = new EvalReport.Question(
             item.id(), item.type(), item.question(), "RAG_REQUIRED", "HYBRID",
             false, excludedReason == null, excludedReason, null,
-            new EvalReport.LatencyMs(120L, 15L, null),
+            new EvalReport.LatencyMs(120L, 15L, null, 0L),
             new EvalReport.Tokens(12, 0, 0),
-            item.expectedExternalIds(), null, List.of(), List.of(),
-            new EvalReport.Metrics(metrics, metrics, metrics));
+            item.expectedExternalIds(), null, List.of(), List.of(), List.of(),
+            new EvalReport.Graph(false, List.of(), List.of(), List.of(), 0, false, 0L),
+            "VECTOR_ONLY",
+            new EvalReport.Metrics(metrics, metrics, metrics, metrics));
 
         QuestionOutcome outcome = new QuestionOutcome(
             item.id(), item.type(), true, false, false, false,
             List.of("ext-1"), Set.of("ext-1"), null);
 
-        return new QuestionRunResult(question, outcome, outcome, outcome, List.of(evidence));
+        return new QuestionRunResult(question, outcome, outcome, outcome, outcome, List.of(evidence));
     }
 
     private EvalReport captureReport() {

@@ -1,4 +1,4 @@
-package com.tech.n.ai.batch.graph.key;
+package com.tech.n.ai.domain.mongodb.key;
 
 import com.tech.n.ai.domain.mongodb.enums.GraphNodeType;
 import com.tech.n.ai.domain.mongodb.enums.GraphRelationType;

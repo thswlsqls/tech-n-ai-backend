@@ -42,6 +42,19 @@ public class EvalConfigSnapshotFactory {
     @Value("${langchain4j.open-ai.embedding-model.dimensions:1536}")
     private int embeddingDimensions;
 
+    // 그래프 경로는 실행할 때 켜고 끄므로 실제 설정값을 읽는다. 하드코딩하면 켠 실행과 끈 실행이 같아 보인다.
+    @Value("${chatbot.rag.graph.enabled:false}")
+    private boolean graphRetrievalEnabled;
+
+    @Value("${chatbot.rag.graph.max-results:10}")
+    private int graphMaxResults;
+
+    @Value("${chatbot.rag.graph.max-seeds:20}")
+    private int graphMaxSeeds;
+
+    @Value("${chatbot.rag.graph.max-time-ms:2000}")
+    private long graphMaxTimeMs;
+
     public EvalConfigSnapshotFactory(MongoTemplate mongoTemplate) {
         this.mongoTemplate = mongoTemplate;
     }
@@ -58,7 +71,11 @@ public class EvalConfigSnapshotFactory {
             embeddingDimensions,
             publishedDocumentCount(),
             TOKEN_ESTIMATION,
-            generationModelCalled
+            generationModelCalled,
+            graphRetrievalEnabled,
+            graphMaxResults,
+            graphMaxSeeds,
+            graphMaxTimeMs
         );
     }
 

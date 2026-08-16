@@ -3,10 +3,13 @@ package com.tech.n.ai.batch.eval.job;
 import com.tech.n.ai.api.chatbot.chain.InputInterpretationChain;
 import com.tech.n.ai.api.chatbot.chain.ResultRefinementChain;
 import com.tech.n.ai.api.chatbot.service.IntentClassificationService;
+import com.tech.n.ai.api.chatbot.service.RetrievalService;
 import com.tech.n.ai.api.chatbot.service.SearchOptionsFactory;
 import com.tech.n.ai.api.chatbot.service.TokenService;
-import com.tech.n.ai.api.chatbot.service.VectorSearchService;
+import com.tech.n.ai.api.chatbot.service.dto.GraphSearchOutcome;
 import com.tech.n.ai.api.chatbot.service.dto.Intent;
+import com.tech.n.ai.api.chatbot.service.dto.RetrievalOutcome;
+import com.tech.n.ai.api.chatbot.service.dto.RetrievalPath;
 import com.tech.n.ai.api.chatbot.service.dto.SearchContext;
 import com.tech.n.ai.api.chatbot.service.dto.SearchOptions;
 import com.tech.n.ai.api.chatbot.service.dto.SearchOutcome;
@@ -52,7 +55,7 @@ class QuestionRunnerTest {
     private SearchOptionsFactory searchOptionsFactory;
 
     @Mock
-    private VectorSearchService vectorSearchService;
+    private RetrievalService retrievalService;
 
     @Mock
     private ResultRefinementChain refinementChain;
@@ -74,13 +77,15 @@ class QuestionRunnerTest {
         when(inputChain.interpret(anyString()))
             .thenReturn(SearchQuery.builder().query("Mistral Le Chat").context(new SearchContext()).build());
         when(searchOptionsFactory.create(any())).thenReturn(SearchOptions.builder().build());
-        when(vectorSearchService.search(anyString(), anyLong(), any()))
-            .thenReturn(SearchOutcome.builder()
-                .path(path)
-                .candidates(List.of())
-                .recencyQueryFailed(false)
-                .results(List.of())
-                .build());
+        SearchOutcome vector = SearchOutcome.builder()
+            .path(path)
+            .candidates(List.of())
+            .recencyQueryFailed(false)
+            .results(List.of())
+            .build();
+        when(retrievalService.retrieve(anyString(), anyLong(), any()))
+            .thenReturn(new RetrievalOutcome(
+                vector, GraphSearchOutcome.disabled(), List.of(), RetrievalPath.NONE, 12L, 0L));
         when(refinementChain.refine(anyString(), any(), anyBoolean(), anyBoolean()))
             .thenReturn(List.of());
         when(tokenService.estimateTokens(anyString())).thenReturn(10);

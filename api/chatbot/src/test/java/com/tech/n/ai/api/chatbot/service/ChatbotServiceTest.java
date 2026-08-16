@@ -9,6 +9,7 @@ import com.tech.n.ai.api.chatbot.dto.response.ChatResponse;
 import com.tech.n.ai.api.chatbot.memory.ConversationChatMemoryProvider;
 import com.tech.n.ai.common.conversation.service.ConversationMessageService;
 import com.tech.n.ai.common.conversation.service.ConversationSessionService;
+import com.tech.n.ai.api.chatbot.service.dto.GraphSearchOutcome;
 import com.tech.n.ai.api.chatbot.service.dto.Intent;
 import com.tech.n.ai.api.chatbot.service.dto.SearchContext;
 import com.tech.n.ai.api.chatbot.service.dto.SearchOutcome;
@@ -69,6 +70,9 @@ class ChatbotServiceTest {
     private VectorSearchService vectorSearchService;
 
     @Mock
+    private GraphSearchService graphSearchService;
+
+    @Mock
     private ResultRefinementChain refinementChain;
 
     @Mock
@@ -110,6 +114,14 @@ class ChatbotServiceTest {
         ReflectionTestUtils.setField(searchOptionsFactory, "minSimilarityScore", 0.7);
         ReflectionTestUtils.setField(searchOptionsFactory, "recencyMonths", 6);
         ReflectionTestUtils.setField(chatbotService, "searchOptionsFactory", searchOptionsFactory);
+
+        // RetrievalService도 실물을 주입한다. 벡터 검색 목은 위에서 만든 것을 그대로 물려
+        // 이 테스트의 스텁·검증이 검색 호출을 그대로 잡도록 한다.
+        // 그래프 검색 목은 운영 기본값대로 꺼진 결과를 돌려준다.
+        RetrievalService retrievalService =
+            new RetrievalService(vectorSearchService, graphSearchService);
+        lenient().when(graphSearchService.search(anyString())).thenReturn(GraphSearchOutcome.disabled());
+        ReflectionTestUtils.setField(chatbotService, "retrievalService", retrievalService);
     }
 
     // ========== LLM_DIRECT Intent 테스트 ==========

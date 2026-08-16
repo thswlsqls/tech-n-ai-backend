@@ -24,8 +24,8 @@ public record EvalReport(
     AnswerQuality answerQuality
 ) {
 
-    /** answerQuality 블록이 생기면서 올린 버전. 앞선 실행의 리포트와 구분한다 */
-    public static final String SCHEMA_VERSION = "2";
+    /** 그래프 검색 블록이 생기면서 올린 버전. 앞선 실행의 리포트와 구분한다 */
+    public static final String SCHEMA_VERSION = "3";
 
     /**
      * 실행 당시 설정 스냅샷
@@ -41,7 +41,11 @@ public record EvalReport(
         Integer embeddingDimensions,
         long publishedDocumentCount,
         String tokenEstimation,
-        boolean generationModelCalled
+        boolean generationModelCalled,
+        Boolean graphRetrievalEnabled,
+        int graphMaxResults,
+        int graphMaxSeeds,
+        long graphMaxTimeMs
     ) {}
 
     /**
@@ -63,6 +67,9 @@ public record EvalReport(
         String latestExternalId,
         List<RankedCandidate> candidates,
         List<ChainOutputItem> chainOutput,
+        List<MergedItem> mergedOutput,
+        Graph graph,
+        String retrievalPath,
         Metrics metrics
     ) {
 
@@ -74,9 +81,36 @@ public record EvalReport(
             return new Question(
                 id, type, question, intent, searchPath, recencyQueryFailed, scored, excludedReason,
                 noEvidence, latencyMs, tokens, expectedExternalIds, latestExternalId,
-                candidates, chainOutput, metrics);
+                candidates, chainOutput, mergedOutput, graph, retrievalPath, metrics);
         }
     }
+
+    /**
+     * 그래프 검색이 이 질문에서 한 일
+     *
+     * 그래프를 타지 않은 질문도 키를 빼지 않는다. enabled=false에 빈 리스트와 0을 채운다.
+     */
+    public record Graph(
+        boolean enabled,
+        List<String> seedKeys,
+        List<String> expandedKeys,
+        List<String> externalIds,
+        int documentCount,
+        boolean capped,
+        long latencyMs
+    ) {}
+
+    /**
+     * 벡터 결과와 그래프 결과를 합친 목록의 한 건. source는 VECTOR 또는 GRAPH다
+     */
+    public record MergedItem(
+        String externalId,
+        String documentId,
+        int rank,
+        Double score,
+        boolean expected,
+        String source
+    ) {}
 
     /**
      * "근거 없음" 유형 질문의 판정 결과. 다른 유형이면 null
@@ -93,7 +127,8 @@ public record EvalReport(
     public record LatencyMs(
         Long search,
         Long refine,
-        Long generation
+        Long generation,
+        Long graph
     ) {}
 
     /**
@@ -118,21 +153,24 @@ public record EvalReport(
     ) {}
 
     /**
-     * 같은 질문을 세 기준으로 각각 채점한 결과
+     * 같은 질문을 네 기준으로 각각 채점한 결과.
+     * byMergedRank는 벡터와 그래프를 합친 목록이고, 앞의 셋은 순수 벡터 경로 그대로다
      */
     public record Metrics(
         RetrievalMetrics byVectorRank,
         RetrievalMetrics byFusionRank,
-        RetrievalMetrics byChainOutput
+        RetrievalMetrics byChainOutput,
+        RetrievalMetrics byMergedRank
     ) {}
 
     /**
-     * 집계도 질문 항목과 같은 세 기준으로 낸다
+     * 집계도 질문 항목과 같은 네 기준으로 낸다
      */
     public record Aggregate(
         AggregateBlock byVectorRank,
         AggregateBlock byFusionRank,
-        AggregateBlock byChainOutput
+        AggregateBlock byChainOutput,
+        AggregateBlock byMergedRank
     ) {}
 
     /**

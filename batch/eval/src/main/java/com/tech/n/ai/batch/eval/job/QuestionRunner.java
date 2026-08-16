@@ -3,10 +3,13 @@ package com.tech.n.ai.batch.eval.job;
 import com.tech.n.ai.api.chatbot.chain.InputInterpretationChain;
 import com.tech.n.ai.api.chatbot.chain.ResultRefinementChain;
 import com.tech.n.ai.api.chatbot.service.IntentClassificationService;
+import com.tech.n.ai.api.chatbot.service.RetrievalService;
 import com.tech.n.ai.api.chatbot.service.SearchOptionsFactory;
 import com.tech.n.ai.api.chatbot.service.TokenService;
-import com.tech.n.ai.api.chatbot.service.VectorSearchService;
+import com.tech.n.ai.api.chatbot.service.dto.GraphSearchOutcome;
 import com.tech.n.ai.api.chatbot.service.dto.Intent;
+import com.tech.n.ai.api.chatbot.service.dto.RetrievalOutcome;
+import com.tech.n.ai.api.chatbot.service.dto.RetrievalPath;
 import com.tech.n.ai.api.chatbot.service.dto.SearchOptions;
 import com.tech.n.ai.api.chatbot.service.dto.SearchOutcome;
 import com.tech.n.ai.api.chatbot.service.dto.SearchPath;
@@ -49,10 +52,13 @@ public class QuestionRunner {
     private static final String EXCLUDED_SEARCH_FAILED = "SEARCH_FAILED";
     private static final String EXCLUDED_NO_EVIDENCE_TYPE = "NO_EVIDENCE_TYPE";
 
+    private static final String SOURCE_VECTOR = "VECTOR";
+    private static final String SOURCE_GRAPH = "GRAPH";
+
     private final IntentClassificationService intentService;
     private final InputInterpretationChain inputChain;
     private final SearchOptionsFactory searchOptionsFactory;
-    private final VectorSearchService vectorSearchService;
+    private final RetrievalService retrievalService;
     private final ResultRefinementChain refinementChain;
     private final TokenService tokenService;
 
@@ -66,10 +72,11 @@ public class QuestionRunner {
         SearchQuery searchQuery = inputChain.interpret(item.question());
         SearchOptions searchOptions = searchOptionsFactory.create(searchQuery);
 
-        long searchStart = System.currentTimeMillis();
-        SearchOutcome searchOutcome =
-            vectorSearchService.search(searchQuery.query(), 0L, searchOptions);
-        long searchMs = System.currentTimeMillis() - searchStart;
+        RetrievalOutcome retrieval =
+            retrievalService.retrieve(searchQuery.query(), 0L, searchOptions);
+        // 기준선 리포트와 같은 뜻을 유지해야 전·후 지연을 비교할 수 있다. 그래프 시간은 따로 적는다.
+        SearchOutcome searchOutcome = retrieval.vector();
+        long searchMs = retrieval.vectorLatencyMs();
 
         boolean recencyDetected = searchQuery.context().isRecencyDetected();
         boolean scoreFusionApplied = Boolean.TRUE.equals(searchOptions.enableScoreFusion());
@@ -77,12 +84,14 @@ public class QuestionRunner {
         long refineStart = System.currentTimeMillis();
         // refine의 첫 인자는 검색 쿼리가 아니라 사용자가 입력한 질문 원문이다
         List<SearchResult> refined = refinementChain.refine(
-            item.question(), searchOutcome.results(), recencyDetected, scoreFusionApplied);
+            item.question(), retrieval.merged(), recencyDetected, scoreFusionApplied);
         long refineMs = System.currentTimeMillis() - refineStart;
 
         Set<String> expected = new HashSet<>(item.expectedExternalIds());
         List<RankedCandidate> candidates = toCandidates(searchOutcome.candidates(), expected);
         List<EvalReport.ChainOutputItem> chainOutput = toChainOutput(refined, expected);
+        List<EvalReport.MergedItem> mergedOutput =
+            toMergedOutput(retrieval.merged(), searchOutcome.results().size(), expected);
 
         List<String> byFusionRank = candidates.stream()
             .sorted(Comparator.comparingInt(RankedCandidate::fusionRank))
@@ -94,6 +103,9 @@ public class QuestionRunner {
             .toList();
         List<String> byChainOutput = chainOutput.stream()
             .map(EvalReport.ChainOutputItem::externalId)
+            .toList();
+        List<String> byMergedRank = mergedOutput.stream()
+            .map(EvalReport.MergedItem::externalId)
             .toList();
 
         boolean fallbackPath = searchOutcome.path() == SearchPath.HYBRID_FALLBACK_STANDARD
@@ -118,16 +130,20 @@ public class QuestionRunner {
             noEvidenceType && EXCLUDED_NO_EVIDENCE_TYPE.equals(excludedReason)
                 ? new EvalReport.NoEvidence(candidatesEmpty, candidatesEmpty)
                 : null,
-            new EvalReport.LatencyMs(searchMs, refineMs, null),
+            new EvalReport.LatencyMs(searchMs, refineMs, null, retrieval.graphLatencyMs()),
             new EvalReport.Tokens(tokenService.estimateTokens(item.question()), 0, 0),
             item.expectedExternalIds(),
             item.latestExternalId(),
             candidates,
             chainOutput,
+            mergedOutput,
+            toGraphBlock(retrieval.graph()),
+            retrieval.path().name(),
             new EvalReport.Metrics(
                 RetrievalScorer.score(byVectorRank, expected, K_VALUES),
                 RetrievalScorer.score(byFusionRank, expected, K_VALUES),
-                RetrievalScorer.score(byChainOutput, expected, K_VALUES)
+                RetrievalScorer.score(byChainOutput, expected, K_VALUES),
+                RetrievalScorer.score(byMergedRank, expected, K_VALUES)
             )
         );
 
@@ -136,6 +152,7 @@ public class QuestionRunner {
             outcome(item, true, fallbackPath, searchFailed, candidatesEmpty, byVectorRank, expected),
             outcome(item, true, fallbackPath, searchFailed, candidatesEmpty, byFusionRank, expected),
             outcome(item, true, fallbackPath, searchFailed, candidatesEmpty, byChainOutput, expected),
+            outcome(item, true, fallbackPath, searchFailed, candidatesEmpty, byMergedRank, expected),
             refined
         );
     }
@@ -152,13 +169,17 @@ public class QuestionRunner {
             false,
             EXCLUDED_INTENT_NOT_RAG,
             null,
-            new EvalReport.LatencyMs(null, null, null),
+            new EvalReport.LatencyMs(null, null, null, null),
             new EvalReport.Tokens(0, 0, 0),
             item.expectedExternalIds(),
             item.latestExternalId(),
             List.of(),
             List.of(),
+            List.of(),
+            toGraphBlock(GraphSearchOutcome.disabled()),
+            RetrievalPath.NONE.name(),
             new EvalReport.Metrics(
+                RetrievalScorer.score(List.of(), expected, K_VALUES),
                 RetrievalScorer.score(List.of(), expected, K_VALUES),
                 RetrievalScorer.score(List.of(), expected, K_VALUES),
                 RetrievalScorer.score(List.of(), expected, K_VALUES)
@@ -166,7 +187,7 @@ public class QuestionRunner {
         );
         QuestionOutcome outcome =
             outcome(item, false, false, false, true, List.of(), expected);
-        return new QuestionRunResult(question, outcome, outcome, outcome, List.of());
+        return new QuestionRunResult(question, outcome, outcome, outcome, outcome, List.of());
     }
 
     private QuestionOutcome outcome(GoldenSetItem item, boolean intentRagRequired,
@@ -236,6 +257,38 @@ public class QuestionRunner {
                 externalId, item.documentId(), i + 1, item.score(), expected.contains(externalId)));
         }
         return result;
+    }
+
+    /**
+     * 합친 목록을 순서 그대로 기록한다.
+     * 앞쪽 vectorResultCount건은 벡터가 물고 온 문서이고 그 뒤는 그래프가 더한 문서다.
+     */
+    private List<EvalReport.MergedItem> toMergedOutput(List<SearchResult> merged,
+                                                        int vectorResultCount,
+                                                        Set<String> expected) {
+        List<EvalReport.MergedItem> result = new ArrayList<>();
+        for (int i = 0; i < merged.size(); i++) {
+            SearchResult item = merged.get(i);
+            String externalId = identifierOf(item);
+            result.add(new EvalReport.MergedItem(
+                externalId, item.documentId(), i + 1, item.score(), expected.contains(externalId),
+                i < vectorResultCount ? SOURCE_VECTOR : SOURCE_GRAPH));
+        }
+        return result;
+    }
+
+    /**
+     * 그래프를 타지 않은 질문도 키를 비우지 않는다. 꺼진 상태 그대로를 값으로 적는다.
+     */
+    private EvalReport.Graph toGraphBlock(GraphSearchOutcome graph) {
+        return new EvalReport.Graph(
+            graph.enabled(),
+            graph.seedKeys(),
+            graph.expandedKeys(),
+            graph.externalIds(),
+            graph.results().size(),
+            graph.capped(),
+            graph.latencyMs());
     }
 
     /**
