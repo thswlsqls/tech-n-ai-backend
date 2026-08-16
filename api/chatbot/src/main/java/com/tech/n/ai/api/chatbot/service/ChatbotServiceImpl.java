@@ -45,7 +45,7 @@ public class ChatbotServiceImpl implements ChatbotService {
     private final TokenService tokenService;
     private final IntentClassificationService intentService;
     private final InputInterpretationChain inputChain;
-    private final VectorSearchService vectorSearchService;
+    private final RetrievalService retrievalService;
     private final ResultRefinementChain refinementChain;
     private final AnswerGenerationChain answerChain;
     private final WebSearchService webSearchService;
@@ -165,7 +165,7 @@ public class ChatbotServiceImpl implements ChatbotService {
         SearchOptions searchOptions = searchOptionsFactory.create(searchQuery);
 
         List<SearchResult> searchResults =
-            vectorSearchService.search(searchQuery.query(), userId, searchOptions).results();
+            retrievalService.retrieve(searchQuery.query(), userId, searchOptions).merged();
         log.info("RAG search completed: {} results for query: {}", searchResults.size(), searchQuery.query());
         meterRegistry.summary(METER_SEARCH_RESULTS).record(searchResults.size());
 

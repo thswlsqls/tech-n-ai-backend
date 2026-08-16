@@ -115,7 +115,8 @@ public class GraphSearchService {
     }
 
     /**
-     * 점수는 순위 역수로 임시로 매긴다. 벡터 결과와 합칠 때 다시 매기므로 이 값 자체에는 뜻이 없다.
+     * 점수는 순위 역수로 임시로 매긴다. RetrievalService가 벡터 결과와 합치면서
+     * 벡터 최저점 기준으로 다시 매기므로 이 값 자체에는 뜻이 없다.
      */
     private SearchResult toSearchResult(Document document, int rank) {
         return SearchResult.builder()
