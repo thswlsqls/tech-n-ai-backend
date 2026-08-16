@@ -15,11 +15,6 @@ def module_source_path = [
 pipeline {
     agent any
 
-    // 같은 잡이 동시에 여러 개 돌면 Gradle 데몬이 여러 개 뜨면서 빌드 머신 메모리가 부족해진다.
-    options {
-        disableConcurrentBuilds()
-    }
-
     parameters {
         choice(
             name: 'MODULE_NAME',
