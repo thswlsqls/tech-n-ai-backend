@@ -77,7 +77,7 @@ public class SearchBaselineTasklet implements Tasklet {
                 toBlock(AggregateScorer.aggregate(byChainOutput, QuestionRunner.K_VALUES)),
                 toBlock(AggregateScorer.aggregate(byMergedRank, QuestionRunner.K_VALUES))
             ),
-            // 제외 판정은 순위 기준과 무관해 세 블록이 모두 같다
+            // 제외 판정은 순위 기준과 무관해 네 블록이 모두 같다
             new EvalReport.Excluded(
                 vectorRankMetrics.excluded().intentNotRag(),
                 vectorRankMetrics.excluded().fallbackPath(),

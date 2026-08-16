@@ -8,7 +8,6 @@ import com.tech.n.ai.api.chatbot.service.dto.SearchOutcome;
 import com.tech.n.ai.api.chatbot.service.dto.SearchResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -33,15 +32,12 @@ public class RetrievalService {
     private final VectorSearchService vectorSearchService;
     private final GraphSearchService graphSearchService;
 
-    @Value("${chatbot.rag.graph.enabled:false}")
-    private boolean graphEnabled;
-
     public RetrievalOutcome retrieve(String query, Long userId, SearchOptions options) {
         long vectorStart = System.currentTimeMillis();
         SearchOutcome vector = vectorSearchService.search(query, userId, options);
         long vectorLatencyMs = System.currentTimeMillis() - vectorStart;
 
-        GraphSearchOutcome graph = graphEnabled ? searchGraph(query) : GraphSearchOutcome.disabled();
+        GraphSearchOutcome graph = searchGraph(query);
 
         List<SearchResult> merged = merge(vector, graph);
         int graphAddedCount = merged.size() - vector.results().size();
@@ -75,7 +71,7 @@ public class RetrievalService {
      * 순위가 1부터 시작하니 어떤 그래프 문서도 벡터 최저점을 넘지 못하고, 뒤로 갈수록 낮아진다.
      * 그래프가 벡터 상위 자리를 밀어내지 않게 하려는 것이다.
      */
-    List<SearchResult> merge(SearchOutcome vector, GraphSearchOutcome graph) {
+    private List<SearchResult> merge(SearchOutcome vector, GraphSearchOutcome graph) {
         List<SearchResult> vectorResults = vector.results();
         List<SearchResult> merged = new ArrayList<>(vectorResults);
 

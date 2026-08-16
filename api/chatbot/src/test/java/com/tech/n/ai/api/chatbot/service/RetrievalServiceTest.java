@@ -14,7 +14,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 
@@ -22,8 +21,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -46,7 +43,6 @@ class RetrievalServiceTest {
     @BeforeEach
     void setUp() {
         retrievalService = new RetrievalService(vectorSearchService, graphSearchService);
-        ReflectionTestUtils.setField(retrievalService, "graphEnabled", true);
     }
 
     private SearchResult result(String documentId, Double score) {
@@ -211,18 +207,17 @@ class RetrievalServiceTest {
     class GraphDisabled {
 
         @Test
-        @DisplayName("그래프 검색을 아예 부르지 않고 벡터 결과만 돌려준다")
-        void skipsGraphSearchEntirely() {
+        @DisplayName("그래프 검색이 꺼짐 결과를 돌려주면 벡터 결과만 남는다")
+        void keepsVectorResultsWhenGraphIsDisabled() {
             // Given
-            ReflectionTestUtils.setField(retrievalService, "graphEnabled", false);
-            when(vectorSearchService.search(anyString(), anyLong(), any()))
-                .thenReturn(vectorOutcome(List.of(result("v1", 0.9))));
+            givenSearches(
+                vectorOutcome(List.of(result("v1", 0.9))),
+                GraphSearchOutcome.disabled());
 
             // When
             RetrievalOutcome outcome = retrieve();
 
             // Then
-            verify(graphSearchService, never()).search(anyString());
             assertThat(outcome.merged())
                 .extracting(SearchResult::documentId)
                 .containsExactly("v1");
