@@ -1,0 +1,29 @@
+spring:
+  config.activate.on-profile: local
+  main.web-application-type: none
+  batch:
+    job:
+      enabled: true
+      name: ${job.name:NONE}
+
+management:
+  health:
+    redis:
+      enabled: false
+
+# 실행 파라미터는 기본값을 코드(@Value)에만 두고 여기에 값을 박지 않는다.
+# 실행할 때 필요한 것만 골라 넘긴다.
+#   --job.name=techGraphBuildJob                 실행할 잡. 이 모듈에는 이 잡 하나뿐이다.
+#   --graph.build.document-limit=20              N건만 돌린다. 0이면 전량. 표본은 20 정도로 둔다.
+#   --graph.build.select=recent                  문서를 고르는 방식. recent는 최신순 앞에서 N건,
+#                                                spread는 provider·update_type이 섞이게 골고루 N건.
+#   --graph.build.reset=true                     그래프 컬렉션 두 개를 비우고 시작한다. 타입 목록이나
+#                                                이름 규칙을 바꿔 옛 노드가 남을 때만 쓴다. 기본은 false.
+#   --graph.build.input-text=embedding-text      추출에 넣을 텍스트. embedding-text(기본) 또는 title-summary.
+#                                                기본값 근거는 03-graph-schema.md의 "결정 3"에 있다.
+#   --graph.build.model-name=gpt-4o-mini         추출 모델. 바꾸면 리포트의 모델 이름도 함께 바뀐다.
+#
+# 아래 셋은 기본값을 두지 않는다. 실행할 때 반드시 준다.
+#   --graph.build.input-price-per-1m-usd=...     입력 100만 토큰당 단가. 모델·시점마다 달라 코드에 박지 않는다.
+#   --graph.build.output-price-per-1m-usd=...    출력 100만 토큰당 단가.
+#   --graph.build.report.dir=...                 리포트를 떨굴 디렉터리. 체크아웃 위치마다 다르다.

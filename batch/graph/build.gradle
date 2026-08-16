@@ -1,0 +1,28 @@
+group = 'com.tech.n.ai.batch'
+version = '0.0.1-SNAPSHOT'
+description = 'batch-graph'
+
+bootJar.enabled = true
+jar.enabled = false
+
+dependencies {
+	implementation project(':datasource-mongodb')
+	implementation project(':common-core')
+
+	// 버전은 루트 build.gradle의 langchain4j-bom, langchain4j-community-bom이 정한다
+	implementation 'dev.langchain4j:langchain4j'
+	implementation 'dev.langchain4j:langchain4j-open-ai'
+	implementation 'dev.langchain4j:langchain4j-community-llm-graph-transformer'
+	implementation 'dev.langchain4j:langchain4j-community-core'
+
+	implementation 'org.springframework.boot:spring-boot-starter-batch'
+
+	compileOnly 'org.projectlombok:lombok'
+	annotationProcessor 'org.projectlombok:lombok'
+	testImplementation 'org.springframework.boot:spring-boot-starter-batch-test'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+task prepareKotlinBuildScriptModel {
+
+}
