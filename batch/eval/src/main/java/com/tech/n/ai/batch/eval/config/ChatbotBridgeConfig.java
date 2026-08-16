@@ -5,13 +5,16 @@ import com.tech.n.ai.api.chatbot.chain.InputInterpretationChain;
 import com.tech.n.ai.api.chatbot.chain.ResultRefinementChain;
 import com.tech.n.ai.api.chatbot.config.LangChain4jConfig;
 import com.tech.n.ai.api.chatbot.service.CohereReRankingServiceImpl;
+import com.tech.n.ai.api.chatbot.service.GraphSearchService;
 import com.tech.n.ai.api.chatbot.service.IntentClassificationServiceImpl;
 import com.tech.n.ai.api.chatbot.service.LLMServiceImpl;
 import com.tech.n.ai.api.chatbot.service.PromptServiceImpl;
+import com.tech.n.ai.api.chatbot.service.RetrievalService;
 import com.tech.n.ai.api.chatbot.service.SearchOptionsFactory;
 import com.tech.n.ai.api.chatbot.service.TokenServiceImpl;
 import com.tech.n.ai.api.chatbot.service.VectorSearchServiceImpl;
 import com.tech.n.ai.domain.mongodb.config.MongoClientConfig;
+import com.tech.n.ai.domain.mongodb.service.TechGraphReader;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
@@ -30,6 +33,9 @@ import org.springframework.context.annotation.Import;
     LangChain4jConfig.class,
     MongoClientConfig.class,
     VectorSearchServiceImpl.class,
+    RetrievalService.class,
+    GraphSearchService.class,
+    TechGraphReader.class,
     InputInterpretationChain.class,
     IntentClassificationServiceImpl.class,
     ResultRefinementChain.class,
