@@ -65,7 +65,7 @@ pipeline {
             }
         }
 
-        stage('Validate API Server') {
+        stage('Health Check') {
             steps {
                 script {
                     // 배치는 수집한 데이터를 api-emerging-tech 내부 API로 넘겨서 저장한다.
@@ -127,24 +127,30 @@ pipeline {
                 }
             }
         }
-
-        stage('Health Check') {
-            steps {
-                echo "Batch Job completed successfully."
-                echo "Job: ${jobName}"
-                echo "Profile: ${params.SPRING_PROFILE}"
-                echo "Exit Code: ${env.batchExitCode}"
-            }
-        }
     }
 
     post {
-        failure {
-            echo "=== BATCH JOB FAILURE ==="
+        success {
+            echo "Batch Job completed successfully."
             echo "Job: ${jobName}"
             echo "Profile: ${params.SPRING_PROFILE}"
             echo "Exit Code: ${env.batchExitCode}"
-            echo "Check console output for detailed error logs."
+        }
+        failure {
+            script {
+                echo "=== BATCH JOB FAILURE ==="
+                echo "Job: ${jobName}"
+                echo "Profile: ${params.SPRING_PROFILE}"
+
+                // 배치를 실행하기 전 단계에서 실패하면 종료 코드가 없다.
+                if (env.batchExitCode) {
+                    echo "Exit Code: ${env.batchExitCode}"
+                } else {
+                    echo "배치를 실행하기 전 단계에서 실패해 종료 코드가 없습니다."
+                }
+
+                echo "Check console output for detailed error logs."
+            }
         }
     }
 }
