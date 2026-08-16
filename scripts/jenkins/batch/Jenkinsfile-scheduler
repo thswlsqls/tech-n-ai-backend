@@ -27,6 +27,10 @@ pipeline {
         BUILD_DIR = "${JENKINS_HOME}/builds"
         PROJECT_NAME = "${project_name}"
         JAR_PATH = "${JENKINS_HOME}/builds/${project_name}.jar"
+        // 배치가 수집 결과를 저장할 때 호출하는 서버.
+        // 주소는 client/feign/src/main/resources/application-feign-internal.yml 의
+        // emerging-tech-internal-api 설정과 같아야 한다.
+        EMERGING_TECH_API_URL = 'http://localhost:8082'
     }
 
     stages {
@@ -57,6 +61,41 @@ pipeline {
                         error "JAR file not found: ${env.JAR_PATH}. Run CI/CD Pipeline first."
                     }
                     echo "JAR validated: ${env.JAR_PATH}"
+                }
+            }
+        }
+
+        stage('Validate API Server') {
+            steps {
+                script {
+                    // 배치는 수집한 데이터를 api-emerging-tech 내부 API로 넘겨서 저장한다.
+                    // 서버가 안 떠 있으면 RSS 를 다 긁어온 뒤 첫 청크를 저장하다 죽으므로,
+                    // 실행 전에 미리 확인해서 "서버 없음"과 "배치 로직 오류"를 구분한다.
+                    def healthUrl = "${env.EMERGING_TECH_API_URL}/actuator/health"
+
+                    // 연결 자체가 안 되면 curl 이 상태 코드를 000 으로 찍는다.
+                    // 200 이 아니어도(예: Redis 가 죽어 health 가 DOWN) 배치는 돌 수 있으므로
+                    // 응답이 오기만 하면 통과시킨다.
+                    def httpCode = sh(
+                        returnStdout: true,
+                        script: "curl -s -o /dev/null -m 5 -w '%{http_code}' ${healthUrl} || true"
+                    ).trim()
+
+                    if (httpCode == '000') {
+                        error """api-emerging-tech 서버에 연결할 수 없습니다: ${healthUrl}
+
+배치는 수집 결과를 이 서버의 내부 API로 저장하므로, 서버 없이는 실행할 수 없습니다.
+서버를 먼저 띄운 뒤 이 잡을 다시 실행하세요.
+
+  ./gradlew :api-emerging-tech:bootRun
+"""
+                    }
+
+                    if (httpCode != '200') {
+                        echo "api-emerging-tech 응답은 왔지만 health 가 정상이 아닙니다 (HTTP ${httpCode}). 배치는 그대로 진행합니다."
+                    } else {
+                        echo "API server validated: ${env.EMERGING_TECH_API_URL}"
+                    }
                 }
             }
         }
