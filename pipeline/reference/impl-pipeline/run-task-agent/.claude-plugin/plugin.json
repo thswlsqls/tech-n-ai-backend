@@ -1,8 +1,0 @@
-{
-  "name": "ringle-run-task",
-  "version": "1.0.0",
-  "description": "ringle-fullstack 전용 task 실행 파이프라인 — docs/tasks·docs/prompts 문서 쌍을 입력으로 탐색→질문→설계→구현→리뷰→기록을 오케스트레이션하는 에이전트 4종과 진입 명령. task마다 작업 브랜치·이슈·PR을 만들고 사용자 승인 후 main에 merge한다.",
-  "author": {
-    "name": "Eunbin Son"
-  }
-}

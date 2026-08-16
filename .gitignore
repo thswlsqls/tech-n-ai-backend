@@ -80,3 +80,51 @@ devops/results/
 
 ### 다이어그램 생성용 파이썬 가상환경 — git 추적 제외 ###
 docs/monitoring/.venv/
+
+### 로컬 작업 산출물 — 원격에 올리지 않는다 ###
+# 앞에 /를 붙여 저장소 루트의 폴더만 제외한다 (api/auth/docs 같은 하위 docs는 그대로 추적)
+/pipeline/
+/prompts/
+
+# docs는 통째로 제외하되, README.md가 링크하는 문서만 남긴다.
+# !로 파일을 다시 포함하려면 상위 디렉터리가 제외돼 있으면 안 되므로 !/docs/**/ 로 디렉터리를 먼저 살린다.
+/docs/**
+!/docs/**/
+!/docs/prototype/step1/2. mongodb-schema-design.md
+!/docs/prototype/step1/3. aurora-schema-design.md
+!/docs/prototype/step10/batch-job-integration-design.md
+!/docs/prototype/step11/ai-integration-analysis.md
+!/docs/prototype/step11/cqrs-kafka-sync-design.md
+!/docs/prototype/step12/rag-chatbot-design.md
+!/docs/prototype/step13/user-bookmark-feature-design.md
+!/docs/prototype/step14/gateway-design.md
+!/docs/prototype/step14/gateway-implementation-plan.md
+!/docs/prototype/step6/oauth-provider-implementation-guide.md
+!/docs/prototype/step6/spring-security-auth-design-guide.md
+!/docs/prototype/step7/redis-optimization-best-practices.md
+!/docs/prototype/step8/rss-scraper-modules-analysis.md
+!/docs/prototype/step8/slack-integration-design-guide.md
+!/docs/reference/agent-pipeline/001-data-pipeline-design.md
+!/docs/reference/agent-pipeline/002-langchain4j-tools-design.md
+!/docs/reference/agent-pipeline/003-agent-integration-design.md
+!/docs/reference/agent-pipeline/004-analytics-tool-redesign.md
+!/docs/reference/agent-pipeline/005-data-collection-agent.md
+!/docs/reference/agent-pipeline/006-agent-query-tool-improvement.md
+!/docs/reference/agent-pipeline/007-unsupported-request-handling.md
+!/docs/reference/agent-pipeline/tests/01-agent-run-test-results.md
+!/docs/reference/agent-pipeline/tests/02-agent-analytics-test-results.md
+!/docs/reference/agent-pipeline/tests/03-agent-data-collection-test-results.md
+!/docs/reference/agent-pipeline/tests/04-agent-query-tools-test-results.md
+!/docs/reference/agent-pipeline/tests/README.md
+!/docs/reference/api-specifications/000-overview.md
+!/docs/reference/api-specifications/001-api-agent.md
+!/docs/reference/api-specifications/002-api-auth.md
+!/docs/reference/api-specifications/003-api-bookmark.md
+!/docs/reference/api-specifications/004-api-chatbot.md
+!/docs/reference/api-specifications/005-api-emerging-tech.md
+!/docs/reference/design/002-admin-role-based-auth.md
+!/docs/reference/design/004-chatbot-rag-redesign.md
+!/docs/reference/design/005-chatbot-hybrid-search-score-fusion.md
+!/docs/reference/design/006-chatbot-session-title-generation.md
+!/docs/reference/design/008-api-gateway-improvement.md
+!/docs/reference/guide/003-mysql-docker-local-setup.md
