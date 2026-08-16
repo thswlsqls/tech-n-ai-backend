@@ -8,6 +8,11 @@ def jar_name = 'batch-source-0.0.1-SNAPSHOT.jar'
 pipeline {
     agent any
 
+    // 같은 잡이 동시에 여러 개 돌면 Gradle 데몬이 여러 개 뜨면서 빌드 머신 메모리가 부족해진다.
+    options {
+        disableConcurrentBuilds()
+    }
+
     environment {
         PROJECT_NAME = "${project_name}"
         BUILD_DIR = "${JENKINS_HOME}/builds"
@@ -38,9 +43,12 @@ pipeline {
                 script {
                     env.buildTimestamp = sh(returnStdout: true, script: 'date +%Y%m%d%H%M%S').trim()
 
+                    // --no-daemon: 데몬이 이 빌드보다 오래 살면 다른 잡이 이어받아 쓰는데,
+                    // 그때 원래 데몬을 띄운 빌드가 끝나면 Jenkins ProcessTreeKiller가 데몬을 죽여
+                    // 남의 빌드가 "daemon disappeared"로 실패한다.
                     sh '''
                         chmod +x ./gradlew
-                        ./gradlew -x test :${PROJECT_NAME}:clean :${PROJECT_NAME}:build --info
+                        ./gradlew --no-daemon -x test :${PROJECT_NAME}:clean :${PROJECT_NAME}:build --info
                     '''
                 }
             }
