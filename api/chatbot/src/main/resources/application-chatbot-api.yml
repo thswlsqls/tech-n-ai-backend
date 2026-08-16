@@ -26,6 +26,14 @@ chatbot:
     max-context-tokens: 3000  # 컨텍스트 최대 토큰 수
     recency-months: 6  # 최신성 키워드 감지 시 검색할 기간 (개월)
 
+    # 지식 그래프 검색 설정 (기본 꺼둠 — 평가 잡에서만 켠다)
+    graph:
+      enabled: false  # 활성화 여부
+      max-results: 10  # 그래프가 돌려줄 문서 최대 개수
+      max-seeds: 20  # 질문이 맞춘 시드 노드 최대 개수
+      max-edges-per-seed: 20  # 시드 하나당 훑을 엣지 최대 개수
+      max-time-ms: 2000  # 그래프 조회 실행 시간 상한 (밀리초)
+
   # Re-Ranking 설정 (Cohere)
   reranking:
     enabled: false  # 활성화 여부 (API Key 설정 시 true로 변경)
