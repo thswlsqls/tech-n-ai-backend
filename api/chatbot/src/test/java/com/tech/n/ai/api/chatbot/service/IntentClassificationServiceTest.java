@@ -5,6 +5,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -293,6 +294,74 @@ class IntentClassificationServiceTest {
 
             // Then
             assertThat(result).isEqualTo(Intent.RAG_REQUIRED);
+        }
+    }
+
+    // ========== 기준 표 25건 (docs/plans/20260812124047/04-intent-baseline.md) ==========
+
+    @Nested
+    @DisplayName("classifyIntent - 기준 표 25건")
+    class IntentBaselineTable {
+
+        @ParameterizedTest
+        @DisplayName("영어 키워드를 단어 경계로 바꾸기 전에도 의도와 맞던 15건은 그대로다")
+        @CsvSource(delimiter = '|', value = {
+            "OpenAI Daybreak 사이버 보안 도구 소식을 알려줘                                                     | RAG_REQUIRED",
+            "avatarin이 리테일 에이전트를 만든 사례를 다룬 블로그 포스트를 알려줘                                | RAG_REQUIRED",
+            "OpenAI의 Codex Security 미리보기와 Anthropic이 방어자에게 사이버 보안 기능을 공개한 소식을 비교해줘 | RAG_REQUIRED",
+            "OpenAI의 최신 모델 출시 소식을 알려줘                                                              | RAG_REQUIRED",
+            "Anthropic Claude Code에서 프롬프트 캐시를 1시간으로 늘리는 환경 변수 이름이 뭔가요?                 | RAG_REQUIRED",
+            "지금 서울 날씨 어때?                                                                               | WEB_SEARCH_REQUIRED",
+            "이 문단을 영어로 번역해줘                                                                          | LLM_DIRECT",
+            "회의록 초안 작성해줘                                                                               | LLM_DIRECT",
+            "아래 글을 세 줄로 요약해줘                                                                         | LLM_DIRECT",
+            "안녕하세요                                                                                         | LLM_DIRECT",
+            "반갑습니다                                                                                         | LLM_DIRECT",
+            "@agent 최근 AI 릴리즈 통계 내줘                                                                    | AGENT_COMMAND",
+            "@agent 이번 달 수집 건수 차트로 보여줘                                                             | AGENT_COMMAND",
+            "OpenAI의 새 모델 정보 알려줘                                                                       | RAG_REQUIRED",
+            "이 로그 메시지가 무슨 뜻인지 설명해줘                                                              | LLM_DIRECT"
+        })
+        void classifyIntent_unchangedCases(String input, Intent expected) {
+            // When
+            Intent result = intentService.classifyIntent(input);
+
+            // Then
+            assertThat(result).isEqualTo(expected);
+        }
+
+        @ParameterizedTest
+        @DisplayName("영어 키워드를 단어 경계로 보면 ai가 explain·email·available·plain에 걸리지 않아 RAG_REQUIRED에서 LLM_DIRECT로 바로잡힌다")
+        @CsvSource(delimiter = '|', value = {
+            "Explain the difference between a stack and a queue | LLM_DIRECT",
+            "Write a polite email to my manager about the schedule | LLM_DIRECT",
+            "이 코드에서 available 옵션이 뭔지 설명해줘 | LLM_DIRECT",
+            "Please summarize this article in plain English | LLM_DIRECT"
+        })
+        void classifyIntent_fixedByWordBoundary(String input, Intent expected) {
+            // When
+            Intent result = intentService.classifyIntent(input);
+
+            // Then
+            assertThat(result).isEqualTo(expected);
+        }
+
+        @ParameterizedTest
+        @DisplayName("아직 의도와 어긋난 채 남은 6건 — 원인 B·C는 이번 범위 밖이라 남겼다 (04-intent-baseline.md 참고)")
+        @CsvSource(delimiter = '|', value = {
+            "오늘 최신 AI 뉴스 알려줘             | RAG_REQUIRED",
+            "현재 애플 주가 알려줘                | RAG_REQUIRED",
+            "오늘 환율 정보 찾아줘                | RAG_REQUIRED",
+            "실시간으로 지금 인터넷에서 검색해줘  | RAG_REQUIRED",
+            "hi, how are you?                     | RAG_REQUIRED",
+            "점심 뭐 먹을까?                      | RAG_REQUIRED"
+        })
+        void classifyIntent_stillMismatchedCases(String input, Intent expected) {
+            // When
+            Intent result = intentService.classifyIntent(input);
+
+            // Then
+            assertThat(result).isEqualTo(expected);
         }
     }
 }
