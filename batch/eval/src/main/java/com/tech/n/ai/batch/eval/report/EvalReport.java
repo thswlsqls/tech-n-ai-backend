@@ -24,8 +24,8 @@ public record EvalReport(
     AnswerQuality answerQuality
 ) {
 
-    /** 그래프 검색 블록이 생기면서 올린 버전. 앞선 실행의 리포트와 구분한다 */
-    public static final String SCHEMA_VERSION = "3";
+    /** 보강 블록이 생기면서 올린 버전. 앞선 실행의 리포트와 구분한다 */
+    public static final String SCHEMA_VERSION = "4";
 
     /**
      * 실행 당시 설정 스냅샷
@@ -45,7 +45,11 @@ public record EvalReport(
         Boolean graphRetrievalEnabled,
         int graphMaxResults,
         int graphMaxSeeds,
-        long graphMaxTimeMs
+        long graphMaxTimeMs,
+        boolean augmentEnabled,
+        int augmentMaxAttempts,
+        double augmentMinVectorScore,
+        double augmentRelaxedMinScore
     ) {}
 
     /**
@@ -70,6 +74,7 @@ public record EvalReport(
         List<MergedItem> mergedOutput,
         Graph graph,
         String retrievalPath,
+        Augment augment,
         Metrics metrics
     ) {
 
@@ -81,9 +86,20 @@ public record EvalReport(
             return new Question(
                 id, type, question, intent, searchPath, recencyQueryFailed, scored, excludedReason,
                 noEvidence, latencyMs, tokens, expectedExternalIds, latestExternalId,
-                candidates, chainOutput, mergedOutput, graph, retrievalPath, metrics);
+                candidates, chainOutput, mergedOutput, graph, retrievalPath, augment, metrics);
         }
     }
+
+    /**
+     * 근거가 약해서 조건을 완화해 다시 찾은 기록
+     *
+     * 보강을 끄고 돌린 실행도 키를 빼지 않는다. 발동하지 않은 상태를 값으로 적는다.
+     */
+    public record Augment(
+        boolean triggered,
+        int attempts,
+        boolean adopted
+    ) {}
 
     /**
      * 그래프 검색이 이 질문에서 한 일

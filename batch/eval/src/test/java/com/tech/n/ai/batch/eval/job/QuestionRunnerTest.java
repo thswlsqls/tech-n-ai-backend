@@ -6,6 +6,7 @@ import com.tech.n.ai.api.chatbot.service.IntentClassificationService;
 import com.tech.n.ai.api.chatbot.service.RetrievalService;
 import com.tech.n.ai.api.chatbot.service.SearchOptionsFactory;
 import com.tech.n.ai.api.chatbot.service.TokenService;
+import com.tech.n.ai.api.chatbot.service.dto.AugmentOutcome;
 import com.tech.n.ai.api.chatbot.service.dto.GraphSearchOutcome;
 import com.tech.n.ai.api.chatbot.service.dto.Intent;
 import com.tech.n.ai.api.chatbot.service.dto.RetrievalOutcome;
@@ -85,7 +86,8 @@ class QuestionRunnerTest {
             .build();
         when(retrievalService.retrieve(anyString(), anyLong(), any()))
             .thenReturn(new RetrievalOutcome(
-                vector, GraphSearchOutcome.disabled(), List.of(), RetrievalPath.NONE, 12L, 0L));
+                vector, GraphSearchOutcome.disabled(), List.of(), RetrievalPath.NONE, 12L, 0L,
+                AugmentOutcome.none()));
         when(refinementChain.refine(anyString(), any(), anyBoolean(), anyBoolean()))
             .thenReturn(List.of());
         when(tokenService.estimateTokens(anyString())).thenReturn(10);
@@ -136,6 +138,36 @@ class QuestionRunnerTest {
             // Then
             assertThat(question.excludedReason()).isEqualTo("SEARCH_FAILED");
             assertThat(question.noEvidence()).isNull();
+        }
+    }
+
+    @Nested
+    @DisplayName("run - 보강 기록")
+    class AugmentBlock {
+
+        @Test
+        @DisplayName("검색이 남긴 보강 기록을 리포트에 그대로 옮긴다")
+        void copiesAugmentOutcomeToReport() {
+            // Given: 보강이 두 번 돌아 재검색 결과로 바뀐 검색
+            givenSearchPath(SearchPath.HYBRID);
+            SearchOutcome vector = SearchOutcome.builder()
+                .path(SearchPath.HYBRID)
+                .candidates(List.of())
+                .recencyQueryFailed(false)
+                .results(List.of())
+                .build();
+            when(retrievalService.retrieve(anyString(), anyLong(), any()))
+                .thenReturn(new RetrievalOutcome(
+                    vector, GraphSearchOutcome.disabled(), List.of(), RetrievalPath.NONE, 12L, 0L,
+                    new AugmentOutcome(true, 2, true)));
+
+            // When
+            EvalReport.Question question = questionRunner.run(noEvidenceItem()).question();
+
+            // Then
+            assertThat(question.augment().triggered()).isTrue();
+            assertThat(question.augment().attempts()).isEqualTo(2);
+            assertThat(question.augment().adopted()).isTrue();
         }
     }
 }

@@ -6,6 +6,7 @@ import com.tech.n.ai.api.chatbot.service.IntentClassificationService;
 import com.tech.n.ai.api.chatbot.service.RetrievalService;
 import com.tech.n.ai.api.chatbot.service.SearchOptionsFactory;
 import com.tech.n.ai.api.chatbot.service.TokenService;
+import com.tech.n.ai.api.chatbot.service.dto.AugmentOutcome;
 import com.tech.n.ai.api.chatbot.service.dto.GraphSearchOutcome;
 import com.tech.n.ai.api.chatbot.service.dto.Intent;
 import com.tech.n.ai.api.chatbot.service.dto.RetrievalOutcome;
@@ -125,7 +126,7 @@ class QuestionRunnerGraphTest {
                 97L);
             return new RetrievalOutcome(
                 vectorOutcome(List.of(vectorHit)), graph, List.of(vectorHit, graphHit),
-                RetrievalPath.BOTH, 210L, 97L);
+                RetrievalPath.BOTH, 210L, 97L, AugmentOutcome.none());
         }
 
         @Test
@@ -193,7 +194,7 @@ class QuestionRunnerGraphTest {
             List<SearchResult> vectorResults = List.of(result("ext-1", "doc1", 0.8));
             return new RetrievalOutcome(
                 vectorOutcome(vectorResults), GraphSearchOutcome.disabled(), vectorResults,
-                RetrievalPath.VECTOR_ONLY, 210L, 0L);
+                RetrievalPath.VECTOR_ONLY, 210L, 0L, AugmentOutcome.none());
         }
 
         @Test
