@@ -11,8 +11,9 @@ import java.util.List;
  * @param graph 그래프 검색 결과 묶음. 그래프를 끄면 {@code enabled=false}인 빈 결과다
  * @param merged 벡터 결과 뒤에 그래프 결과를 붙이고 중복을 뺀 목록
  * @param path 근거를 어디서 얻었는지
- * @param vectorLatencyMs 벡터 검색에 걸린 시간
+ * @param vectorLatencyMs 벡터 검색에 걸린 시간. 보강이 돌면 재검색 시간까지 더한 값이다
  * @param graphLatencyMs 그래프 검색에 걸린 시간. 그래프를 끄면 0이다
+ * @param augment 조건을 완화해 다시 찾은 기록. 보강을 끄면 발동하지 않은 값이다
  */
 public record RetrievalOutcome(
     SearchOutcome vector,
@@ -20,5 +21,6 @@ public record RetrievalOutcome(
     List<SearchResult> merged,
     RetrievalPath path,
     long vectorLatencyMs,
-    long graphLatencyMs
+    long graphLatencyMs,
+    AugmentOutcome augment
 ) {}

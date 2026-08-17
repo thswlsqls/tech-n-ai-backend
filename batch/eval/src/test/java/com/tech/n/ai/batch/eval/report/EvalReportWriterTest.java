@@ -276,6 +276,7 @@ class EvalReportWriterTest {
             new EvalReport.Graph(true, List.of("Model|gpt-4o"), List.of("Provider|openai"),
                 List.of("ext-1"), 1, false, 42L),
             "BOTH",
+            new EvalReport.Augment(false, 0, false),
             new EvalReport.Metrics(metrics, metrics, metrics, metrics));
 
         EvalReport.AggregateBlock block = new EvalReport.AggregateBlock(
@@ -295,7 +296,8 @@ class EvalReportWriterTest {
             "draft-schema-only",
             new EvalReport.Config(5, 0.7, 6, true, false, 0.7,
                 "text-embedding-3-small", 1536, 1234L, "추정치", false,
-                true, 10, 20, 2000L),
+                true, 10, 20, 2000L,
+                false, 2, 0.72, 0.5),
             List.of(question),
             new EvalReport.Aggregate(block, block, block, block),
             new EvalReport.Excluded(0, 0, 0, 0),

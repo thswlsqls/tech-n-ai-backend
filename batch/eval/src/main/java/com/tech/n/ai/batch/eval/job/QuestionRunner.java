@@ -6,6 +6,7 @@ import com.tech.n.ai.api.chatbot.service.IntentClassificationService;
 import com.tech.n.ai.api.chatbot.service.RetrievalService;
 import com.tech.n.ai.api.chatbot.service.SearchOptionsFactory;
 import com.tech.n.ai.api.chatbot.service.TokenService;
+import com.tech.n.ai.api.chatbot.service.dto.AugmentOutcome;
 import com.tech.n.ai.api.chatbot.service.dto.GraphSearchOutcome;
 import com.tech.n.ai.api.chatbot.service.dto.Intent;
 import com.tech.n.ai.api.chatbot.service.dto.RetrievalOutcome;
@@ -139,6 +140,7 @@ public class QuestionRunner {
             mergedOutput,
             toGraphBlock(retrieval.graph()),
             retrieval.path().name(),
+            toAugmentBlock(retrieval.augment()),
             new EvalReport.Metrics(
                 RetrievalScorer.score(byVectorRank, expected, K_VALUES),
                 RetrievalScorer.score(byFusionRank, expected, K_VALUES),
@@ -178,6 +180,7 @@ public class QuestionRunner {
             List.of(),
             toGraphBlock(GraphSearchOutcome.disabled()),
             RetrievalPath.NONE.name(),
+            toAugmentBlock(AugmentOutcome.none()),
             new EvalReport.Metrics(
                 RetrievalScorer.score(List.of(), expected, K_VALUES),
                 RetrievalScorer.score(List.of(), expected, K_VALUES),
@@ -289,6 +292,13 @@ public class QuestionRunner {
             graph.results().size(),
             graph.capped(),
             graph.latencyMs());
+    }
+
+    /**
+     * 보강을 끄고 돌린 질문도 키를 비우지 않는다. 발동하지 않은 상태 그대로를 값으로 적는다.
+     */
+    private EvalReport.Augment toAugmentBlock(AugmentOutcome augment) {
+        return new EvalReport.Augment(augment.triggered(), augment.attempts(), augment.adopted());
     }
 
     /**

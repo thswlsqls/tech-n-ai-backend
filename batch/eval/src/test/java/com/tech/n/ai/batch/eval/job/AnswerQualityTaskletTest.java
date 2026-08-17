@@ -91,7 +91,8 @@ class AnswerQualityTaskletTest {
         when(configSnapshotFactory.create(true)).thenReturn(new EvalReport.Config(
             5, 0.7, 6, true, false, 0.0,
             "text-embedding-3-small", 1536, 1234L, TOKEN_ESTIMATION, true,
-            false, 10, 20, 2000L));
+            false, 10, 20, 2000L,
+            false, 2, 0.72, 0.5));
         when(tokenService.truncateResults(any(), anyInt())).thenReturn(List.of(evidence));
         when(promptService.buildPrompt(anyString(), any())).thenReturn("PROMPT");
         when(answerChain.generate(anyString(), any())).thenReturn("답변 본문");
@@ -136,6 +137,7 @@ class AnswerQualityTaskletTest {
             item.expectedExternalIds(), null, List.of(), List.of(), List.of(),
             new EvalReport.Graph(false, List.of(), List.of(), List.of(), 0, false, 0L),
             "VECTOR_ONLY",
+            new EvalReport.Augment(false, 0, false),
             new EvalReport.Metrics(metrics, metrics, metrics, metrics));
 
         QuestionOutcome outcome = new QuestionOutcome(

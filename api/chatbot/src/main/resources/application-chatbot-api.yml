@@ -34,6 +34,13 @@ chatbot:
       max-edges-per-seed: 20  # 시드 하나당 훑을 엣지 최대 개수
       max-time-ms: 2000  # 그래프 조회 실행 시간 상한 (밀리초)
 
+    # 근거가 약할 때 조건을 완화해 다시 찾기 (기본 꺼둠 — 평가 잡에서만 켠다)
+    augment:
+      enabled: false  # 활성화 여부
+      max-attempts: 2  # 재검색 최대 횟수
+      min-vector-score: 0.72  # 후보 최고 vectorScore가 이 값 미만이면 근거가 약하다고 본다
+      relaxed-min-score: 0.5  # 2단계에서 낮출 유사도 문턱
+
   # Re-Ranking 설정 (Cohere)
   reranking:
     enabled: false  # 활성화 여부 (API Key 설정 시 true로 변경)

@@ -55,6 +55,19 @@ public class EvalConfigSnapshotFactory {
     @Value("${chatbot.rag.graph.max-time-ms:2000}")
     private long graphMaxTimeMs;
 
+    // 보강 경로도 실행할 때 켜고 끄므로 실제 설정값을 읽는다. 안 적으면 켠 실행과 끈 실행이 리포트에서 같아 보인다.
+    @Value("${chatbot.rag.augment.enabled:false}")
+    private boolean augmentEnabled;
+
+    @Value("${chatbot.rag.augment.max-attempts:2}")
+    private int augmentMaxAttempts;
+
+    @Value("${chatbot.rag.augment.min-vector-score:0.72}")
+    private double augmentMinVectorScore;
+
+    @Value("${chatbot.rag.augment.relaxed-min-score:0.5}")
+    private double augmentRelaxedMinScore;
+
     public EvalConfigSnapshotFactory(MongoTemplate mongoTemplate) {
         this.mongoTemplate = mongoTemplate;
     }
@@ -75,7 +88,11 @@ public class EvalConfigSnapshotFactory {
             graphRetrievalEnabled,
             graphMaxResults,
             graphMaxSeeds,
-            graphMaxTimeMs
+            graphMaxTimeMs,
+            augmentEnabled,
+            augmentMaxAttempts,
+            augmentMinVectorScore,
+            augmentRelaxedMinScore
         );
     }
 
