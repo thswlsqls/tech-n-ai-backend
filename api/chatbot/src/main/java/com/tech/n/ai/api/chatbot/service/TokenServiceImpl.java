@@ -2,14 +2,12 @@ package com.tech.n.ai.api.chatbot.service;
 
 import com.tech.n.ai.api.chatbot.common.exception.TokenLimitExceededException;
 import com.tech.n.ai.api.chatbot.service.dto.SearchResult;
-import com.tech.n.ai.api.chatbot.service.dto.TokenUsage;
 import dev.langchain4j.model.openai.OpenAiTokenCountEstimator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -109,23 +107,5 @@ public class TokenServiceImpl implements TokenService {
         }
         
         return truncated;
-    }
-    
-    @Override
-    public TokenUsage trackUsage(String requestId, String userId, int inputTokens, int outputTokens) {
-        TokenUsage usage = TokenUsage.builder()
-            .requestId(requestId)
-            .userId(userId)
-            .inputTokens(inputTokens)
-            .outputTokens(outputTokens)
-            .totalTokens(inputTokens + outputTokens)
-            .timestamp(Instant.now())
-            .build();
-        
-        // 로깅
-        log.info("Token usage tracked: requestId={}, userId={}, inputTokens={}, outputTokens={}, totalTokens={}",
-            requestId, userId, inputTokens, outputTokens, usage.totalTokens());
-        
-        return usage;
     }
 }

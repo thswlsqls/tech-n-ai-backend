@@ -383,21 +383,6 @@ class ChatbotServiceTest {
             // Then
             verify(sessionService).updateLastMessageAt(TEST_SESSION_ID);
         }
-
-        @Test
-        @DisplayName("응답 후 토큰 사용량 추적")
-        void generateResponse_tracksTokenUsage() {
-            // Given
-            ChatRequest request = new ChatRequest("테스트", null);
-            setupCommonMocks(Intent.LLM_DIRECT);
-            when(sessionService.createSession(TEST_USER_ID.toString(), null)).thenReturn(TEST_SESSION_ID);
-            when(llmService.generate(anyList())).thenReturn("응답");
-            // When
-            chatbotService.generateResponse(request, TEST_USER_ID, "USER");
-
-            // Then
-            verify(tokenService).trackUsage(eq(TEST_SESSION_ID), eq(TEST_USER_ID.toString()), eq(10), eq(10));
-        }
     }
 
     // ========== 타이틀 생성 테스트 ==========

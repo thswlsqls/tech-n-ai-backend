@@ -2,7 +2,6 @@ package com.tech.n.ai.api.chatbot.service;
 
 import com.tech.n.ai.api.chatbot.common.exception.TokenLimitExceededException;
 import com.tech.n.ai.api.chatbot.service.dto.SearchResult;
-import com.tech.n.ai.api.chatbot.service.dto.TokenUsage;
 import dev.langchain4j.model.openai.OpenAiTokenCountEstimator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -192,28 +191,6 @@ class TokenServiceImplTest {
 
             // Then
             assertThat(truncated).isEmpty();
-        }
-    }
-
-    // ========== trackUsage 테스트 ==========
-
-    @Nested
-    @DisplayName("trackUsage")
-    class TrackUsage {
-
-        @Test
-        @DisplayName("토큰 사용량 추적")
-        void trackUsage_정상() {
-            // When
-            TokenUsage usage = tokenService.trackUsage("req-1", "user-1", 100, 50);
-
-            // Then
-            assertThat(usage.requestId()).isEqualTo("req-1");
-            assertThat(usage.userId()).isEqualTo("user-1");
-            assertThat(usage.inputTokens()).isEqualTo(100);
-            assertThat(usage.outputTokens()).isEqualTo(50);
-            assertThat(usage.totalTokens()).isEqualTo(150);
-            assertThat(usage.timestamp()).isNotNull();
         }
     }
 }

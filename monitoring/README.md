@@ -160,7 +160,7 @@ brew services info jenkins-lts       # 상태 확인
 
 ## 5. 애플리케이션 커스텀 미터
 
-앱이 직접 등록한 미터 네 개다. Spring Boot의 기본 미터(JVM·HTTP)로는 챗봇과 에이전트가
+앱이 직접 등록한 미터 여섯 개다. Spring Boot의 기본 미터(JVM·HTTP)로는 챗봇과 에이전트가
 안에서 무엇을 하는지 알 수 없어 따로 만들었다. 태그는 붙이지 않았고, 서비스 이름을 구분하는
 `application` 태그만 [`../common/core/src/main/resources/application-common-core.yml`](../common/core/src/main/resources/application-common-core.yml)이
 자동으로 붙인다. 값은 Prometheus에서 아래 이름으로 보인다(Micrometer가 점을 밑줄로 바꾼다).
@@ -180,6 +180,25 @@ Prometheus 이름: `chatbot_llm_errors_total`
 - **누가 언제 보나**: 평소에는 알림이 대신 본다. `ChatbotLlmHighFailureRate` 알림이 오면 백엔드 담당자가 확인한다.
 - **어떤 값이면 이상인가**: 최근 5분 실패 비율(`rate(chatbot_llm_errors_total[5m]) / rate(chatbot_llm_duration_seconds_count[5m])`)이 10%를 넘으면 이상이다. 실패한 호출도 지연시간 미터에 세므로 이 나눗셈이 곧 실패율이다.
 - **넘으면 무엇을 하나**: 앱 로그에서 `Failed to generate LLM response`를 찾아 원인(인증 실패·요금 한도·타임아웃)을 가른다. 키나 한도 문제면 설정을, 제공자 장애면 복구를 기다린다.
+
+### `chatbot.llm.input.tokens` — LLM 호출당 입력 토큰 수 (api-chatbot)
+
+Prometheus 이름: `chatbot_llm_input_tokens_sum` / `_count` / `_max`
+
+제공자가 응답에 실어 보낸 실측값이다. `LLMService`를 거치는 호출만 세므로, 세션 제목 생성처럼 `ChatModel`을 직접 부르는 경로는 여기에 안 잡힌다.
+
+- **누가 언제 보나**: OpenAI 청구액이 예상보다 클 때, 그리고 프롬프트 템플릿이나 근거 문서 개수를 바꿔 배포한 직후에 백엔드 담당자가 본다. `_sum`은 그 기간에 `LLMService`를 거친 호출의 입력 토큰 합계라, 실제 청구량의 하한으로 본다.
+- **어떤 값이면 이상인가**: `_sum / _count`로 낸 호출당 평균이 2,000을 넘으면 이상이다. 지금 RAG 프롬프트는 근거 문서까지 합쳐 한 건 평균 660토큰이라 평균이 세 배로 뛰었다면 프롬프트에 뭔가 과하게 붙고 있는 것이다. `_max`가 4,000(`chatbot.token.max-input-tokens`)에 가까워지면 RAG·웹 검색 경로가 그 한도에 걸릴 수 있다는 신호다. 다만 두 숫자가 재는 범위가 다르다. 한도 검사는 `PromptService`가 만든 프롬프트 문자열 하나를 자체 추정식으로 센 값이고, 이 미터는 챗 메모리에 실린 이전 대화까지 포함한 요청 전체에 대해 제공자가 돌려준 실측값이다. 일반 대화 경로와 웹 검색 결과가 0건일 때의 대체 응답 경로는 이 검사를 아예 거치지 않는다.
+- **넘으면 무엇을 하나**: `chatbot.rag.max-search-results`(5건)와 `chatbot.rag.max-context-tokens`(3,000)를 확인해 프롬프트에 붙는 근거 문서를 줄인다.
+- **결측 확인**: `chatbot_llm_duration_seconds_count - chatbot_llm_errors_total - chatbot_llm_input_tokens_count`가 사용량이 안 실려 온 호출 수다. 실패한 호출은 지연시간 미터에는 세지만 토큰은 기록하지 않으니 실패 건수를 먼저 빼야 한다. 값이 없으면 0으로 채우지 않고 건너뛰기 때문에 남은 차이로 결측이 드러난다. 실패 건수를 뺀 뒤에도 차이가 계속 늘면 제공자 응답에서 사용량이 빠지고 있다는 뜻이라 `_sum`을 청구량으로 믿으면 안 된다.
+
+### `chatbot.llm.output.tokens` — LLM 호출당 출력 토큰 수 (api-chatbot)
+
+Prometheus 이름: `chatbot_llm_output_tokens_sum` / `_count` / `_max`
+
+- **누가 언제 보나**: 답변이 중간에 잘린다는 제보가 들어왔을 때, 그리고 입력 토큰과 함께 비용을 볼 때 본다. 출력 토큰은 단가가 입력보다 비싸서 합계를 따로 본다.
+- **어떤 값이면 이상인가**: `_max`가 2,000(`LangChain4jConfig`의 `maxTokens`)에 붙어 있으면 이상이다. 모델이 하고 싶은 말을 다 못 하고 한도에서 잘렸다는 뜻이다.
+- **넘으면 무엇을 하나**: 잘린 답변이 실제로 나오는지 대화 로그로 확인하고, 맞으면 답변을 짧게 쓰도록 프롬프트를 고치거나 `maxTokens`를 올린다.
 
 ### `chatbot.search.results` — RAG 검색 결과 건수 (api-chatbot)
 

@@ -1,7 +1,6 @@
 package com.tech.n.ai.api.chatbot.service;
 
 import com.tech.n.ai.api.chatbot.service.dto.SearchResult;
-import com.tech.n.ai.api.chatbot.service.dto.TokenUsage;
 
 import java.util.List;
 
@@ -33,15 +32,4 @@ public interface TokenService {
      * @return 제한된 검색 결과 목록
      */
     List<SearchResult> truncateResults(List<SearchResult> results, int maxTokens);
-    
-    /**
-     * 토큰 사용량 추적
-     * 
-     * @param requestId 요청 ID
-     * @param userId 사용자 ID
-     * @param inputTokens 입력 토큰 수
-     * @param outputTokens 출력 토큰 수
-     * @return 토큰 사용량 정보
-     */
-    TokenUsage trackUsage(String requestId, String userId, int inputTokens, int outputTokens);
 }

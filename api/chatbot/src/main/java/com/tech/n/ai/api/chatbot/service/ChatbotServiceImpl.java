@@ -106,7 +106,6 @@ public class ChatbotServiceImpl implements ChatbotService {
         saveCurrentMessages(sessionId, chatMemory, request.message(), response);
 
         sessionService.updateLastMessageAt(sessionId);
-        trackTokenUsage(sessionId, userId, request.message(), response);
 
         if (isNewSession) {
             titleGenerationService.generateAndSaveTitleAsync(
@@ -235,12 +234,6 @@ public class ChatbotServiceImpl implements ChatbotService {
             tokenService.estimateTokens(userMessage));
         messageService.saveMessage(sessionId, "ASSISTANT", assistantMessage,
             tokenService.estimateTokens(assistantMessage));
-    }
-    
-    private void trackTokenUsage(String sessionId, Long userId, String input, String output) {
-        int inputTokens = tokenService.estimateTokens(input);
-        int outputTokens = tokenService.estimateTokens(output);
-        tokenService.trackUsage(sessionId, userId.toString(), inputTokens, outputTokens);
     }
     
     /**
