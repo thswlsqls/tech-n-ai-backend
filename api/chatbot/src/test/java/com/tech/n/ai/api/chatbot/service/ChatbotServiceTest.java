@@ -3,7 +3,6 @@ package com.tech.n.ai.api.chatbot.service;
 import com.tech.n.ai.api.chatbot.chain.AnswerGenerationChain;
 import com.tech.n.ai.api.chatbot.chain.InputInterpretationChain;
 import com.tech.n.ai.api.chatbot.chain.ResultRefinementChain;
-import com.tech.n.ai.api.chatbot.converter.MessageFormatConverter;
 import com.tech.n.ai.api.chatbot.dto.request.ChatRequest;
 import com.tech.n.ai.api.chatbot.dto.response.ChatResponse;
 import com.tech.n.ai.api.chatbot.memory.ConversationChatMemoryProvider;
@@ -17,7 +16,11 @@ import com.tech.n.ai.api.chatbot.service.dto.SearchPath;
 import com.tech.n.ai.api.chatbot.service.dto.SearchQuery;
 import com.tech.n.ai.api.chatbot.service.dto.SearchResult;
 import com.tech.n.ai.api.chatbot.service.dto.WebSearchDocument;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.memory.ChatMemory;
+import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,6 +28,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -88,9 +93,6 @@ class ChatbotServiceTest {
     private AgentDelegationService agentDelegationService;
 
     @Mock
-    private MessageFormatConverter messageConverter;
-
-    @Mock
     private SessionTitleGenerationService titleGenerationService;
 
     @Mock
@@ -102,6 +104,9 @@ class ChatbotServiceTest {
 
     @InjectMocks
     private ChatbotServiceImpl chatbotService;
+
+    @Captor
+    private ArgumentCaptor<List<ChatMessage>> messagesCaptor;
 
     private static final Long TEST_USER_ID = 1L;
     private static final String TEST_SESSION_ID = "100";
@@ -137,8 +142,7 @@ class ChatbotServiceTest {
             ChatRequest request = new ChatRequest("안녕하세요", null);
             setupCommonMocks(Intent.LLM_DIRECT);
             when(sessionService.createSession(TEST_USER_ID.toString(), null)).thenReturn(TEST_SESSION_ID);
-            when(messageConverter.convertToProviderFormat(anyList(), any())).thenReturn("formatted");
-            when(llmService.generate(anyString())).thenReturn("안녕하세요! 무엇을 도와드릴까요?");
+            when(llmService.generate(anyList())).thenReturn("안녕하세요! 무엇을 도와드릴까요?");
 
             // When
             ChatResponse result = chatbotService.generateResponse(request, TEST_USER_ID, "USER");
@@ -157,8 +161,7 @@ class ChatbotServiceTest {
             ChatRequest request = new ChatRequest("이전 대화 이어서", TEST_SESSION_ID);
             setupCommonMocks(Intent.LLM_DIRECT);
             when(messageService.getMessagesForMemory(eq(TEST_SESSION_ID), any())).thenReturn(Collections.emptyList());
-            when(messageConverter.convertToProviderFormat(anyList(), any())).thenReturn("formatted");
-            when(llmService.generate(anyString())).thenReturn("네, 이어서 진행합니다.");
+            when(llmService.generate(anyList())).thenReturn("네, 이어서 진행합니다.");
 
             // When
             ChatResponse result = chatbotService.generateResponse(request, TEST_USER_ID, "USER");
@@ -167,6 +170,33 @@ class ChatbotServiceTest {
             assertThat(result.conversationId()).isEqualTo(TEST_SESSION_ID);
             verify(sessionService).getSession(TEST_SESSION_ID, TEST_USER_ID.toString());
             verify(sessionService, never()).createSession(anyString(), any());
+        }
+
+        @Test
+        @DisplayName("일반 대화 처리 - 대화 메시지 목록을 그대로 LLM에 넘긴다")
+        void generateResponse_llmDirect_메시지목록_전달() {
+            // Given: 이전 대화 두 건이 저장돼 있는 기존 세션
+            ChatRequest request = new ChatRequest("RAG가 뭐야?", TEST_SESSION_ID);
+            when(memoryProvider.get(anyString())).thenReturn(MessageWindowChatMemory.withMaxMessages(10));
+            when(intentService.classifyIntent(anyString())).thenReturn(Intent.LLM_DIRECT);
+            when(messageService.getMessagesForMemory(eq(TEST_SESSION_ID), any())).thenReturn(List.of(
+                UserMessage.from("안녕하세요"),
+                AiMessage.from("안녕하세요! 무엇을 도와드릴까요?")));
+            when(llmService.generate(anyList())).thenReturn("검색한 문서를 근거로 답하는 방식입니다.");
+
+            // When
+            chatbotService.generateResponse(request, TEST_USER_ID, "USER");
+
+            // Then: 이전 대화 두 건 뒤에 이번 질문이 붙은 목록이 그대로 넘어간다
+            verify(llmService).generate(messagesCaptor.capture());
+            List<ChatMessage> sentMessages = messagesCaptor.getValue();
+            assertThat(sentMessages).hasSize(3);
+            assertThat(sentMessages.get(0)).isInstanceOf(UserMessage.class);
+            assertThat(((UserMessage) sentMessages.get(0)).singleText()).isEqualTo("안녕하세요");
+            assertThat(sentMessages.get(1)).isInstanceOf(AiMessage.class);
+            assertThat(((AiMessage) sentMessages.get(1)).text()).isEqualTo("안녕하세요! 무엇을 도와드릴까요?");
+            assertThat(sentMessages.get(2)).isInstanceOf(UserMessage.class);
+            assertThat(((UserMessage) sentMessages.get(2)).singleText()).isEqualTo("RAG가 뭐야?");
         }
     }
 
@@ -328,8 +358,7 @@ class ChatbotServiceTest {
             ChatRequest request = new ChatRequest("테스트 메시지", null);
             setupCommonMocks(Intent.LLM_DIRECT);
             when(sessionService.createSession(TEST_USER_ID.toString(), null)).thenReturn(TEST_SESSION_ID);
-            when(messageConverter.convertToProviderFormat(anyList(), any())).thenReturn("formatted");
-            when(llmService.generate(anyString())).thenReturn("테스트 응답");
+            when(llmService.generate(anyList())).thenReturn("테스트 응답");
 
             // When
             chatbotService.generateResponse(request, TEST_USER_ID, "USER");
@@ -346,8 +375,7 @@ class ChatbotServiceTest {
             ChatRequest request = new ChatRequest("테스트", null);
             setupCommonMocks(Intent.LLM_DIRECT);
             when(sessionService.createSession(TEST_USER_ID.toString(), null)).thenReturn(TEST_SESSION_ID);
-            when(messageConverter.convertToProviderFormat(anyList(), any())).thenReturn("formatted");
-            when(llmService.generate(anyString())).thenReturn("응답");
+            when(llmService.generate(anyList())).thenReturn("응답");
 
             // When
             chatbotService.generateResponse(request, TEST_USER_ID, "USER");
@@ -363,8 +391,7 @@ class ChatbotServiceTest {
             ChatRequest request = new ChatRequest("테스트", null);
             setupCommonMocks(Intent.LLM_DIRECT);
             when(sessionService.createSession(TEST_USER_ID.toString(), null)).thenReturn(TEST_SESSION_ID);
-            when(messageConverter.convertToProviderFormat(anyList(), any())).thenReturn("formatted");
-            when(llmService.generate(anyString())).thenReturn("응답");
+            when(llmService.generate(anyList())).thenReturn("응답");
             // When
             chatbotService.generateResponse(request, TEST_USER_ID, "USER");
 
@@ -386,8 +413,7 @@ class ChatbotServiceTest {
             ChatRequest request = new ChatRequest("AI 트렌드 알려줘", null);
             setupCommonMocks(Intent.LLM_DIRECT);
             when(sessionService.createSession(TEST_USER_ID.toString(), null)).thenReturn(TEST_SESSION_ID);
-            when(messageConverter.convertToProviderFormat(anyList(), any())).thenReturn("formatted");
-            when(llmService.generate(anyString())).thenReturn("AI 트렌드 답변");
+            when(llmService.generate(anyList())).thenReturn("AI 트렌드 답변");
 
             // When
             chatbotService.generateResponse(request, TEST_USER_ID, "USER");
@@ -404,8 +430,7 @@ class ChatbotServiceTest {
             ChatRequest request = new ChatRequest("이전 대화 이어서", TEST_SESSION_ID);
             setupCommonMocks(Intent.LLM_DIRECT);
             when(messageService.getMessagesForMemory(eq(TEST_SESSION_ID), any())).thenReturn(Collections.emptyList());
-            when(messageConverter.convertToProviderFormat(anyList(), any())).thenReturn("formatted");
-            when(llmService.generate(anyString())).thenReturn("네, 이어서 진행합니다.");
+            when(llmService.generate(anyList())).thenReturn("네, 이어서 진행합니다.");
 
             // When
             chatbotService.generateResponse(request, TEST_USER_ID, "USER");
@@ -422,8 +447,7 @@ class ChatbotServiceTest {
             ChatRequest request = new ChatRequest("안녕", null);
             setupCommonMocks(Intent.LLM_DIRECT);
             when(sessionService.createSession(TEST_USER_ID.toString(), null)).thenReturn(TEST_SESSION_ID);
-            when(messageConverter.convertToProviderFormat(anyList(), any())).thenReturn("formatted");
-            when(llmService.generate(anyString())).thenReturn("안녕하세요!");
+            when(llmService.generate(anyList())).thenReturn("안녕하세요!");
 
             // When
             ChatResponse result = chatbotService.generateResponse(request, TEST_USER_ID, "USER");
