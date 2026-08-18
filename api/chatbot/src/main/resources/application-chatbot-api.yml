@@ -78,7 +78,6 @@ chatbot:
     expiration-days: 90  # 만료 기간 (마지막 메시지 후 N일 경과 시 만료)
     batch-enabled: true  # 배치 작업 활성화 여부 (세션 만료 처리용)
   
-  # ChatMemory 설정 (토큰 수 기준 메시지 유지 방식 - 기본 전략)
+  # ChatMemory 설정 (메시지 개수 기준으로 최근 대화만 남기는 창)
   chat-memory:
-    max-tokens: 2000  # 최대 토큰 수 (OpenAI GPT-4o-mini 컨텍스트 128K 고려)
-    strategy: token-window  # 기본 전략: token-window (토큰 수 기준), 대안: message-window (메시지 개수 기준)
+    max-messages: 10  # 창에 남길 최대 메시지 수 (이력 조회가 최근 50건까지라 50을 넘겨도 더 오지 않는다)
