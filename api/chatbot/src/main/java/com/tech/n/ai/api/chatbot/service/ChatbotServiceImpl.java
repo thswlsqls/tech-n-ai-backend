@@ -3,7 +3,6 @@ package com.tech.n.ai.api.chatbot.service;
 import com.tech.n.ai.api.chatbot.chain.AnswerGenerationChain;
 import com.tech.n.ai.api.chatbot.chain.InputInterpretationChain;
 import com.tech.n.ai.api.chatbot.chain.ResultRefinementChain;
-import com.tech.n.ai.api.chatbot.converter.MessageFormatConverter;
 import com.tech.n.ai.api.chatbot.dto.request.ChatRequest;
 import com.tech.n.ai.api.chatbot.dto.response.ChatResponse;
 import com.tech.n.ai.api.chatbot.dto.response.SourceResponse;
@@ -52,7 +51,6 @@ public class ChatbotServiceImpl implements ChatbotService {
     private final PromptService promptService;
 
     private final AgentDelegationService agentDelegationService;
-    private final MessageFormatConverter messageConverter;
     private final SessionTitleGenerationService titleGenerationService;
     private final SearchOptionsFactory searchOptionsFactory;
     private final MeterRegistry meterRegistry;
@@ -139,8 +137,7 @@ public class ChatbotServiceImpl implements ChatbotService {
         chatMemory.add(userMessage);
 
         List<ChatMessage> messages = chatMemory.messages();
-        Object providerFormat = messageConverter.convertToProviderFormat(messages, null);
-        String response = llmService.generate(providerFormat.toString());
+        String response = llmService.generate(messages);
 
         AiMessage aiMessage = AiMessage.from(response);
         chatMemory.add(aiMessage);

@@ -155,13 +155,7 @@ RAG 파이프라인은 다음과 같은 단계로 구성됩니다:
 - 토큰 제한 검증 및 경고
 - 캐싱을 통한 중복 호출 방지
 
-### 7. Provider별 메시지 포맷 변환
-
-- OpenAI 메시지 포맷 변환 (기본)
-- Anthropic 메시지 포맷 변환 (대안)
-- Provider별 특성에 맞는 메시지 포맷 자동 변환
-
-### 8. 세션 생명주기 관리
+### 7. 세션 생명주기 관리
 
 - 비활성 세션 자동 비활성화 (30분 미사용 시)
 - 만료된 세션 자동 처리 (90일 경과 시)
@@ -552,10 +546,6 @@ api/chatbot/
 │   │   └── AnswerGenerationChain.java
 │   ├── memory/
 │   │   └── ConversationChatMemoryProvider.java
-│   ├── converter/
-│   │   ├── MessageFormatConverter.java
-│   │   ├── OpenAiMessageConverter.java
-│   │   └── AnthropicMessageConverter.java
 │   ├── dto/
 │   │   ├── request/
 │   │   │   ├── ChatRequest.java
@@ -618,12 +608,6 @@ api/chatbot/
 
 - **ConversationChatMemoryProvider**: 세션별 ChatMemory 제공 (`MessageWindowChatMemory` 최대 10개)
 - **MongoDbChatMemoryStore** (`common-conversation`): MongoDB 기반 ChatMemory 저장소
-
-#### 6. Converter Layer
-
-- **MessageFormatConverter**: Provider별 메시지 포맷 변환 인터페이스
-- **OpenAiMessageConverter**: OpenAI 메시지 포맷 변환
-- **AnthropicMessageConverter**: Anthropic 메시지 포맷 변환
 
 ---
 

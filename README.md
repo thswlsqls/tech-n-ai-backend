@@ -167,7 +167,6 @@ CQRS 데이터 플로우와 전체 구조는 [AWS 배포 인프라 아키텍처]
 - **세션 타이틀 자동생성**: 첫 응답 후 `@Async` LLM 호출로 3~5단어 생성, 수동 변경 지원 (`PATCH /sessions/{id}/title`)
 - **대화 메모리**: MessageWindowChatMemory (TokenWindowChatMemory는 TokenCountEstimator Bean 도입 후 적용 예정)
 - **세션 생명주기**: 30분 미사용 시 비활성(매시 정각), 90일 경과 시 만료(매일 02시) 배치
-- **멀티 Provider 포맷 변환**: OpenAI 기본(`@Primary`), Anthropic 대안
 - **비용 통제**: 토큰 상한(입력 4,000 / 출력 2,000, 80% 경고) + Redis 캐싱(TTL 1시간)
 
 ### RAG 파이프라인 시퀀스 다이어그램  

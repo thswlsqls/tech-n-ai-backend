@@ -1,5 +1,6 @@
 package com.tech.n.ai.api.chatbot.service;
 
+import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.model.chat.ChatModel;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -7,7 +8,9 @@ import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 /**
  * LLM 서비스 구현체
@@ -34,9 +37,19 @@ public class LLMServiceImpl implements LLMService {
 
     @Override
     public String generate(String prompt) {
+        return callWithMetrics(() -> chatModel.chat(prompt));
+    }
+
+    @Override
+    public String generate(List<ChatMessage> messages) {
+        return callWithMetrics(() -> chatModel.chat(messages).aiMessage().text());
+    }
+
+    // 두 오버로드가 같은 미터 기록 규칙을 쓰도록 호출을 여기로 모은다
+    private String callWithMetrics(Supplier<String> call) {
         long startNanos = System.nanoTime();
         try {
-            return chatModel.chat(prompt);
+            return call.get();
         } catch (Exception e) {
             llmErrors.increment();
             log.error("Failed to generate LLM response", e);
