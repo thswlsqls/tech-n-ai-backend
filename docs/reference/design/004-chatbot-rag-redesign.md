@@ -139,7 +139,7 @@ private SearchContext analyzeContext(String input) {
 
 | 항목 | 공식 권장사항 | 현재 상태 | 판정 |
 |------|-------------|----------|------|
-| ChatMemory | `TokenWindowChatMemory` 권장 (프로덕션) | `MessageWindowChatMemory` 사용 중 (TODO 남아있음) | 개선 필요 |
+| ChatMemory | `TokenWindowChatMemory` 권장 (프로덕션) | `MessageWindowChatMemory` 사용 (창 크기 `chatbot.chat-memory.max-messages`) | 적합 — 아래 4.2 참고 |
 | 쿼리 압축 | `CompressingQueryTransformer` 사용 권장 (멀티턴) | `InputInterpretationChain`에서 노이즈 제거만 수행, 대명사 해소 없음 | 개선 권장 |
 | `storeRetrievedContentInChatMemory` | `false` 권장 (메모리 최적화) | RAG 결과가 ChatMemory에 저장되지 않음 (적합) | 적합 |
 | Re-Ranking | `ScoringModel` 사용 권장 | Cohere rerank 옵션 지원 (기본 비활성) | 적합 |
@@ -544,14 +544,13 @@ public record SearchOptions(
 > `TokenCountEstimator`를 사용하여 토큰 수 기준으로 메시지를 유지한다.
 
 **현재 상태**:
-- `ConversationChatMemoryProvider`에서 `MessageWindowChatMemory` 사용 중 (TODO 남아있음)
-- `TokenWindowChatMemory`로 전환하려면 `TokenCountEstimator` Bean 주입 필요
-- `LangChain4jConfig`에 `OpenAiTokenCountEstimator` Bean이 이미 정의되어 있음
+- `ConversationChatMemoryProvider`가 `MessageWindowChatMemory`를 만들어 주고, 창 크기는 `chatbot.chat-memory.max-messages`(기본 10)로 정한다
+- 설정에 있던 `chat-memory.max-tokens`와 `strategy: token-window`는 코드가 읽지 않는 값이라 지웠다. 실제 동작인 메시지 개수 기준에 맞춰 키를 하나로 정리한 것이다
 
 **검증 결과**:
-- `application-chatbot-api.yml`에 `chat-memory.strategy: token-window` 설정이 있으나, 실제 코드는 `MessageWindowChatMemory` 사용 중
-- `OpenAiTokenCountEstimator` Bean은 이미 존재하므로, `ConversationChatMemoryProvider`에 주입하면 `TokenWindowChatMemory`로 전환 가능
-- **이번 설계 범위**: ChatMemory 전략 전환도 별도 개선 과제로 분류. 현재는 벡터 검색 구현에 집중
+- 설정과 코드의 어긋남은 해소됐다. 남는 것은 `TokenWindowChatMemory`로 갈지 여부인데, 지금은 가지 않는다
+- 이력을 채우는 쪽이 `ChatbotServiceImpl.loadHistoryToMemory()`이고 `MongoDbChatMemoryStore`의 쓰기가 no-op이라, ChatMemory에 저장소를 걸면 방금 `add()`한 현재 질문이 프롬프트에서 빠진다. 저장소를 걸지 않는 지금 구성이 이 문제를 피한다
+- `OpenAiTokenCountEstimator` Bean은 그대로 있으므로 토큰 기준으로 바꿀 길은 열려 있다. 다만 바꾸려면 저장 순서와 실패한 턴의 처리까지 함께 정해야 해서 별도 과제로 둔다
 
 ### 4.3 검색 결과 품질 검증
 

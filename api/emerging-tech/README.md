@@ -284,8 +284,9 @@ slack:
 
 ```gradle
 dependencies {
-    implementation 'dev.langchain4j:langchain4j:1.10.0'
-    implementation 'dev.langchain4j:langchain4j-open-ai:1.10.0'
+    // 버전은 루트 build.gradle의 langchain4j-bom이 정한다
+    implementation 'dev.langchain4j:langchain4j'
+    implementation 'dev.langchain4j:langchain4j-open-ai'
 
     implementation project(':common-core')
     implementation project(':common-exception')

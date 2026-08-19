@@ -1,8 +1,8 @@
 # datasource-mongodb 모듈
 
-CQRS에서 **읽기(Query) 쪽**을 맡는 데이터 접근 모듈입니다. MongoDB Atlas에 연결하며 읽기에 최적화된 도큐먼트, 리포지토리, 집계 서비스, RAG 챗봇용 벡터 검색 유틸리티를 제공합니다.
+CQRS에서 **읽기(Query) 쪽**을 맡는 데이터 접근 모듈입니다. MongoDB Atlas에 연결하며 읽기에 최적화된 도큐먼트, 리포지토리, 집계 서비스, RAG 챗봇용 벡터 검색·지식 그래프 조회 유틸리티를 제공합니다.
 
-라이브러리 모듈(`jar`)이며 `api-emerging-tech`·`api-chatbot` 등이 의존성으로 씁니다. 자바 패키지 루트는 `com.tech.n.ai.domain.mongodb` 입니다.
+라이브러리 모듈(`jar`)이며 `api-emerging-tech`·`api-chatbot`·`batch-graph`·`batch-eval` 등이 의존성으로 씁니다. 자바 패키지 루트는 `com.tech.n.ai.domain.mongodb` 입니다.
 
 ## 모듈 구조
 
@@ -13,10 +13,11 @@ datasource/mongodb/src/main/
 │   │   ├── MongoClientConfig.java        # 연결 문자열, 커넥션 풀, ReadPreference/WriteConcern
 │   │   ├── MongoIndexConfig.java         # 시작 시 인덱스 자동 생성 (일반 + Vector Search)
 │   │   └── VectorSearchIndexConfig.java  # Vector Search 인덱스 정의 상수 + Atlas CLI 헬퍼
-│   ├── document/                         # EmergingTech, ConversationSession, ConversationMessage, ExceptionLog
-│   ├── enums/                            # EmergingTechType, PostStatus, SourceType, TechProvider
-│   ├── repository/                       # 위 4개 컬렉션의 MongoRepository
-│   ├── service/                          # EmergingTechAggregationService + projection DTO 2종
+│   ├── document/                         # EmergingTech, ConversationSession, ConversationMessage, ExceptionLog, TechGraphNode, TechGraphEdge
+│   ├── enums/                            # EmergingTechType, PostStatus, SourceType, TechProvider, GraphNodeType, GraphRelationType
+│   ├── key/                              # GraphKeys — 그래프 노드·엣지 키 생성 규칙
+│   ├── repository/                       # 앞 4개 컬렉션의 MongoRepository
+│   ├── service/                          # EmergingTechAggregationService, TechGraphReader + projection DTO
 │   └── util/                             # VectorSearchOptions, VectorSearchUtil
 └── resources/
     └── application-mongodb-domain.yml    # MongoDB Atlas 연결 설정
@@ -24,7 +25,7 @@ datasource/mongodb/src/main/
 
 ## 도큐먼트
 
-컬렉션은 네 개입니다. 모두 MongoDB `ObjectId`를 `@Id`로 쓰고, Aurora의 TSID는 별도 문자열 필드로 보관합니다.
+컬렉션은 여섯 개입니다. 모두 MongoDB `ObjectId`를 `@Id`로 쓰고, Aurora의 TSID는 별도 문자열 필드로 보관합니다.
 
 ### EmergingTechDocument (`emerging_techs`)
 
@@ -48,6 +49,27 @@ AI/기술 업데이트 정보를 담는 핵심 컬렉션입니다.
 ### ExceptionLogDocument (`exception_logs`)
 
 읽기/쓰기 예외 기록. `source`, `exception_type`, `exception_message`, `stack_trace`, `severity`, `occurred_at`, 그리고 중첩 `context`(`module`, `method`, `parameters`, `user_id`, `request_id`).
+
+### TechGraphNodeDocument (`tech_graph_nodes`) · TechGraphEdgeDocument (`tech_graph_edges`)
+
+`emerging_techs` 문서에서 뽑아낸 지식 그래프입니다. `batch-graph`가 채우고 `api-chatbot`이 읽습니다.
+
+노드는 `key`(UNIQUE), `type`(`GraphNodeType` 라벨), `name`(처음 저장될 때 본 원본 표기), `external_ids`(이 노드가 나온 `emerging_techs` 문서들), 타임스탬프를 갖습니다. 엣지는 `key`(UNIQUE), `type`(`GraphRelationType` 라벨), `source_key`, `target_key`, `external_ids`, 타임스탬프를 갖습니다.
+
+타입은 미리 정해둔 목록으로만 저장합니다.
+
+| enum | 값 |
+|------|-----|
+| `GraphNodeType` | `Company`, `Model`, `Technology`, `Release`, `Capability` |
+| `GraphRelationType` | `RELEASED`, `SUCCEEDS`, `SUPPORTS`, `USES`, `DEPENDS_ON` |
+
+`key`는 upsert가 같은 대상을 다시 찾는 유일한 수단입니다. 같은 모델이 문서마다 다른 표기로 나와도 같은 키가 나와야 재실행에서 노드가 늘지 않습니다. 규칙은 `GraphKeys`에 있고, 그래프를 만드는 배치와 읽는 챗봇이 이 클래스를 함께 씁니다.
+
+- 노드 키: `타입 라벨 + "|" + 정규화한 이름` — 예: `Model|gpt-4o`
+- 엣지 키: `출발 키 + "->" + 관계 라벨 + "->" + 도착 키` — 예: `Company|openai->RELEASED->Model|gpt-4o`
+- 이름 정규화: 앞뒤 공백 제거, 연속 공백 한 칸으로 축약, 소문자 변환
+
+이 두 컬렉션의 `key` unique 인덱스는 아래 `MongoIndexConfig`가 만들지 않고 **`batch-graph`의 잡이 시작할 때** 만듭니다. 컨텍스트만 띄워도 운영 Atlas에 쓰기가 나가는 것을 막기 위해서입니다.
 
 ## 리포지토리
 
@@ -123,6 +145,17 @@ AI/기술 업데이트 정보를 담는 핵심 컬렉션입니다.
 
 옵션은 `VectorSearchOptions`(빌더)로 전달합니다: `numCandidates`, `limit`, `minScore`, `filter`, `exact`(ANN/ENN), Score Fusion용 `vectorWeight`/`recencyWeight`/`recencyDecayLambda`.
 
+## 그래프 조회 (TechGraphReader)
+
+`api-chatbot`이 질문에서 만든 노드 키 후보로 시드 노드를 찾고, 엣지를 한 번 타서 이웃(1홉)까지 가져옵니다. `findMatches()` 하나이며 aggregation 한 번으로 끝냅니다(`$lookup`에 localField/foreignField와 pipeline을 함께 쓰는 문법은 MongoDB 5.0부터입니다).
+
+- 결과는 시드(0홉)와 이웃(1홉)을 합친 `GraphNodeMatch` 목록입니다. 같은 키가 양쪽에 나오면 홉이 작은 쪽만 남깁니다.
+- `maxSeeds`·`maxEdgesPerSeed`·`maxTimeMs`로 조회 범위와 서버 실행 시간을 제한합니다.
+- `Company` 노드는 홉을 넓힐 때 뺍니다. `Company|openai` 하나가 문서 수백 건을 가리키는 허브라 확장에 쓰면 아무 문서나 딸려 옵니다. 0홉으로 직접 맞은 경우는 그대로 둡니다.
+- 사용자 입력은 `$in` 배열과 이스케이프한 정규식 값 자리에만 들어갑니다. 정규식 이스케이프에 `Pattern.quote()`를 쓰지 않는데, `\Q...\E` 인용은 리터럴 안에 `\E`가 들어오면 그 자리에서 끊기기 때문입니다.
+
+읽기 전용이라 이 클래스는 그래프 컬렉션에 쓰지 않습니다. 채우는 쪽은 `batch-graph`입니다.
+
 ## CQRS에서의 위치
 
 Query 쪽입니다. Aurora(Command)의 쓰기가 Kafka 이벤트로 전파되어 여기 컬렉션에 반영됩니다(목표 지연 1초 이내, Redis 멱등 처리). Aurora와의 매핑은 TSID를 문자열로 보관하는 필드로 이뤄집니다.
@@ -130,7 +163,7 @@ Query 쪽입니다. Aurora(Command)의 쓰기가 Kafka 이벤트로 전파되어
 - `ConversationSessionDocument.session_id` ↔ Aurora `conversation_sessions.session_id`
 - `ConversationMessageDocument.message_id` ↔ Aurora `conversation_messages.message_id`
 
-`bookmarks`/`emerging_techs`는 각 서비스의 동기화·수집 경로를 따릅니다. 이벤트 발행·소비는 API 서비스와 `common-kafka`가 담당합니다.
+`bookmarks`/`emerging_techs`는 각 서비스의 동기화·수집 경로를 따릅니다. 이벤트 발행·소비는 API 서비스와 `common-kafka`가 담당합니다. `tech_graph_*`는 Aurora에 대응하는 테이블이 없고 `batch-graph`가 `emerging_techs`에서 파생시켜 만듭니다.
 
 ## 의존성
 

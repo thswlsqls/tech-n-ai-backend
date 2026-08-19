@@ -163,11 +163,15 @@ CQRS 데이터 플로우와 전체 구조는 [AWS 배포 인프라 아키텍처]
 - **Emerging Tech 전용 RAG**: `emerging_techs` 컬렉션 벡터 검색 (status: PUBLISHED pre-filter)
 - **하이브리드 검색 (Score Fusion + RRF)**: 벡터 유사도와 최신성 정렬을 MongoDB Pipeline 내 Exponential Decay Score Fusion + RRF(k=60)로 결합해 최신 문서 누락 방지
 - **검색 결과 재순위**: Cohere `rerank-multilingual-v3.0` (opt-in: 기본 비활성, `chatbot.reranking.enabled=true` + API Key 설정 시 활성화, 점수 0.3 미만 제외)
-- **의도 분류**: 키워드 규칙 기반 — `@agent` 접두는 Agent 위임(ADMIN 전용), 실시간 키워드는 웹 검색(Google Custom Search opt-in), AI 기술·질문형은 RAG, 그 외 일반 대화
+- **의도 분류**: LLM을 부르지 않는 키워드 규칙 — `@agent` 접두는 Agent 위임(ADMIN 전용), 실시간 키워드는 웹 검색(Google Custom Search opt-in), AI 기술·질문형은 RAG, 그 외 일반 대화. 영어 키워드는 단어 경계로 확인하고 한국어는 조사가 붙으므로 부분 문자열로 확인
+- **검색 경로 단일화**: `RetrievalService`가 벡터 검색·그래프 검색·재검색을 묶어, 운영 챗봇과 평가 배치(`batch-eval`)가 같은 코드를 탐
+- **지식 그래프 검색** (opt-in, 기본 비활성): `batch-graph`가 만든 노드·엣지를 타고, 문서 여러 건을 엮어야 답이 나오는 질문의 근거를 추가 확보
+- **근거 부족 시 재검색** (opt-in, 기본 비활성): 후보 최고 벡터 점수가 문턱에 못 미치면 필터·유사도 문턱을 단계적으로 완화해 다시 찾고, 1차 결과 뒤에 덧붙임
 - **세션 타이틀 자동생성**: 첫 응답 후 `@Async` LLM 호출로 3~5단어 생성, 수동 변경 지원 (`PATCH /sessions/{id}/title`)
-- **대화 메모리**: MessageWindowChatMemory (TokenWindowChatMemory는 TokenCountEstimator Bean 도입 후 적용 예정)
+- **대화 메모리**: `MessageWindowChatMemory`, 창 크기는 `chatbot.chat-memory.max-messages`(기본 10)
 - **세션 생명주기**: 30분 미사용 시 비활성(매시 정각), 90일 경과 시 만료(매일 02시) 배치
 - **비용 통제**: 토큰 상한(입력 4,000 / 출력 2,000, 80% 경고) + Redis 캐싱(TTL 1시간)
+- **토큰 사용량 실측**: OpenAI 응답에 실려 오는 값을 그대로 미터에 기록 (`chatbot.llm.input.tokens`·`chatbot.llm.output.tokens`)
 
 ### RAG 파이프라인 시퀀스 다이어그램  
 
@@ -194,11 +198,18 @@ CQRS 데이터 플로우와 전체 구조는 [AWS 배포 인프라 아키텍처]
 - **OpenAI**: GPT-4o-mini (LLM) + text-embedding-3-small (Embedding), 기본 Provider
 - **Cohere `rerank-multilingual-v3.0`** · **Google Custom Search API** (둘 다 opt-in)
 
+### 검색 품질 측정
+
+검색 방식을 바꿀 때 좋아졌는지 나빠졌는지를 감이 아니라 같은 질문 목록과 같은 지표로 비교합니다. 골든셋 52건을 운영과 같은 검색 경로에 태워 recall@k·MRR을 재고, 답변은 다른 모델이 근거 기반성·질문 응답성 두 축으로 채점합니다. 자세한 내용은 [`batch/eval/README.md`](batch/eval/README.md)에 있습니다.
+
+그래프 검색과 재검색이 기본 꺼짐인 것도 이 측정 결과 때문입니다. 둘 다 근거를 더 찾아내긴 했지만 사용자에게 넘어가는 상위 5건 안에는 들지 못해, 수치를 맞추려고 코드를 더 붙이지 않고 꺼 둔 채 두었습니다.
+
 자세한 RAG 챗봇 설계는 다음 문서를 참고하세요:
 - [langchain4j RAG 기반 챗봇 설계서](docs/prototype/step12/rag-chatbot-design.md)
 - [Emerging Tech 전용 RAG 검색 개선 설계서](docs/reference/design/004-chatbot-rag-redesign.md)
 - [하이브리드 검색 Score Fusion 설계서](docs/reference/design/005-chatbot-hybrid-search-score-fusion.md)
 - [세션 타이틀 자동생성 설계서](docs/reference/design/006-chatbot-session-title-generation.md)
+- [챗봇 모듈 README](api/chatbot/README.md)
 
 ## 🤖 AI Agent 자동화 시스템
 
@@ -639,8 +650,9 @@ OAuth 2.0 인증 플로우에서 **CSRF 공격 방지**를 위한 State 파라�
 - **Apache Kafka**: 이벤트 기반 CQRS 동기화
 
 ### AI/ML 라이브러리
-- **langchain4j**: 1.10.0 (RAG 프레임워크 및 AI Agent)
-- **OpenAI API**: GPT-4o-mini (LLM), text-embedding-3-small (Embedding)
+- **langchain4j**: 1.10.0 (RAG 프레임워크 및 AI Agent). 버전은 루트 `build.gradle`의 `langchain4j-bom`이 한곳에서 관리하고 모듈에는 좌표만 적습니다 (`mongodb-atlas`·`cohere` 등 beta 통합 모듈은 1.10.0-beta18)
+- **langchain4j community**: `llm-graph-transformer` (지식 그래프 추출, `batch-graph`)
+- **OpenAI API**: GPT-4o-mini (LLM·그래프 추출), GPT-4o (평가 판정), text-embedding-3-small (Embedding)
 
 ### 기타 주요 라이브러리
 - **Spring Security**: 인증/인가
@@ -651,6 +663,7 @@ OAuth 2.0 인증 플로우에서 **CSRF 공격 방지**를 위한 State 파라�
 - **Spring REST Docs**: API 문서화
 - **OpenFeign**: 외부 API 클라이언트
 - **Redis**: 캐싱, OAuth State 관리, 멱등성 보장, 세션 관리
+- **Micrometer / Prometheus**: LLM 호출 지연·실패·토큰, RAG 검색 결과 건수, 에이전트 Tool 호출 횟수를 커스텀 미터로 노출 (`monitoring/README.md` 5절)
 
 ## 프로젝트 구조
 
@@ -666,7 +679,9 @@ tech-n-ai/
 │   ├── emerging-tech/      # AI 업데이트 정보 API
 │   └── gateway/            # API Gateway
 ├── batch/                  # 배치 처리 모듈
-│   └── source/            # 정보 출처 업데이트 배치 (GitHub Release, RSS, Web Scraping)
+│   ├── source/             # 정보 출처 업데이트 배치 (GitHub Release, RSS, Web Scraping)
+│   ├── eval/               # RAG 검색·답변 품질 측정 배치
+│   └── graph/              # 신기술 문서에서 지식 그래프를 만드는 배치
 ├── client/                 # 외부 API 연동 모듈
 │   ├── feign/              # OpenFeign 클라이언트 (OAuth, GitHub, Internal API)
 │   ├── rss/                # RSS 피드 파서
@@ -688,7 +703,7 @@ tech-n-ai/
 
 `api`/`batch` 모듈이 필요한 `common-*`, `datasource-*`, `client-*`를 조합합니다. 실측 의존 관계는 다음과 같습니다.
 
-- **api/batch 모듈**: common, datasource, client 모듈 의존
+- **api/batch 모듈**: common, datasource, client 모듈 의존. 예외로 `batch-eval`은 운영과 같은 검색 코드를 타려고 `api-chatbot`을 의존합니다 (그래서 `api-chatbot`은 `jar.enabled = true`)
 - **common-core**: 트리 안 어떤 모듈에도 의존하지 않는 유일한 모듈
 - **common-exception, common-kafka**: `common-core` + `datasource-mongodb` 의존
 - **common-conversation**: `common-core`·`common-exception`·`common-kafka` + `datasource-aurora`·`datasource-mongodb` 의존
@@ -741,6 +756,7 @@ Query Side (읽기 전용)로 사용되는 MongoDB Atlas의 주요 컬렉션:
 - **ConversationSessionDocument**: 대화 세션 정보 (RAG 챗봇 및 AI Agent용)
 - **ConversationMessageDocument**: 대화 메시지 히스토리 (RAG 챗봇 및 AI Agent용)
 - **ExceptionLogDocument**: 예외 로그
+- **TechGraphNodeDocument / TechGraphEdgeDocument**: `emerging_techs`에서 뽑아낸 지식 그래프 (`tech_graph_nodes`·`tech_graph_edges`, `batch-graph`가 채우고 챗봇이 읽음)
 
 #### 읽기 최적화 전략
 
@@ -1011,6 +1027,25 @@ TECH-N-AI API 서버와 연동하기 위한 프론트엔드 클라이언트 랜�
 ---
 
 ## 참고 문서
+
+### 모듈 README
+
+각 모듈의 구조·설정·실행 방법은 모듈 README에 있습니다.
+
+| 모듈 | 설명 |
+|------|------|
+| [api/agent](api/agent/README.md) | LangChain4j 자율 에이전트 |
+| [api/auth](api/auth/README.md) | OAuth 2.0·관리자 인증 |
+| [api/bookmark](api/bookmark/README.md) | 사용자 북마크 |
+| [api/chatbot](api/chatbot/README.md) | RAG 멀티턴 챗봇 |
+| [api/emerging-tech](api/emerging-tech/README.md) | AI 업데이트 조회 API |
+| [api/gateway](api/gateway/README.md) | API Gateway |
+| [batch/source](batch/source/README.md) | GitHub·RSS·스크래핑 수집 배치 |
+| [batch/eval](batch/eval/README.md) | RAG 검색·답변 품질 측정 배치 |
+| [batch/graph](batch/graph/README.md) | 지식 그래프 생성 배치 |
+| [datasource/aurora](datasource/aurora/README.md) | Command 쪽 (Aurora MySQL) |
+| [datasource/mongodb](datasource/mongodb/README.md) | Query 쪽 (MongoDB Atlas) |
+| [monitoring](monitoring/README.md) | 로컬 관측 스택과 커스텀 미터 |
 
 ### 설계 문서
 

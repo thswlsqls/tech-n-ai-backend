@@ -49,7 +49,7 @@ LangChain4j `ChatMemoryStore` 구현체. `getMessages`는 세션의 최근 메�
 
 ## 의존성
 
-`common-core`·`common-exception`·`common-kafka`, `datasource-aurora`(쓰기)·`datasource-mongodb`(읽기). `dev.langchain4j:langchain4j:1.10.0`은 `api` 스코프라 이 모듈을 쓰는 쪽이 그대로 물려받습니다.
+`common-core`·`common-exception`·`common-kafka`, `datasource-aurora`(쓰기)·`datasource-mongodb`(읽기). `dev.langchain4j:langchain4j`는 `api` 스코프라 이 모듈을 쓰는 쪽이 그대로 물려받습니다. 버전(1.10.0)은 루트 `build.gradle`의 `langchain4j-bom`이 정합니다.
 
 ## 참고 자료
 

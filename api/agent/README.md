@@ -300,8 +300,9 @@ dependencies {
     implementation project(':datasource-mongodb')
 
     // LangChain4j Core + OpenAI (1.10.0: Tool Error Handler 지원)
-    implementation 'dev.langchain4j:langchain4j:1.10.0'
-    implementation 'dev.langchain4j:langchain4j-open-ai:1.10.0'
+    // 버전은 루트 build.gradle의 langchain4j-bom이 정한다
+    implementation 'dev.langchain4j:langchain4j'
+    implementation 'dev.langchain4j:langchain4j-open-ai'
 
     // Agent Tool용 클라이언트 모듈
     implementation project(':client-feign')

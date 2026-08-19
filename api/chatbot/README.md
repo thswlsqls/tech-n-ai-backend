@@ -96,14 +96,19 @@ RAG 파이프라인은 다음과 같은 단계로 구성됩니다:
   ↓
 입력 해석 체인 (검색 쿼리 추출)
   ↓
-벡터 검색 (MongoDB Atlas Vector Search)
+RetrievalService — 검색 단계를 한곳에 모은다
+  ├─ 벡터 검색 (MongoDB Atlas Vector Search, 하이브리드 + RRF)
+  ├─ 그래프 검색 (tech_graph_*, 기본 꺼짐)  → 벡터 결과 뒤에 붙임
+  └─ 근거가 약하면 조건을 완화해 재검색 (기본 꺼짐) → 1차 결과 뒤에 붙임
   ↓
-결과 정제 체인 (유사도 필터링, 중복 제거)
+결과 정제 체인 (유사도 필터링, 중복 제거, 점수 내림차순 정렬 후 상위 N건)
   ↓
 답변 생성 체인 (프롬프트 구축, LLM 호출)
   ↓
 최종 답변 반환
 ```
+
+`RetrievalService`를 둔 이유는 운영 챗봇과 평가 잡(`batch-eval`)이 같은 검색 코드를 타게 하려는 것입니다. 검색 옵션이 두 벌로 갈리면 `enableScoreFusion` 한 줄만 어긋나도 평가에서 잰 수치가 실제 서비스 동작과 달라집니다. 옵션 조립도 `SearchOptionsFactory` 하나로 모았습니다.
 
 ---
 
@@ -123,6 +128,28 @@ RAG 파이프라인은 다음과 같은 단계로 구성됩니다:
 - **RRF 결합**: 두 검색 소스를 Reciprocal Rank Fusion (k=60) 알고리즘으로 결합
 - MongoDB 8.2/8.3의 `$rankFusion`/`$scoreFusion` 효과를 MongoDB 8.0 환경에서 재현
 
+### 2-1. 지식 그래프 검색 (기본 꺼짐)
+
+`batch-graph`가 만든 `tech_graph_nodes`·`tech_graph_edges`를 읽어 벡터 검색이 놓친 문서를 더합니다. 문서 여러 건을 엮어야 답이 나오는 질문을 겨냥한 경로입니다.
+
+- `GraphSeedExtractor`가 질문에서 노드 키 후보를 만듭니다. 붙어 있는 단어 1~4개를 하나의 이름으로 보고 노드 타입 5종에 각각 키를 만듭니다. 정규화는 그래프를 만들 때 쓴 `GraphKeys.normalizeName`을 그대로 부릅니다 — 여기서 다르게 다듬으면 배치가 저장한 키와 어긋나 아무것도 못 찾습니다. LLM을 부르지 않아 같은 질문이면 늘 같은 후보가 나옵니다
+- `TechGraphReader`(`datasource-mongodb`)가 aggregation 한 번으로 시드와 1홉 이웃을 가져옵니다
+- `GraphEvidenceRanker`가 문서 단위로 접어 순위를 매깁니다. 여러 시드가 함께 가리킨 문서가 먼저입니다
+- 그래프 문서 점수는 `벡터 최저점 ÷ (순위+1)`로 다시 매깁니다. 어떤 그래프 문서도 벡터 최저점을 넘지 못하므로 벡터 상위 자리를 밀어내지 않습니다
+- 그래프 조회가 실패해도 벡터 결과만으로 답을 만듭니다
+
+`chatbot.rag.graph.enabled`가 기본 꺼짐입니다. 켜고 측정한 결과 다중 홉 질문의 recall@5가 오르지 않았습니다 — 근거는 찾아왔지만 벡터가 이미 상위 5칸을 채워 6위 아래로만 들어갔고, 답변에 넘어가는 것은 상위 5건이기 때문입니다.
+
+### 2-2. 근거가 약할 때 재검색 (기본 꺼짐)
+
+벡터 후보가 없거나 후보 최고 `vectorScore`가 문턱(`min-vector-score`, 기본 0.72)에 못 미치면 검색 조건을 단계적으로 풉니다.
+
+- 질의 문자열은 그대로 두고 provider·updateType 필터와 유사도 문턱만 완화합니다. 임베딩 호출만 한 번 더 나가고 채팅 호출은 늘지 않습니다
+- 다시 찾은 결과는 1차 결과를 갈아치우지 않고 **뒤에 붙입니다**. 필터를 풀면 최신성 직접 쿼리까지 같이 바뀌어 재검색 결과가 1차를 다 담고 있지 않기 때문입니다
+- 앞 단계와 실질적으로 같아지는 단계는 건너뜁니다
+
+`chatbot.rag.augment.enabled`도 기본 꺼짐입니다. 켜고 측정했을 때 새 근거를 실제로 찾아내긴 했지만(`byVectorRank` recall@5 0.6825 → 0.6944) 사용자에게 가는 상위 5건에는 들어가지 못했습니다.
+
 ### 3. 세션 타이틀 자동생성
 
 - 새 세션의 첫 메시지-응답 완료 후 `@Async` 비동기 LLM 호출로 3~5단어 타이틀 자동 생성
@@ -134,12 +161,15 @@ RAG 파이프라인은 다음과 같은 단계로 구성됩니다:
 
 - 세션 기반 대화 컨텍스트 관리
 - JWT 토큰 기반 사용자 인증 및 세션 소유권 검증
-- ChatMemory를 통한 대화 히스토리 유지
-- 메시지 개수 기준 윈도우 관리 (`MessageWindowChatMemory`, 최대 10개 — 설정의 token-window 전환은 TODO)
+- 메시지 개수 기준 윈도우 관리 (`MessageWindowChatMemory`). 창 크기는 `chatbot.chat-memory.max-messages`(기본 10)로 정합니다
+- 이력을 채우는 쪽은 `ChatbotServiceImpl.loadHistoryToMemory()`이고, ChatMemory에 저장소(`MongoDbChatMemoryStore`)를 걸지 않습니다. 저장소를 걸면 `MessageWindowChatMemory`가 메시지를 자기 안에 들고 있지 않고 매번 저장소를 다시 읽는데, 그 저장소의 쓰기 메서드는 로그만 찍는 no-op이라 방금 `add()`한 현재 질문이 프롬프트에서 빠집니다
+- 일반 대화 경로는 대화 이력을 `List<ChatMessage>` 그대로 LLM에 넘깁니다. 예전에는 자바 컬렉션의 `toString()` 결과를 문자열로 붙였는데, 그러면 구조를 나타내는 `role=user`와 사용자가 쓴 텍스트를 구분할 근거가 없고 사용자 입력이 이스케이프 없이 섞였습니다
 
 ### 5. 의도 분류
 
 - 4종 자동 분류: `LLM_DIRECT`(일반 대화) / `RAG_REQUIRED` / `WEB_SEARCH_REQUIRED` / `AGENT_COMMAND`
+- LLM을 부르지 않는 키워드 규칙입니다. 한 턴당 LLM 호출 횟수에 영향을 주지 않습니다
+- 영어 키워드는 `Pattern`으로 단어 경계(`\b`)를 확인하고, 한국어 키워드는 `Set.contains`로 부분 문자열을 봅니다. 한국어는 조사가 붙어 단어 경계가 생기지 않기 때문입니다. 단어 경계를 확인하기 전에는 `explain` 같은 영어 단어 안의 `ai`가 RAG 키워드로 잘못 걸렸습니다
 - RAG 필요 시 하이브리드 벡터 검색 수행
 - Agent 위임은 `@agent` 프리픽스 명령으로 동작하며 ADMIN 권한 사용자만 가능 (`api-agent`로 feign 위임)
 - 일반 대화 시 LLM 직접 호출
@@ -151,9 +181,13 @@ RAG 파이프라인은 다음과 같은 단계로 구성됩니다:
 
 ### 6. 토큰 제어 및 비용 통제
 
-- 입력/출력 토큰 사용량 추적
-- 토큰 제한 검증 및 경고
+- **토큰 사용량은 OpenAI가 응답에 실어 보내는 실측값으로 계측합니다.** `LLMServiceImpl`이 `ChatResponse.tokenUsage()`를 꺼내 `chatbot.llm.input.tokens`·`chatbot.llm.output.tokens` 미터에 남깁니다. 예전에는 질문 문자열만 추정해 세서 실제 입력 토큰의 2.7%(평균 17.9 대 660.4 토큰)만 잡혔습니다
+- 사용량이 없거나 필드가 `null`이면 기록을 건너뜁니다. 0으로 채우면 실제 0토큰과 구분되지 않습니다
+- 입력 토큰 상한(`chatbot.token.max-input-tokens`, 기본 4,000) 검증과 경고. 이 검증은 프롬프트 문자열을 추정해 재는 쪽이라 실측 미터와 별개이고, 일반 대화 경로는 검사를 거치지 않습니다
 - 캐싱을 통한 중복 호출 방지
+- `SessionTitleGenerationServiceImpl`은 `ChatModel`을 직접 부르므로 위 미터에 잡히지 않습니다. 미터 합계는 청구 총액이 아니라 하한입니다
+
+미터 이름과 확인 방법은 [`monitoring/README.md`](../../monitoring/README.md) 5절에 있습니다.
 
 ### 7. 세션 생명주기 관리
 
@@ -437,6 +471,19 @@ chatbot:
     max-context-tokens: 3000
     recency-months: 6      # 최신성 키워드 감지 시 검색 기간 (개월)
 
+    graph:                 # 지식 그래프 검색 (기본 꺼둠 — 평가 잡에서만 켠다)
+      enabled: false
+      max-results: 10        # 그래프가 돌려줄 문서 최대 개수
+      max-seeds: 20          # 질문이 맞춘 시드 노드 최대 개수
+      max-edges-per-seed: 20 # 시드 하나당 훑을 엣지 최대 개수
+      max-time-ms: 2000      # 그래프 조회 실행 시간 상한
+
+    augment:               # 근거가 약할 때 조건을 완화해 재검색 (기본 꺼둠)
+      enabled: false
+      max-attempts: 2        # 재검색 최대 횟수
+      min-vector-score: 0.72 # 이 값 미만이면 근거가 약하다고 본다
+      relaxed-min-score: 0.5 # 2단계에서 낮출 유사도 문턱
+
   reranking:
     enabled: false         # Cohere Re-Ranking (COHERE_API_KEY 설정 시 활성화)
     model-name: rerank-multilingual-v3.0
@@ -464,8 +511,7 @@ chatbot:
     batch-enabled: true
   
   chat-memory:
-    max-tokens: 2000
-    strategy: token-window   # 설정값과 달리 현재 구현은 MessageWindowChatMemory(최대 10개)로 동작
+    max-messages: 10   # 창에 남길 최대 메시지 수 (이력 조회가 최근 50건까지라 50을 넘겨도 더 오지 않는다)
 ```
 
 ### 환경 변수
@@ -482,19 +528,15 @@ chatbot:
 
 ### build.gradle
 
+langchain4j 의존성에는 버전을 적지 않습니다. 루트 `build.gradle`이 `langchain4j-bom`을 import해 한곳에서 정하고, stable 모듈은 1.10.0, `mongodb-atlas`·`cohere` 같은 beta 모듈은 1.10.0-beta18로 해석됩니다.
+
 ```gradle
 dependencies {
-    // langchain4j Core
-    implementation 'dev.langchain4j:langchain4j:1.10.0'
-
-    // langchain4j MongoDB Atlas
-    implementation 'dev.langchain4j:langchain4j-mongodb-atlas:1.10.0-beta18'
-
-    // langchain4j OpenAI (LLM Provider - 기본 선택)
-    implementation 'dev.langchain4j:langchain4j-open-ai:1.10.0'
-
-    // langchain4j Cohere (Re-Ranking)
-    implementation 'dev.langchain4j:langchain4j-cohere:1.10.0-beta18'
+    // 버전은 루트 build.gradle의 langchain4j-bom이 정한다
+    implementation 'dev.langchain4j:langchain4j'
+    implementation 'dev.langchain4j:langchain4j-mongodb-atlas'
+    implementation 'dev.langchain4j:langchain4j-open-ai'
+    implementation 'dev.langchain4j:langchain4j-cohere'
 
     // 프로젝트 모듈 의존성
     implementation project(':common-core')
@@ -507,6 +549,8 @@ dependencies {
     implementation project(':datasource-mongodb')
 }
 ```
+
+`bootJar`과 함께 `jar.enabled = true`도 켜 둡니다. `batch-eval`이 이 모듈을 의존성으로 가져와 운영과 같은 검색 코드를 타기 때문입니다. 꺼 두면 소비 모듈이 클래스가 없는 `-plain.jar`를 가리켜 조용히 빠집니다.
 
 ---
 
@@ -531,7 +575,12 @@ api/chatbot/
 │   │   ├── ChatbotService.java
 │   │   ├── InputPreprocessingService.java
 │   │   ├── IntentClassificationService.java
+│   │   ├── RetrievalService.java            # 벡터·그래프·재검색을 묶는 검색 진입점
 │   │   ├── VectorSearchService.java
+│   │   ├── SearchOptionsFactory.java        # 검색 옵션 조립 (운영·평가 공용)
+│   │   ├── GraphSearchService.java          # 지식 그래프 검색 (기본 꺼짐)
+│   │   ├── GraphSeedExtractor.java          # 질문 → 노드 키 후보
+│   │   ├── GraphEvidenceRanker.java         # 그래프 결과를 문서 단위로 접어 순위 매김
 │   │   ├── PromptService.java
 │   │   ├── LLMService.java
 │   │   ├── TokenService.java
@@ -539,7 +588,9 @@ api/chatbot/
 │   │   ├── ReRankingService.java (CohereReRankingServiceImpl)
 │   │   ├── WebSearchService.java
 │   │   ├── AgentDelegationService.java
-│   │   └── SessionTitleGenerationService.java
+│   │   ├── SessionTitleGenerationService.java
+│   │   └── dto/                             # SearchOutcome, GraphSearchOutcome,
+│   │                                        # RetrievalOutcome, RetrievalPath, AugmentOutcome 등
 │   ├── chain/
 │   │   ├── InputInterpretationChain.java
 │   │   ├── ResultRefinementChain.java
@@ -586,10 +637,13 @@ api/chatbot/
 - **ChatbotService**: 챗봇 응답 생성 오케스트레이션
 - **InputPreprocessingService**: 입력 전처리 및 검증
 - **IntentClassificationService**: 의도 분류 (RAG 필요 여부)
-- **VectorSearchService**: MongoDB Atlas Vector Search 수행
+- **RetrievalService**: 검색 단계 진입점. 벡터 검색을 돌리고, 켜져 있으면 그래프 결과와 재검색 결과를 뒤에 붙인다. 운영과 `batch-eval`이 이 클래스를 함께 탄다
+- **VectorSearchService**: MongoDB Atlas Vector Search 수행. `SearchOutcome`으로 검색 경로·RRF 직전 후보·최신성 쿼리 실패 여부·최종 결과를 함께 돌려준다
+- **SearchOptionsFactory**: 검색 옵션 조립. 운영과 평가가 같은 옵션을 쓰게 한다
+- **GraphSearchService / GraphSeedExtractor / GraphEvidenceRanker**: 지식 그래프 검색 (기본 꺼짐)
 - **PromptService**: 프롬프트 구축 및 최적화
-- **LLMService**: LLM 호출 및 응답 처리
-- **TokenService**: 토큰 사용량 추적 및 제어
+- **LLMService**: LLM 호출 및 응답 처리. `generate(String)`과 `generate(List<ChatMessage>)` 두 오버로드가 같은 통로로 지연시간·실패·토큰 미터를 남긴다
+- **TokenService**: 프롬프트 토큰 추정과 입력 상한 검증 (실측 토큰 계측은 `LLMServiceImpl`이 담당)
 - **CacheService**: 검색 결과 및 임베딩 캐싱
 - **ReRankingService**: Cohere 기반 검색 결과 재순위 (기본 비활성)
 - **WebSearchService**: Google Custom Search 웹 검색 (기본 비활성)
@@ -606,8 +660,7 @@ api/chatbot/
 
 #### 5. Memory Layer
 
-- **ConversationChatMemoryProvider**: 세션별 ChatMemory 제공 (`MessageWindowChatMemory` 최대 10개)
-- **MongoDbChatMemoryStore** (`common-conversation`): MongoDB 기반 ChatMemory 저장소
+- **ConversationChatMemoryProvider**: 요청마다 새 `MessageWindowChatMemory`를 만들어 준다. 창 크기는 `chatbot.chat-memory.max-messages`(기본 10). 저장소를 걸지 않는 이유는 위 [4. 멀티턴 대화 히스토리 관리](#4-멀티턴-대화-히스토리-관리)에 있다
 
 ---
 
@@ -663,6 +716,6 @@ api/chatbot/
 
 ---
 
-**문서 버전**: 1.2
-**최종 업데이트**: 2026-07-22
+**문서 버전**: 1.3
+**최종 업데이트**: 2026-08-18
 
