@@ -35,7 +35,7 @@ flowchart LR
         logs["CloudWatch Logs<br/>/aws/ecs/{env}/{service}"]
     end
 
-    mongo[("MongoDB Atlas<br/>external · CQRS read store<br/>RAG DB · Vector Search")]
+    mongo[("MongoDB Atlas<br/>external · CQRS read store<br/>RAG DB · Vector Search<br/>지식 그래프 tech_graph_nodes/edges")]
 
     client -->|HTTPS :443| alb
     alb --> gw & auth & et & chat & book & agent
@@ -58,6 +58,7 @@ flowchart LR
     %% 환경 차이: dev 에는 MSK 노드와 점선 연결이 없음. beta=MSK Serverless, prod=MSK Provisioned(3 broker).
     %% ALB 프로토콜: prod=HTTPS 443(+80 리다이렉트), dev/beta=HTTP 80. 위 그림은 prod 기준.
     %% 프런트(Amplify/CloudFront)는 모듈만 있고 미배포 → 진입점은 ALB 뿐.
+    %% 배치(batch-source·batch-eval·batch-graph)는 ECS 서비스로 배포되지 않는다(facts §3). batch-graph가 만든 지식 그래프만 Atlas에 남아 api-chatbot이 읽는다.
 
     %% 색상: 공식 브랜드·AWS 카테고리 색으로 계층을 한눈에 구분
     classDef cons fill:#5F6B7A,stroke:#3B4453,color:#fff

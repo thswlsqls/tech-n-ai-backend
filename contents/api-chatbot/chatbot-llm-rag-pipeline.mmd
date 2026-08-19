@@ -1,0 +1,84 @@
+sequenceDiagram
+    autonumber
+    actor User
+    participant Controller as ChatbotController
+    participant Facade as ChatbotFacade
+    participant Chatbot as ChatbotService
+    participant Pre as InputPreprocessingService
+    participant Intent as IntentClassificationService
+    participant Interpret as InputInterpretationChain
+    participant Retrieval as RetrievalService
+    participant Vector as VectorSearchService
+    participant Graph as GraphSearchService
+    participant Embed as Embedding Model
+    participant Mongo as MongoDB Atlas
+    participant Refine as ResultRefinementChain
+    participant Answer as AnswerGenerationChain
+    participant Prompt as PromptService
+    participant Token as TokenService
+    participant LLM as LLMService
+    participant Provider as LLM Provider
+
+    User->>Controller: POST /api/v1/chatbot
+    Controller->>Facade: chat(request)
+    Facade->>Chatbot: generateResponse(request)
+
+    Chatbot->>Pre: preprocess(input)
+    Pre->>Pre: validate & normalize
+    Pre-->>Chatbot: preprocessedInput
+
+    Chatbot->>Intent: classifyIntent(preprocessedInput)
+    Intent->>Intent: 키워드 규칙 (LLM 호출 없음)<br/>영어는 단어 경계, 한국어는 부분 문자열
+    Intent-->>Chatbot: intent (RAG_REQUIRED / GENERAL 등)
+
+    alt RAG 필요
+        Chatbot->>Interpret: interpret(query)
+        Interpret->>Interpret: 입력 정제 및 검색 쿼리 추출
+        Interpret-->>Chatbot: searchQuery
+
+        Chatbot->>Retrieval: retrieve(searchQuery, userId, options)
+        Retrieval->>Vector: search(searchQuery, userId, options)
+        Vector->>Embed: embed(query)
+        Embed-->>Vector: queryVector
+        Vector->>Mongo: $vectorSearch + 최신성 쿼리 → RRF(k=60)
+        Mongo-->>Vector: 후보 문서
+        Vector-->>Retrieval: SearchOutcome
+
+        opt 근거가 약하고 augment.enabled (기본 꺼짐)
+            Retrieval->>Vector: search(필터·유사도 문턱을 완화한 조건)
+            Vector->>Mongo: 재검색
+            Mongo-->>Vector: 후보 문서
+            Vector-->>Retrieval: 1차 결과 뒤에 덧붙임
+        end
+
+        opt graph.enabled (기본 꺼짐)
+            Retrieval->>Graph: search(query)
+            Graph->>Mongo: tech_graph_nodes · tech_graph_edges 1홉 조회
+            Mongo-->>Graph: 시드 노드와 이웃
+            Graph-->>Retrieval: 그래프 근거 (벡터 상위를 밀지 않음)
+        end
+
+        Retrieval-->>Chatbot: RetrievalOutcome (벡터 · 그래프 · 병합 결과)
+
+        Chatbot->>Refine: refine(results)
+        Refine->>Refine: 유사도 필터링, 중복 제거, 상위 N건
+        Refine-->>Chatbot: refinedResults
+
+        Chatbot->>Answer: generate(query, refinedResults)
+        Answer->>Prompt: buildPrompt(query, refinedResults)
+        Prompt->>Token: truncateResults / validateInputTokens
+        Token-->>Prompt: 상한 안에 맞춘 프롬프트
+        Prompt-->>Answer: prompt
+        Answer->>LLM: generate(prompt)
+    else 일반 대화
+        Chatbot->>LLM: generate(메시지 목록)
+    end
+
+    LLM->>Provider: chat(...)
+    Provider-->>LLM: ChatResponse (답변 + tokenUsage)
+    LLM->>LLM: 미터 기록 — 지연 · 실패 · 입력/출력 토큰 실측
+    LLM-->>Chatbot: answer
+
+    Chatbot-->>Facade: ChatResponse
+    Facade-->>Controller: ChatResponse
+    Controller-->>User: ApiResponse (ChatResponse)

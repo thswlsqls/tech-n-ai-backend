@@ -73,6 +73,31 @@ erDiagram
         String request_id
     }
 
+    tech_graph_nodes {
+        ObjectId _id PK
+        String key UK "타입라벨|정규화한이름. 예: Model|gpt-4o"
+        String type "Company/Model/Technology/Release/Capability"
+        String name "처음 저장될 때 본 원본 표기"
+        StringArray external_ids "이 노드가 나온 emerging_techs 문서들"
+        DateTime created_at
+        DateTime updated_at
+    }
+
+    tech_graph_edges {
+        ObjectId _id PK
+        String key UK "source_key->관계라벨->target_key"
+        String type "RELEASED/SUCCEEDS/SUPPORTS/USES/DEPENDS_ON"
+        String source_key "출발 노드의 key"
+        String target_key "도착 노드의 key"
+        StringArray external_ids "이 엣지가 나온 emerging_techs 문서들"
+        DateTime created_at
+        DateTime updated_at
+    }
+
     emerging_techs ||--|| emerging_techs_metadata : "embedded"
     exception_logs ||--|| exception_logs_context : "embedded"
     conversation_sessions ||--o{ conversation_messages : "session_id"
+    emerging_techs }o--o{ tech_graph_nodes : "external_ids"
+    emerging_techs }o--o{ tech_graph_edges : "external_ids"
+    tech_graph_nodes ||--o{ tech_graph_edges : "source_key"
+    tech_graph_nodes ||--o{ tech_graph_edges : "target_key"

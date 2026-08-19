@@ -1,0 +1,80 @@
+%%{init: {'theme': 'neutral'}}%%
+flowchart TD
+    subgraph client["Client"]
+        user["User"]
+    end
+
+    subgraph api["API Layer"]
+        controller["ChatbotController"]
+        facade["ChatbotFacade"]
+    end
+
+    subgraph service["Service Layer"]
+        chatbot["ChatbotService"]
+        preprocess["InputPreprocessingService"]
+        intent["IntentClassificationService"]
+        websearch["WebSearchService"]
+        agentdel["AgentDelegationService"]
+        prompt["PromptService"]
+        token["TokenService"]
+        llm["LLMService"]
+
+        subgraph retrieval["RetrievalService · 검색 단계를 한곳에 모음"]
+            vector["VectorSearchService<br/>하이브리드 검색 + RRF"]
+            relax["조건 완화 재검색<br/>기본 꺼짐"]
+            graphsearch["GraphSearchService<br/>기본 꺼짐"]
+        end
+    end
+
+    subgraph chain["Chain Layer"]
+        interpret["InputInterpretationChain"]
+        refine["ResultRefinementChain"]
+        answer["AnswerGenerationChain"]
+    end
+
+    subgraph data["Data Layer · MongoDB Atlas"]
+        mongo[("emerging_techs<br/>Vector Search 1536dim")]
+        graphdb[("tech_graph_nodes<br/>tech_graph_edges")]
+    end
+
+    subgraph batch["Batch · ECS 미배포, 필요할 때 실행"]
+        bgraph["batch-graph<br/>문서에서 노드·엣지 추출"]
+        beval["batch-eval<br/>검색·답변 품질 측정"]
+    end
+
+    subgraph external["External"]
+        openai["OpenAI<br/>GPT-4o-mini · text-embedding-3-small"]
+        cohere["Cohere rerank-multilingual-v3.0<br/>opt-in"]
+        gcs["Google Custom Search<br/>opt-in"]
+    end
+
+    user -->|"POST /api/v1/chatbot"| controller
+    controller --> facade
+    facade --> chatbot
+    chatbot --> preprocess
+    preprocess --> intent
+
+    intent -->|"RAG 필요"| interpret
+    intent -->|"실시간 정보"| websearch
+    intent -->|"@agent · ADMIN"| agentdel
+    intent -->|"일반 대화"| llm
+
+    interpret --> retrieval
+    vector --> mongo
+    vector -.->|"근거가 약하면"| relax
+    relax --> mongo
+    graphsearch --> graphdb
+    vector -->|"질의 임베딩"| openai
+
+    retrieval --> refine
+    refine -.->|"재순위"| cohere
+    refine --> answer
+    answer --> prompt
+    prompt --> token
+    answer --> llm
+    llm -->|"chat 호출 · 토큰 사용량 실측"| openai
+    websearch --> gcs
+
+    bgraph -->|"읽기"| mongo
+    bgraph -->|"upsert"| graphdb
+    beval -->|"운영과 같은 검색 코드"| retrieval
