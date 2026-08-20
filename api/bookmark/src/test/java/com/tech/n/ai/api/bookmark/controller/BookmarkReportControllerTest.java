@@ -1,5 +1,8 @@
 package com.tech.n.ai.api.bookmark.controller;
 
+import com.tech.n.ai.api.bookmark.common.exception.BookmarkExceptionHandler;
+import com.tech.n.ai.api.bookmark.common.exception.BookmarkValidationException;
+import com.tech.n.ai.api.bookmark.dto.request.BookmarkDailyReportRequest;
 import com.tech.n.ai.api.bookmark.dto.request.BookmarkViewEventRequest;
 import com.tech.n.ai.api.bookmark.dto.response.BookmarkDailyReportResponse;
 import com.tech.n.ai.api.bookmark.dto.response.BookmarkViewEventResponse;
@@ -29,6 +32,8 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -60,6 +65,7 @@ class BookmarkReportControllerTest {
         mockMvc = MockMvcBuilders
             .standaloneSetup(bookmarkReportController)
             .setCustomArgumentResolvers(new TestUserPrincipalArgumentResolver())
+            .setControllerAdvice(new BookmarkExceptionHandler())
             .build();
     }
 
@@ -80,7 +86,23 @@ class BookmarkReportControllerTest {
                     .content(objectMapper.writeValueAsString(new BookmarkViewEventRequest("web"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("2000"))
-                .andExpect(jsonPath("$.data.todayViewCount").value(1));
+                .andExpect(jsonPath("$.data.todayViewCount").value("1"));
+
+            verify(bookmarkReportFacade).recordView(
+                eq(TEST_USER_ID), eq("100"), eq(new BookmarkViewEventRequest("web")));
+        }
+
+        @Test
+        @DisplayName("삭제된 북마크 - 404")
+        void recordView_없는북마크() throws Exception {
+            when(bookmarkReportFacade.recordView(anyLong(), anyString(), any(BookmarkViewEventRequest.class)))
+                .thenThrow(new com.tech.n.ai.api.bookmark.common.exception.BookmarkNotFoundException(
+                    "삭제된 북마크입니다: 100"));
+
+            mockMvc.perform(post(BASE_URL + "/100/views")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(new BookmarkViewEventRequest("web"))))
+                .andExpect(status().isNotFound());
         }
     }
 
@@ -99,10 +121,30 @@ class BookmarkReportControllerTest {
 
             mockMvc.perform(get(BASE_URL + "/reports/daily")
                     .param("from", "2026-08-01")
-                    .param("to", "2026-08-03"))
+                    .param("to", "2026-08-03")
+                    .param("provider", "github"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("2000"))
-                .andExpect(jsonPath("$.data.totalViews").value(9));
+                .andExpect(jsonPath("$.data.totalViews").value("9"))
+                .andExpect(jsonPath("$.data.days[0].date").value("2026-08-01"))
+                .andExpect(jsonPath("$.data.days[0].provider").value("github"))
+                .andExpect(jsonPath("$.data.days[0].viewCount").value("9"));
+
+            verify(bookmarkReportFacade).getDailyReport(
+                eq(TEST_USER_ID),
+                eq(new BookmarkDailyReportRequest("2026-08-01", "2026-08-03", "github")));
+        }
+
+        @Test
+        @DisplayName("from 이 to 보다 늦음 - 400")
+        void getDailyReport_역순구간() throws Exception {
+            when(bookmarkReportFacade.getDailyReport(anyLong(), any()))
+                .thenThrow(new BookmarkValidationException("from은 to보다 늦을 수 없습니다."));
+
+            mockMvc.perform(get(BASE_URL + "/reports/daily")
+                    .param("from", "2026-08-03")
+                    .param("to", "2026-08-01"))
+                .andExpect(status().isBadRequest());
         }
     }
 

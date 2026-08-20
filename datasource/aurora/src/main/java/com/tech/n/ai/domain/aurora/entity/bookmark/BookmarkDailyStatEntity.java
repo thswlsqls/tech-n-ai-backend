@@ -5,6 +5,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -18,6 +19,11 @@ import java.time.LocalDate;
 @Entity
 @Table(
     name = "bookmark_daily_stats",
+    uniqueConstraints = {
+        @UniqueConstraint(
+            name = "uk_bookmark_daily_stats_user_date_provider",
+            columnNames = {"user_id", "stat_date", "provider"})
+    },
     indexes = {
         @Index(name = "idx_bookmark_daily_stats_user_date", columnList = "user_id, stat_date")
     }

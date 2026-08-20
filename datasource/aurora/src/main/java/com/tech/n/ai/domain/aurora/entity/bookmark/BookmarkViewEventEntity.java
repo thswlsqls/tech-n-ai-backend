@@ -43,12 +43,14 @@ public class BookmarkViewEventEntity extends BaseEntity {
     @Column(name = "source", length = 20)
     private String source;
 
-    public static BookmarkViewEventEntity of(Long bookmarkId, Long userId, String provider, LocalDateTime viewedAt) {
+    public static BookmarkViewEventEntity of(Long bookmarkId, Long userId, String provider,
+                                             LocalDateTime viewedAt, String source) {
         BookmarkViewEventEntity entity = new BookmarkViewEventEntity();
         entity.bookmarkId = bookmarkId;
         entity.userId = userId;
         entity.provider = provider;
         entity.viewedAt = viewedAt;
+        entity.source = source;
         return entity;
     }
 }

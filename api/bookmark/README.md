@@ -49,16 +49,24 @@ Controller → Facade → Service → Repository → Aurora MySQL
                                     └ (생성 시) EmergingTech 조회 → MongoDB
 ```
 
-- **Controller** (`BookmarkController`): HTTP 요청/응답 처리, JWT에서 사용자 ID 추출
-- **Facade** (`BookmarkFacade`): 서비스 호출을 조합하고 엔티티를 응답 DTO로 변환. ID 문자열 파싱, 페이지 변환을 담당
+- **Controller**: HTTP 요청/응답 처리, JWT에서 사용자 ID 추출
+  - `BookmarkController`: 북마크 CRUD·검색·이력
+  - `BookmarkReportController`: 조회 이벤트 기록, 일별 리포트
+- **Facade**: 서비스 호출을 조합하고 엔티티를 응답 DTO로 변환. ID 문자열 파싱, 페이지 변환을 담당
+  - `BookmarkFacade`: 북마크 CRUD·검색·이력
+  - `BookmarkReportFacade`: 경로 ID 파싱과 리포트 요청 구간 검증
 - **Service**:
   - `BookmarkCommandService`: 저장·수정·삭제·복구 (쓰기)
   - `BookmarkQueryService`: 목록·상세·검색 (읽기)
   - `BookmarkHistoryService`: 이력 조회 및 버전 복구
+  - `BookmarkViewEventService`: 조회 이벤트 적재와 일별 집계 갱신
+  - `BookmarkReportService`: 구간 집계 조회
 - **Repository** (`datasource-aurora` 모듈):
   - `BookmarkReaderRepository`: JPA `JpaSpecificationExecutor` 기반 조회
   - `BookmarkHistoryReaderRepository`: 이력 조회
   - `BookmarkWriterRepository`: 저장·삭제 + 이력 기록
+  - `BookmarkDailyStatReaderRepository`: 일별 집계 조회
+  - `BookmarkViewEventWriterJpaRepository` · `BookmarkDailyStatWriterJpaRepository`: 조회 이벤트·집계 저장
 
 ## 데이터 모델
 

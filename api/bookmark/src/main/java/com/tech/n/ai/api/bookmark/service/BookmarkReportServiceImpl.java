@@ -9,13 +9,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
  * BookmarkReportService 구현체
  *
- * bookmark_daily_stats 에 쌓아 둔 집계를 날짜 순으로 읽어 내려간다.
+ * bookmark_daily_stats 에 쌓아 둔 집계를 구간 단위로 한 번에 읽는다.
  */
 @Slf4j
 @Service
@@ -29,30 +28,18 @@ public class BookmarkReportServiceImpl implements BookmarkReportService {
         LocalDate from = LocalDate.parse(request.from());
         LocalDate to = LocalDate.parse(request.to());
 
-        List<BookmarkDailyReportResponse.DailyView> days = new ArrayList<>();
-        long totalViews = 0L;
+        List<BookmarkDailyStatEntity> stats =
+            bookmarkDailyStatReaderRepository.findRange(userId, from, to, request.provider());
 
-        for (LocalDate date = from; !date.isAfter(to); date = date.plusDays(1)) {
-            List<BookmarkDailyStatEntity> stats =
-                bookmarkDailyStatReaderRepository.findByUserIdAndStatDate(userId, date);
+        List<BookmarkDailyReportResponse.DailyView> days = stats.stream()
+            .map(stat -> new BookmarkDailyReportResponse.DailyView(
+                stat.getStatDate().toString(), stat.getProvider(), stat.getViewCount()))
+            .toList();
 
-            for (BookmarkDailyStatEntity stat : stats) {
-                if (!matchesProvider(request.provider(), stat.getProvider())) {
-                    continue;
-                }
-                days.add(new BookmarkDailyReportResponse.DailyView(
-                    date.toString(), stat.getProvider(), stat.getViewCount()));
-                totalViews += stat.getViewCount();
-            }
-        }
+        long totalViews = stats.stream()
+            .mapToLong(BookmarkDailyStatEntity::getViewCount)
+            .sum();
 
         return new BookmarkDailyReportResponse(request.from(), request.to(), totalViews, days);
-    }
-
-    private boolean matchesProvider(String requested, String actual) {
-        if (requested == null || requested.isBlank()) {
-            return true;
-        }
-        return requested.equals(actual);
     }
 }

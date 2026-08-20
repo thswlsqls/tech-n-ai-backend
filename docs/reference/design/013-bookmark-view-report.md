@@ -136,7 +136,7 @@ POST /api/v1/bookmark/{id}/views
 |------|------|------|
 | `bookmarkId` | String | 조회한 북마크 ID |
 | `viewedAt` | DateTime | 기록 시각 |
-| `todayViewCount` | Number | 기록 후 그 날짜의 누적 조회 수 |
+| `todayViewCount` | String | 기록 후 그 날짜의 누적 조회 수. **JSON에는 문자열로 나간다** — TSID 정밀도를 지키려고 전역 Jackson 설정이 모든 `Long`을 문자열로 직렬화한다(`common/core/.../JacksonConfig.java`) |
 
 | 상황 | 상태 코드 |
 |------|-----------|
@@ -164,10 +164,10 @@ GET /api/v1/bookmark/reports/daily?from=2026-08-01&to=2026-08-30&provider=github
 |------|------|------|
 | `from` | String | 시작일 |
 | `to` | String | 종료일 |
-| `totalViews` | Number | 구간 전체 조회 수 |
+| `totalViews` | String | 구간 전체 조회 수 (위와 같은 이유로 문자열) |
 | `days[].date` | String | 날짜 |
 | `days[].provider` | String | 제공자 |
-| `days[].viewCount` | Number | 그 날짜의 조회 수 |
+| `days[].viewCount` | String | 그 날짜의 조회 수 (위와 같은 이유로 문자열) |
 
 | 상황 | 상태 코드 |
 |------|-----------|
@@ -211,8 +211,14 @@ GET /reports/daily
 
 ### 5.3 날짜 기준
 
-프로젝트 전체가 KST로 돈다(루트 `build.gradle`이 `-Duser.timezone=Asia/Seoul`을 강제한다).
-집계 날짜도 KST 기준으로 자른다. UTC로 자르면 KST 00시~09시 사이의 조회가 전날 칸에 들어간다.
+집계 날짜는 KST 기준으로 자른다. UTC로 자르면 KST 00시~09시 사이의 조회가 전날 칸에 들어간다.
+
+**JVM 기본 존에 기대지 않고 코드에서 존을 못 박는다.** 루트 `build.gradle`의
+`-Duser.timezone=Asia/Seoul`은 로컬 `bootRun`과 `test`에만 걸리고 배포 산출물에는 적용되지 않는다.
+`devops/terraform`의 ECS 태스크 정의에 `TZ`나 `JAVA_TOOL_OPTIONS`가 없어서, 운영 컨테이너의 JVM 기본 존은
+이미지 기본값을 따른다. 그래서 날짜를 자르는 자리에 `Clock`을 주입하고 그 `Clock`을
+`Clock.system(ZoneId.of("Asia/Seoul"))`으로 만든다. 테스트는 같은 자리에 고정 시각 `Clock`을 넣어
+자정 경계를 재현한다.
 
 ---
 
@@ -232,7 +238,7 @@ GET /reports/daily
 - [ ] 남의 북마크 ID로 요청하면 403
 - [ ] 삭제된 북마크 ID로 요청하면 404
 - [ ] KST 00시 30분의 조회가 그 날짜 칸에 들어간다
-- [ ] 90일 구간 리포트 조회에서 집계 쿼리가 1회만 나간다
+- [ ] 90일 구간 리포트 조회에서 집계 쿼리가 1회만 나간다 (`BookmarkReportServiceTest.getDailyReport_구간조회_1회`)
 - [ ] 91일 구간을 요청하면 400
 - [ ] `from`이 `to`보다 늦으면 400
 
