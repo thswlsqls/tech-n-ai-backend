@@ -24,6 +24,10 @@
 - **특정 시점 조회**: 주어진 시점 직전의 가장 최근 이력을 조회합니다.
 - **버전 복구**: 특정 이력 버전(historyId)에 저장된 데이터로 북마크를 되돌립니다. 단, 중복 방지용 UNIQUE 제약에 묶인 `emerging_tech_id`는 복원 대상에서 제외합니다.
 
+### 조회 리포트
+- **조회 이벤트 기록**: 북마크 상세를 열 때마다 이벤트를 한 건 남기고, 그 날짜의 집계를 함께 올립니다.
+- **일별 리포트 조회**: 날짜 구간(`from`~`to`)을 받아 날짜·제공자별 조회 수를 돌려줍니다. 구간은 최대 90일입니다.
+
 ## 아키텍처
 
 ### 데이터 저장 방식
@@ -83,6 +87,31 @@ Controller → Facade → Service → Repository → Aurora MySQL
 | `before_data`, `after_data` | 변경 전·후 상태 (JSON) |
 | `changed_by`, `changed_at`, `change_reason` | 변경자·변경 시각·사유 |
 
+### `bookmark_view_events` 테이블 (`BookmarkViewEventEntity`)
+
+| 컬럼 | 설명 |
+| --- | --- |
+| `id` | 기본키 (TSID) |
+| `bookmark_id` | 조회한 북마크 ID |
+| `user_id` | 조회한 사용자 ID |
+| `provider` | 조회 시점의 제공자 (북마크에서 복사) |
+| `viewed_at` | 조회 시각 |
+| `source` | 조회 경로 (`web`, `app`) |
+
+집계가 틀어졌을 때 다시 계산하기 위한 원본입니다. 리포트 API는 이 테이블을 직접 읽지 않습니다.
+
+### `bookmark_daily_stats` 테이블 (`BookmarkDailyStatEntity`)
+
+| 컬럼 | 설명 |
+| --- | --- |
+| `id` | 기본키 (TSID) |
+| `user_id` | 사용자 ID |
+| `stat_date` | 집계 날짜 (KST 기준) |
+| `provider` | 제공자 |
+| `view_count` | 그 날짜·제공자의 조회 수 |
+
+- `(user_id, stat_date, provider)`에 UNIQUE 제약을 둡니다. 같은 조합의 행이 둘 생기면 합계가 두 번 세어집니다.
+
 ## API 엔드포인트
 
 - **Base URL**: `/api/v1/bookmark`
@@ -102,6 +131,8 @@ Controller → Facade → Service → Repository → Aurora MySQL
 | `GET` | `/api/v1/bookmark/history/{entityId}` | 변경 이력 목록 조회 | `page`, `size`, `operationType`, `startDate`, `endDate` |
 | `GET` | `/api/v1/bookmark/history/{entityId}/at` | 특정 시점 데이터 조회 | `timestamp`(필수, `yyyy-MM-dd` 또는 `yyyy-MM-ddTHH:mm:ss`) |
 | `POST` | `/api/v1/bookmark/history/{entityId}/restore` | 특정 버전으로 복구 | `historyId`(필수) |
+| `POST` | `/api/v1/bookmark/{id}/views` | 조회 이벤트 기록 | body: `source`(선택) |
+| `GET` | `/api/v1/bookmark/reports/daily` | 일별 조회 리포트 | `from`(필수), `to`(필수), `provider` |
 
 ID는 API 경계에서 모두 문자열로 주고받습니다. TSID(64비트 Long)가 자바스크립트의 안전 정수 범위를 넘기 때문입니다.
 
