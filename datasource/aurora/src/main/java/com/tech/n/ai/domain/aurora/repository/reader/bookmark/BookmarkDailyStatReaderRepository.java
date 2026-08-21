@@ -27,12 +27,15 @@ public interface BookmarkDailyStatReaderRepository extends JpaRepository<Bookmar
      *
      * 날짜마다 따로 조회하면 90일 구간에서 SELECT 가 90번 나간다.
      * `(user_id, stat_date)` 인덱스가 이 범위 조회를 커버한다.
+     *
+     * provider 는 선택 필터다. 안 주면(null) 그 구간의 모든 제공자를 돌려준다.
+     * `s.provider = :provider` 만 걸면 null 비교가 참이 되지 않아 전 행이 빠진다.
      */
     @Query("SELECT s FROM BookmarkDailyStatEntity s "
          + "WHERE s.userId = :userId "
          + "AND s.statDate BETWEEN :from AND :to "
          + "AND s.isDeleted = false "
-         + "AND s.provider = :provider "
+         + "AND (:provider IS NULL OR s.provider = :provider) "
          + "ORDER BY s.statDate ASC, s.provider ASC")
     List<BookmarkDailyStatEntity> findRange(
         @Param("userId") Long userId,

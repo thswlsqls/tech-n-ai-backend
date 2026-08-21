@@ -136,6 +136,23 @@ class BookmarkReportControllerTest {
         }
 
         @Test
+        @DisplayName("provider 를 빈 값으로 보내면 미지정으로 넘어간다")
+        void getDailyReport_provider빈값() throws Exception {
+            when(bookmarkReportFacade.getDailyReport(anyLong(), any()))
+                .thenReturn(new BookmarkDailyReportResponse("2026-08-01", "2026-08-03", 0L, List.of()));
+
+            mockMvc.perform(get(BASE_URL + "/reports/daily")
+                    .param("from", "2026-08-01")
+                    .param("to", "2026-08-03")
+                    .param("provider", ""))
+                .andExpect(status().isOk());
+
+            verify(bookmarkReportFacade).getDailyReport(
+                eq(TEST_USER_ID),
+                eq(new BookmarkDailyReportRequest("2026-08-01", "2026-08-03", null)));
+        }
+
+        @Test
         @DisplayName("from 이 to 보다 늦음 - 400")
         void getDailyReport_역순구간() throws Exception {
             when(bookmarkReportFacade.getDailyReport(anyLong(), any()))

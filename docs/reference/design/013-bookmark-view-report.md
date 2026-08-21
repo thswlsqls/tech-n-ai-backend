@@ -156,7 +156,7 @@ GET /api/v1/bookmark/reports/daily?from=2026-08-01&to=2026-08-30&provider=github
 |----------|------|------|------|
 | `from` | String | Y | 시작일 `yyyy-MM-dd` |
 | `to` | String | Y | 종료일 `yyyy-MM-dd` |
-| `provider` | String | N | 제공자 필터 |
+| `provider` | String | N | 제공자 필터. 안 주거나 빈 값이면 그 구간의 모든 제공자를 돌려준다 |
 
 응답
 

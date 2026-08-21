@@ -18,4 +18,15 @@ public record BookmarkDailyReportRequest(
 
     String provider
 ) {
+
+    /**
+     * 빈 문자열로 온 provider 는 미지정과 같게 다룬다.
+     * `?provider=` 처럼 값 없이 보내는 경로가 있어서, 여기서 null 로 맞춰 두지 않으면
+     * 빈 문자열인 행을 찾다가 결과가 비어 버린다.
+     */
+    public BookmarkDailyReportRequest {
+        if (provider != null && provider.isBlank()) {
+            provider = null;
+        }
+    }
 }
