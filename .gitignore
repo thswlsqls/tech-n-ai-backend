@@ -134,3 +134,8 @@ docs/monitoring/.venv/
 /.codex/
 /.rtk/
 /.serena/
+
+### 로컬 도구 ###
+# PR eval harness(tools/pr-eval) 는 추적한다. runs/ 만 제외한다 —
+# PR 마다 버려지는 작업 폴더이고, 누적 자산(_memory/learnings.md)은 추적 대상이다.
+/tools/pr-eval/runs/
