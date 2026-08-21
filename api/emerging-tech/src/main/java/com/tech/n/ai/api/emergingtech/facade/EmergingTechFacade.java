@@ -119,23 +119,22 @@ public class EmergingTechFacade {
         int failureCount = 0;
         List<String> failureMessages = new ArrayList<>();
 
-        for (EmergingTechCreateRequest item : request.items()) {
-            try {
-                EmergingTechCommandService.SaveResult result = commandService.saveEmergingTech(item);
+        try {
+            for (EmergingTechCommandService.SaveResult result : commandService.saveEmergingTechAll(request.items())) {
                 if (result.isNew()) {
                     newCount++;
                 } else {
                     duplicateCount++;
                 }
-            } catch (Exception e) {
-                failureCount++;
-                String errorMessage = String.format(
-                    "Emerging Tech 저장 실패: title=%s, error=%s",
-                    item.title(), e.getMessage()
-                );
-                log.error(errorMessage, e);
-                failureMessages.add(errorMessage);
             }
+        } catch (Exception e) {
+            failureCount = request.items().size();
+            String errorMessage = String.format(
+                "Emerging Tech 저장 실패: count=%d, error=%s",
+                request.items().size(), e.getMessage()
+            );
+            log.error(errorMessage, e);
+            failureMessages.add(errorMessage);
         }
 
         log.info("Emerging Tech 다건 생성 완료: total={}, new={}, duplicate={}, failure={}",

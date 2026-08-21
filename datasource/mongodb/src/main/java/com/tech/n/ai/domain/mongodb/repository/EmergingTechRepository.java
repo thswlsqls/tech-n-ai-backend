@@ -7,6 +7,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -25,6 +27,16 @@ public interface EmergingTechRepository extends MongoRepository<EmergingTechDocu
      * URL로 조회 (중복 체크용)
      */
     Optional<EmergingTechDocument> findByUrl(String url);
+
+    /**
+     * 외부 ID 목록으로 조회 (다건 중복 체크용)
+     */
+    List<EmergingTechDocument> findByExternalIdIn(Collection<String> externalIds);
+
+    /**
+     * URL 목록으로 조회 (다건 중복 체크용)
+     */
+    List<EmergingTechDocument> findByUrlIn(Collection<String> urls);
 
     /**
      * 제목 검색 (대소문자 무시)
