@@ -267,6 +267,44 @@ class EmergingTechCommandServiceTest {
         }
 
         @Test
+        @DisplayName("DB 중복과 요청 안 접힘이 섞이면 위치와 저장 인덱스가 어긋난다")
+        void DB_중복과_요청_안_접힘이_섞여도_올바른_문서를_가리킨다() {
+            // Given: [0] 은 DB 에 이미 있고, [1] 은 신규, [2] 는 [1] 과 같은 url 이다.
+            // 이 입력에서만 "요청 위치" 와 "저장 인덱스" 가 어긋난다 —
+            // [1] 의 위치는 1 이지만 저장 목록에서는 0 번이다.
+            List<EmergingTechCreateRequest> requests = List.of(
+                createRequest("ext-existing", "https://example.com/existing"),
+                createRequest("ext-1", "https://example.com/dup"),
+                createRequest("ext-2", "https://example.com/dup"));
+
+            EmergingTechDocument existing = createDocument();
+            existing.setExternalId("ext-existing");
+
+            when(emergingTechRepository.findByExternalIdIn(any())).thenReturn(List.of(existing));
+            when(emergingTechRepository.findByUrlIn(any())).thenReturn(List.of());
+            stubEmbedAll();
+            stubSaveAll();
+
+            // When
+            List<EmergingTechCommandService.SaveResult> results = commandService.saveEmergingTechAll(requests);
+
+            // Then: 저장은 [1] 하나뿐이다
+            ArgumentCaptor<List<EmergingTechDocument>> saved = ArgumentCaptor.forClass(List.class);
+            verify(emergingTechRepository).saveAll(saved.capture());
+            assertThat(saved.getValue()).hasSize(1);
+            assertThat(saved.getValue().getFirst().getUrl()).isEqualTo("https://example.com/dup");
+
+            assertThat(results.get(0).isNew()).isFalse();
+            assertThat(results.get(0).document()).isSameAs(existing);
+            assertThat(results.get(1).isNew()).isTrue();
+            // 접힌 자리가 대표와 같은 문서를 가리켜야 한다.
+            // savedIndexOfPosition[folded] 대신 folded 를 쓰면 여기서 깨진다
+            assertThat(results.get(2).isNew()).isFalse();
+            assertThat(results.get(2).document()).isSameAs(results.get(1).document());
+            assertThat(results.get(2).document().getUrl()).isEqualTo("https://example.com/dup");
+        }
+
+        @Test
         @DisplayName("같은 externalId 가 두 번 와도 한 번만 저장한다")
         void 요청_안_externalId_중복도_접는다() {
             // Given

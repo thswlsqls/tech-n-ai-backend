@@ -212,8 +212,8 @@ public class EmergingTechCommandServiceImpl implements EmergingTechCommandServic
         boolean[] representative = new boolean[size];
         Arrays.fill(savedIndexOfPosition, -1);
 
-        Map<String, Integer> byExternalId = new HashMap<>();
-        Map<String, Integer> byUrl = new HashMap<>();
+        Map<String, Integer> positionByExternalId = new HashMap<>();
+        Map<String, Integer> positionByUrl = new HashMap<>();
         List<EmergingTechDocument> newDocuments = new ArrayList<>();
 
         for (int i = 0; i < size; i++) {
@@ -222,12 +222,16 @@ public class EmergingTechCommandServiceImpl implements EmergingTechCommandServic
             }
 
             EmergingTechCreateRequest request = requests.get(i);
-            Integer folded = request.externalId() != null ? byExternalId.get(request.externalId()) : null;
+            Integer folded = request.externalId() != null
+                ? positionByExternalId.get(request.externalId()) : null;
             if (folded == null && request.url() != null) {
-                folded = byUrl.get(request.url());
+                folded = positionByUrl.get(request.url());
             }
             if (folded != null) {
                 savedIndexOfPosition[i] = savedIndexOfPosition[folded];
+                // 응답의 duplicateCount 한 칸에 DB 중복과 함께 담겨 구별되지 않으므로 여기서 남긴다
+                log.debug("요청 안 중복을 접었다: position={}, 대표={}, externalId={}, url={}",
+                    i, folded, request.externalId(), request.url());
                 continue;
             }
 
@@ -235,10 +239,10 @@ public class EmergingTechCommandServiceImpl implements EmergingTechCommandServic
             savedIndexOfPosition[i] = newDocuments.size();
             newDocuments.add(createDocument(request));
             if (request.externalId() != null) {
-                byExternalId.put(request.externalId(), i);
+                positionByExternalId.put(request.externalId(), i);
             }
             if (request.url() != null) {
-                byUrl.put(request.url(), i);
+                positionByUrl.put(request.url(), i);
             }
         }
         return new BatchPlan(newDocuments, savedIndexOfPosition, representative);
