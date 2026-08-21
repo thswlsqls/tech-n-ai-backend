@@ -75,7 +75,7 @@ AI/기술 업데이트 정보를 담는 핵심 컬렉션입니다.
 
 모두 `MongoRepository<문서, ObjectId>`를 상속하는 Spring Data MongoDB 인터페이스입니다.
 
-- `EmergingTechRepository`: `findByExternalId`·`findByUrl`(중복 체크), `findByTitleContainingIgnoreCase`. 필터 조합 쿼리는 `MongoTemplate` 동적 Criteria로 처리.
+- `EmergingTechRepository`: `findByExternalIdIn`·`findByUrlIn`(중복 체크 — 요청 건수와 무관하게 조회 한 번), `findByTitleContainingIgnoreCase`. 단건짜리 `findByExternalId`·`findByUrl` 은 남아 있으나 프로덕션 호출자는 없다. 필터 조합 쿼리는 `MongoTemplate` 동적 Criteria로 처리.
 - `ConversationSessionRepository`: `findBySessionId`, `findByUserIdOrderByLastMessageAtDesc` 등
 - `ConversationMessageRepository`: `findByMessageId`, `@Query`로 `session_id` 기준 `sequence_number` 정렬 조회
 - `ExceptionLogRepository`: source/type/시각 기준 조회

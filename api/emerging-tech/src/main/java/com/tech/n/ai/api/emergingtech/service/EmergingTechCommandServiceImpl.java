@@ -13,8 +13,8 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -49,21 +49,15 @@ public class EmergingTechCommandServiceImpl implements EmergingTechCommandServic
         }
 
         List<EmergingTechDocument> duplicates = findDuplicates(requests);
+        BatchPlan plan = planNewDocuments(requests, duplicates);
 
-        List<EmergingTechDocument> newDocuments = new ArrayList<>();
-        for (int i = 0; i < requests.size(); i++) {
-            if (duplicates.get(i) == null) {
-                newDocuments.add(createDocument(requests.get(i)));
-            }
-        }
+        generateEmbeddings(plan.newDocuments());
 
-        generateEmbeddings(newDocuments);
-
-        List<EmergingTechDocument> saved = newDocuments.isEmpty()
+        List<EmergingTechDocument> saved = plan.newDocuments().isEmpty()
             ? List.of()
-            : emergingTechRepository.saveAll(newDocuments);
+            : emergingTechRepository.saveAll(plan.newDocuments());
 
-        return toResults(duplicates, saved);
+        return toResults(duplicates, plan, saved);
     }
 
     @Override
@@ -160,7 +154,10 @@ public class EmergingTechCommandServiceImpl implements EmergingTechCommandServic
 
     /**
      * 임베딩 벡터를 한 번의 호출로 생성한다.
-     * 실패 시에도 문서 저장은 진행됩니다.
+     *
+     * 실패해도 문서 저장은 진행한다. 다만 <b>실패 단위가 문서 하나가 아니라 목록 전체다</b> —
+     * 건별로 부르던 때는 실패한 문서만 벡터를 잃었지만, 지금은 이 호출이 실패하면
+     * 그 요청의 신규 문서가 전부 벡터 없이 저장된다.
      * 임베딩 텍스트가 빈 문서는 TextSegment 가 거부하므로 호출 대상에서 뺀다.
      */
     private void generateEmbeddings(List<EmergingTechDocument> documents) {
@@ -190,17 +187,79 @@ public class EmergingTechCommandServiceImpl implements EmergingTechCommandServic
     }
 
     /**
-     * 요청 순서대로 결과를 조립한다. 신규 자리는 저장 결과에서 순서대로 꺼낸다.
+     * 저장 계획.
+     *
+     * @param newDocuments          실제로 저장할 문서. 요청 안 중복은 한 번만 담긴다
+     * @param savedIndexOfPosition  요청 자리 → {@code newDocuments} 인덱스. DB 중복 자리는 -1
+     * @param representative        그 자리가 문서를 새로 만든 자리인가. 접힌 자리는 false
+     */
+    private record BatchPlan(List<EmergingTechDocument> newDocuments,
+                             int[] savedIndexOfPosition,
+                             boolean[] representative) {}
+
+    /**
+     * 저장할 문서를 고른다.
+     *
+     * 중복 조회는 요청 처리 시작 시점의 DB 만 보므로 같은 요청 안의 앞선 항목을 보지 못한다.
+     * 그대로 두면 같은 {@code url} 이 두 번 담긴 요청이 unique 인덱스에서 터진다.
+     * 그래서 신규 자리끼리 externalId → url 순으로 한 번 더 접고 대표는 앞 위치로 둔다.
+     * 키가 {@code null} 인 자리는 접지 않는다 — 값이 없는 것끼리 같다고 볼 수 없다.
+     */
+    private BatchPlan planNewDocuments(List<EmergingTechCreateRequest> requests,
+                                       List<EmergingTechDocument> duplicates) {
+        int size = requests.size();
+        int[] savedIndexOfPosition = new int[size];
+        boolean[] representative = new boolean[size];
+        Arrays.fill(savedIndexOfPosition, -1);
+
+        Map<String, Integer> byExternalId = new HashMap<>();
+        Map<String, Integer> byUrl = new HashMap<>();
+        List<EmergingTechDocument> newDocuments = new ArrayList<>();
+
+        for (int i = 0; i < size; i++) {
+            if (duplicates.get(i) != null) {
+                continue;
+            }
+
+            EmergingTechCreateRequest request = requests.get(i);
+            Integer folded = request.externalId() != null ? byExternalId.get(request.externalId()) : null;
+            if (folded == null && request.url() != null) {
+                folded = byUrl.get(request.url());
+            }
+            if (folded != null) {
+                savedIndexOfPosition[i] = savedIndexOfPosition[folded];
+                continue;
+            }
+
+            representative[i] = true;
+            savedIndexOfPosition[i] = newDocuments.size();
+            newDocuments.add(createDocument(request));
+            if (request.externalId() != null) {
+                byExternalId.put(request.externalId(), i);
+            }
+            if (request.url() != null) {
+                byUrl.put(request.url(), i);
+            }
+        }
+        return new BatchPlan(newDocuments, savedIndexOfPosition, representative);
+    }
+
+    /**
+     * 요청 순서대로 결과를 조립한다.
+     * 요청 안 중복으로 접힌 자리는 대표와 같은 문서를 가리키되 {@code isNew} 가 false 다 —
+     * 그래야 신규 건수가 실제 저장 건수와 맞는다.
      */
     private List<SaveResult> toResults(List<EmergingTechDocument> duplicates,
+                                       BatchPlan plan,
                                        List<EmergingTechDocument> saved) {
         List<SaveResult> results = new ArrayList<>(duplicates.size());
-        Iterator<EmergingTechDocument> savedIterator = saved.iterator();
-        for (EmergingTechDocument duplicate : duplicates) {
+        for (int i = 0; i < duplicates.size(); i++) {
+            EmergingTechDocument duplicate = duplicates.get(i);
             if (duplicate != null) {
                 results.add(new SaveResult(duplicate, false));
             } else {
-                results.add(new SaveResult(savedIterator.next(), true));
+                results.add(new SaveResult(saved.get(plan.savedIndexOfPosition()[i]),
+                                           plan.representative()[i]));
             }
         }
         return results;

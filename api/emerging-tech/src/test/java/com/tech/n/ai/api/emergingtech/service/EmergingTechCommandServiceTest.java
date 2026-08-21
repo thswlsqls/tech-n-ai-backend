@@ -164,8 +164,14 @@ class EmergingTechCommandServiceTest {
             assertThat(results).allMatch(EmergingTechCommandService.SaveResult::isNew);
 
             // 건별로 돌면 조회 20회 · 임베딩 10회 · 저장 10회가 된다
-            verify(emergingTechRepository, times(1)).findByExternalIdIn(any());
-            verify(emergingTechRepository, times(1)).findByUrlIn(any());
+            ArgumentCaptor<Collection<String>> externalIds = ArgumentCaptor.forClass(Collection.class);
+            ArgumentCaptor<Collection<String>> urls = ArgumentCaptor.forClass(Collection.class);
+            verify(emergingTechRepository, times(1)).findByExternalIdIn(externalIds.capture());
+            verify(emergingTechRepository, times(1)).findByUrlIn(urls.capture());
+            assertThat(externalIds.getValue())
+                .containsExactlyInAnyOrderElementsOf(requests.stream().map(EmergingTechCreateRequest::externalId).toList());
+            assertThat(urls.getValue())
+                .containsExactlyInAnyOrderElementsOf(requests.stream().map(EmergingTechCreateRequest::url).toList());
             verify(embeddingModel, times(1)).embedAll(anyList());
             verify(emergingTechRepository, times(1)).saveAll(anyList());
             verify(emergingTechRepository, never()).findByExternalId(any());
@@ -226,6 +232,84 @@ class EmergingTechCommandServiceTest {
             assertThat(results.get(1).document().getExternalId()).isEqualTo("ext-1");
             assertThat(results.get(2).isNew()).isFalse();
             assertThat(results.get(2).document()).isEqualTo(existing2);
+        }
+
+        @Test
+        @DisplayName("한 요청에 같은 url 이 두 번 오면 한 번만 저장한다")
+        void 요청_안_중복은_한_번만_저장한다() {
+            // Given: 1번과 2번이 같은 url 이다. externalId 는 서로 다르다
+            List<EmergingTechCreateRequest> requests = List.of(
+                createRequest("ext-0", "https://example.com/0"),
+                createRequest("ext-1", "https://example.com/dup"),
+                createRequest("ext-2", "https://example.com/dup"));
+
+            when(emergingTechRepository.findByExternalIdIn(any())).thenReturn(List.of());
+            when(emergingTechRepository.findByUrlIn(any())).thenReturn(List.of());
+            stubEmbedAll();
+            stubSaveAll();
+
+            // When
+            List<EmergingTechCommandService.SaveResult> results = commandService.saveEmergingTechAll(requests);
+
+            // Then: unique 인덱스에 같은 url 이 두 번 가지 않는다
+            ArgumentCaptor<List<EmergingTechDocument>> saved = ArgumentCaptor.forClass(List.class);
+            verify(emergingTechRepository).saveAll(saved.capture());
+            assertThat(saved.getValue()).hasSize(2);
+            assertThat(saved.getValue()).extracting(EmergingTechDocument::getUrl)
+                .containsExactly("https://example.com/0", "https://example.com/dup");
+
+            // 접힌 자리는 대표와 같은 문서를 가리키되 신규가 아니다 — newCount 가 실제 저장 수와 맞아야 한다
+            assertThat(results).hasSize(3);
+            assertThat(results.get(1).isNew()).isTrue();
+            assertThat(results.get(2).isNew()).isFalse();
+            assertThat(results.get(2).document()).isSameAs(results.get(1).document());
+            assertThat(results.stream().filter(EmergingTechCommandService.SaveResult::isNew).count()).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("같은 externalId 가 두 번 와도 한 번만 저장한다")
+        void 요청_안_externalId_중복도_접는다() {
+            // Given
+            List<EmergingTechCreateRequest> requests = List.of(
+                createRequest("ext-same", "https://example.com/1"),
+                createRequest("ext-same", "https://example.com/2"));
+
+            when(emergingTechRepository.findByExternalIdIn(any())).thenReturn(List.of());
+            when(emergingTechRepository.findByUrlIn(any())).thenReturn(List.of());
+            stubEmbedAll();
+            stubSaveAll();
+
+            // When
+            List<EmergingTechCommandService.SaveResult> results = commandService.saveEmergingTechAll(requests);
+
+            // Then
+            ArgumentCaptor<List<EmergingTechDocument>> saved = ArgumentCaptor.forClass(List.class);
+            verify(emergingTechRepository).saveAll(saved.capture());
+            assertThat(saved.getValue()).hasSize(1);
+            assertThat(results.get(0).isNew()).isTrue();
+            assertThat(results.get(1).isNew()).isFalse();
+        }
+
+        @Test
+        @DisplayName("키가 null 인 자리끼리는 접지 않는다")
+        void 키가_null_인_자리는_접지_않는다() {
+            // Given: externalId 가 둘 다 null 이고 url 은 서로 다르다
+            List<EmergingTechCreateRequest> requests = List.of(
+                createRequest(null, "https://example.com/1"),
+                createRequest(null, "https://example.com/2"));
+
+            when(emergingTechRepository.findByUrlIn(any())).thenReturn(List.of());
+            stubEmbedAll();
+            stubSaveAll();
+
+            // When
+            List<EmergingTechCommandService.SaveResult> results = commandService.saveEmergingTechAll(requests);
+
+            // Then: 값이 없는 것끼리 같다고 보면 안 된다
+            ArgumentCaptor<List<EmergingTechDocument>> saved = ArgumentCaptor.forClass(List.class);
+            verify(emergingTechRepository).saveAll(saved.capture());
+            assertThat(saved.getValue()).hasSize(2);
+            assertThat(results).allMatch(EmergingTechCommandService.SaveResult::isNew);
         }
 
         @Test

@@ -111,7 +111,10 @@ public class EmergingTechFacade {
     }
 
     /**
-     * 다건 생성 (부분 성공 허용)
+     * 다건 생성.
+     *
+     * 중복 검사·임베딩·저장을 요청 단위로 한 번씩 처리한다.
+     * 저장이 실패하면 그 요청을 전건 실패로 보고한다 — 항목 단위 집계가 아니다.
      */
     public EmergingTechBatchResponse createEmergingTechBatch(EmergingTechBatchRequest request) {
         int newCount = 0;
