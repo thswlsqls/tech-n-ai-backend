@@ -5,14 +5,22 @@ import com.tech.n.ai.domain.mongodb.document.EmergingTechDocument;
 import com.tech.n.ai.domain.mongodb.enums.PostStatus;
 import com.tech.n.ai.domain.mongodb.repository.EmergingTechRepository;
 import dev.langchain4j.data.embedding.Embedding;
+import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Emerging Tech 명령 서비스 구현체
@@ -28,13 +36,28 @@ public class EmergingTechCommandServiceImpl implements EmergingTechCommandServic
 
     @Override
     public SaveResult saveEmergingTech(EmergingTechCreateRequest request) {
-        Optional<EmergingTechDocument> duplicate = findDuplicate(request);
-        if (duplicate.isPresent()) {
-            return new SaveResult(duplicate.get(), false);
+        return saveEmergingTechAll(List.of(request)).get(0);
+    }
+
+    /**
+     * 요청 건수와 무관하게 중복 조회 2회, 임베딩 1회, 저장 1회로 처리한다.
+     */
+    @Override
+    public List<SaveResult> saveEmergingTechAll(List<EmergingTechCreateRequest> requests) {
+        if (requests.isEmpty()) {
+            return List.of();
         }
 
-        EmergingTechDocument document = createDocument(request);
-        return new SaveResult(emergingTechRepository.save(document), true);
+        List<EmergingTechDocument> duplicates = findDuplicates(requests);
+        BatchPlan plan = planNewDocuments(requests, duplicates);
+
+        generateEmbeddings(plan.newDocuments());
+
+        List<EmergingTechDocument> saved = plan.newDocuments().isEmpty()
+            ? List.of()
+            : emergingTechRepository.saveAll(plan.newDocuments());
+
+        return toResults(duplicates, plan, saved);
     }
 
     @Override
@@ -46,30 +69,52 @@ public class EmergingTechCommandServiceImpl implements EmergingTechCommandServic
     }
 
     /**
-     * externalId, url 기준 중복 검사
+     * externalId, url 기준 중복 검사.
+     * 요청과 같은 길이의 목록을 돌려주며, 신규인 자리는 null 이다.
      */
-    private Optional<EmergingTechDocument> findDuplicate(EmergingTechCreateRequest request) {
-        if (request.externalId() != null) {
-            var existing = emergingTechRepository.findByExternalId(request.externalId());
-            if (existing.isPresent()) {
-                log.debug("이미 존재하는 Emerging Tech: externalId={}", request.externalId());
-                return existing;
-            }
-        }
+    private List<EmergingTechDocument> findDuplicates(List<EmergingTechCreateRequest> requests) {
+        Set<String> externalIds = keysOf(requests, EmergingTechCreateRequest::externalId);
+        Set<String> urls = keysOf(requests, EmergingTechCreateRequest::url);
 
-        if (request.url() != null) {
-            var existingByUrl = emergingTechRepository.findByUrl(request.url());
-            if (existingByUrl.isPresent()) {
-                log.debug("이미 존재하는 Emerging Tech: url={}", request.url());
-                return existingByUrl;
-            }
-        }
+        Map<String, EmergingTechDocument> byExternalId = externalIds.isEmpty() ? Map.of()
+            : indexBy(emergingTechRepository.findByExternalIdIn(externalIds),
+                      EmergingTechDocument::getExternalId);
+        Map<String, EmergingTechDocument> byUrl = urls.isEmpty() ? Map.of()
+            : indexBy(emergingTechRepository.findByUrlIn(urls), EmergingTechDocument::getUrl);
 
-        return Optional.empty();
+        List<EmergingTechDocument> duplicates = new ArrayList<>(requests.size());
+        for (EmergingTechCreateRequest request : requests) {
+            EmergingTechDocument found = null;
+            if (request.externalId() != null) {
+                found = byExternalId.get(request.externalId());
+            }
+            if (found == null && request.url() != null) {
+                found = byUrl.get(request.url());
+            }
+            duplicates.add(found);
+        }
+        return duplicates;
+    }
+
+    private Set<String> keysOf(List<EmergingTechCreateRequest> requests,
+                               Function<EmergingTechCreateRequest, String> keyOfRequest) {
+        return requests.stream()
+            .map(keyOfRequest)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+    }
+
+    private Map<String, EmergingTechDocument> indexBy(List<EmergingTechDocument> documents,
+                                                      Function<EmergingTechDocument, String> keyOfDocument) {
+        Map<String, EmergingTechDocument> index = new HashMap<>();
+        for (EmergingTechDocument document : documents) {
+            index.putIfAbsent(keyOfDocument.apply(document), document);
+        }
+        return index;
     }
 
     /**
-     * 요청 DTO → Document 변환
+     * 요청 DTO → Document 변환. 임베딩 벡터는 {@link #generateEmbeddings}가 채운다.
      */
     private EmergingTechDocument createDocument(EmergingTechCreateRequest request) {
         EmergingTechDocument document = new EmergingTechDocument();
@@ -93,8 +138,12 @@ public class EmergingTechCommandServiceImpl implements EmergingTechCommandServic
             document.setMetadata(metadata);
         }
 
-        // 임베딩 생성 (title + summary)
-        generateEmbedding(document);
+        EmergingTechDocument.EmergingTechMetadata metadata = document.getMetadata();
+        List<String> tags = metadata != null ? metadata.getTags() : null;
+        String githubRepo = metadata != null ? metadata.getGithubRepo() : null;
+        document.setEmbeddingText(buildEmbeddingText(
+            document.getProvider(), githubRepo,
+            document.getTitle(), document.getSummary(), tags));
 
         LocalDateTime now = LocalDateTime.now();
         document.setCreatedAt(now);
@@ -104,27 +153,120 @@ public class EmergingTechCommandServiceImpl implements EmergingTechCommandServic
     }
 
     /**
-     * 임베딩 텍스트 및 벡터 생성
-     * 실패 시에도 문서 저장은 진행됩니다.
+     * 임베딩 벡터를 한 번의 호출로 생성한다.
+     *
+     * 실패해도 문서 저장은 진행한다. 다만 <b>실패 단위가 문서 하나가 아니라 목록 전체다</b> —
+     * 건별로 부르던 때는 실패한 문서만 벡터를 잃었지만, 지금은 이 호출이 실패하면
+     * 그 요청의 신규 문서가 전부 벡터 없이 저장된다.
+     * 임베딩 텍스트가 빈 문서는 TextSegment 가 거부하므로 호출 대상에서 뺀다.
      */
-    private void generateEmbedding(EmergingTechDocument document) {
-        try {
-            EmergingTechDocument.EmergingTechMetadata metadata = document.getMetadata();
-            List<String> tags = metadata != null ? metadata.getTags() : null;
-            String githubRepo = metadata != null ? metadata.getGithubRepo() : null;
-            String embeddingText = buildEmbeddingText(
-                document.getProvider(), githubRepo,
-                document.getTitle(), document.getSummary(), tags);
-            document.setEmbeddingText(embeddingText);
+    private void generateEmbeddings(List<EmergingTechDocument> documents) {
+        List<EmergingTechDocument> targets = documents.stream()
+            .filter(d -> d.getEmbeddingText() != null && !d.getEmbeddingText().isBlank())
+            .toList();
 
-            Embedding embedding = embeddingModel.embed(embeddingText).content();
-            List<Float> vector = embedding.vectorAsList();
-            document.setEmbeddingVector(vector);
-
-            log.info("임베딩 생성 완료: title={}, vectorSize={}", document.getTitle(), vector.size());
-        } catch (Exception e) {
-            log.error("임베딩 생성 실패: title={}, error={}", document.getTitle(), e.getMessage(), e);
+        if (targets.isEmpty()) {
+            return;
         }
+
+        try {
+            List<TextSegment> segments = targets.stream()
+                .map(d -> TextSegment.from(d.getEmbeddingText()))
+                .toList();
+
+            List<Embedding> embeddings = embeddingModel.embedAll(segments).content();
+            for (int i = 0; i < targets.size(); i++) {
+                targets.get(i).setEmbeddingVector(embeddings.get(i).vectorAsList());
+            }
+
+            log.info("임베딩 생성 완료: count={}, vectorSize={}",
+                targets.size(), embeddings.getFirst().vectorAsList().size());
+        } catch (Exception e) {
+            log.error("임베딩 생성 실패: count={}, error={}", targets.size(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 저장 계획.
+     *
+     * @param newDocuments          실제로 저장할 문서. 요청 안 중복은 한 번만 담긴다
+     * @param savedIndexOfPosition  요청 자리 → {@code newDocuments} 인덱스. DB 중복 자리는 -1
+     * @param representative        그 자리가 문서를 새로 만든 자리인가. 접힌 자리는 false
+     */
+    private record BatchPlan(List<EmergingTechDocument> newDocuments,
+                             int[] savedIndexOfPosition,
+                             boolean[] representative) {}
+
+    /**
+     * 저장할 문서를 고른다.
+     *
+     * 중복 조회는 요청 처리 시작 시점의 DB 만 보므로 같은 요청 안의 앞선 항목을 보지 못한다.
+     * 그대로 두면 같은 {@code url} 이 두 번 담긴 요청이 unique 인덱스에서 터진다.
+     * 그래서 신규 자리끼리 externalId → url 순으로 한 번 더 접고 대표는 앞 위치로 둔다.
+     * 키가 {@code null} 인 자리는 접지 않는다 — 값이 없는 것끼리 같다고 볼 수 없다.
+     */
+    private BatchPlan planNewDocuments(List<EmergingTechCreateRequest> requests,
+                                       List<EmergingTechDocument> duplicates) {
+        int size = requests.size();
+        int[] savedIndexOfPosition = new int[size];
+        boolean[] representative = new boolean[size];
+        Arrays.fill(savedIndexOfPosition, -1);
+
+        Map<String, Integer> positionByExternalId = new HashMap<>();
+        Map<String, Integer> positionByUrl = new HashMap<>();
+        List<EmergingTechDocument> newDocuments = new ArrayList<>();
+
+        for (int i = 0; i < size; i++) {
+            if (duplicates.get(i) != null) {
+                continue;
+            }
+
+            EmergingTechCreateRequest request = requests.get(i);
+            Integer folded = request.externalId() != null
+                ? positionByExternalId.get(request.externalId()) : null;
+            if (folded == null && request.url() != null) {
+                folded = positionByUrl.get(request.url());
+            }
+            if (folded != null) {
+                savedIndexOfPosition[i] = savedIndexOfPosition[folded];
+                // 응답의 duplicateCount 한 칸에 DB 중복과 함께 담겨 구별되지 않으므로 여기서 남긴다
+                log.debug("요청 안 중복을 접었다: position={}, 대표={}, externalId={}, url={}",
+                    i, folded, request.externalId(), request.url());
+                continue;
+            }
+
+            representative[i] = true;
+            savedIndexOfPosition[i] = newDocuments.size();
+            newDocuments.add(createDocument(request));
+            if (request.externalId() != null) {
+                positionByExternalId.put(request.externalId(), i);
+            }
+            if (request.url() != null) {
+                positionByUrl.put(request.url(), i);
+            }
+        }
+        return new BatchPlan(newDocuments, savedIndexOfPosition, representative);
+    }
+
+    /**
+     * 요청 순서대로 결과를 조립한다.
+     * 요청 안 중복으로 접힌 자리는 대표와 같은 문서를 가리키되 {@code isNew} 가 false 다 —
+     * 그래야 신규 건수가 실제 저장 건수와 맞는다.
+     */
+    private List<SaveResult> toResults(List<EmergingTechDocument> duplicates,
+                                       BatchPlan plan,
+                                       List<EmergingTechDocument> saved) {
+        List<SaveResult> results = new ArrayList<>(duplicates.size());
+        for (int i = 0; i < duplicates.size(); i++) {
+            EmergingTechDocument duplicate = duplicates.get(i);
+            if (duplicate != null) {
+                results.add(new SaveResult(duplicate, false));
+            } else {
+                results.add(new SaveResult(saved.get(plan.savedIndexOfPosition()[i]),
+                                           plan.representative()[i]));
+            }
+        }
+        return results;
     }
 
     private String buildEmbeddingText(String provider, String githubRepo,
