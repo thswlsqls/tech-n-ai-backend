@@ -115,9 +115,9 @@ PR 본문·`TODO` 주석·설계 문서가 **미리 밝혀 둔 한계**에서 �
 | 파일 성격 | 물을 수 있는 축 | 물을 수 없는 것 |
 |---|---|---|
 | 프로덕션 코드 | 전 축 | — |
-| 테스트 | R-G 중심, R-H 가능 | 테스트 파일 안의 R-C·R-E·R-D |
+| 테스트 | R-G 중심, R-H · R-I 가능 | 테스트 파일 안의 R-C·R-E·R-D |
 | 설계 문서 (`docs/`·`README.md`) | R-A 중심, 코드와 어긋나면 R-B | R-G·R-E·R-C |
-| 설정 (`build.gradle`·`docker-compose.yml`·`package.json`) | R-F · R-H | R-A·R-B·R-C |
+| 설정 (`build.gradle`·`docker-compose.yml`·`package.json`) | R-F · R-H · R-I | R-A·R-B·R-C |
 
 이 표는 Stage 1 종료 조건 S1의 "해당 축" 판정에도 그대로 쓴다 —
 PR이 설정 파일만 건드렸다면 R-A·R-B·R-C는 애초에 해당 축이 아니다.
@@ -174,8 +174,10 @@ inline 코멘트 본문 첫 줄은 아래 형식이다.
 | `R-B` | 데이터 정확성 | `R-F` | 장애 격리 |
 | `R-C` | 동시성·원자성 | `R-G` | 테스트 |
 | `R-D` | 인터페이스 계약 | `R-H` | 유지보수성 |
+| `R-I` | 보안 | — | — |
 
-(위는 backend 프로파일 기준이다. frontend 는 `R-C`·`R-E` 이름이 다르다.)
+(위는 backend 프로파일 기준이다. frontend 는 `R-C`·`R-E` 이름이 다르고 `R-I` 가 없다.
+`R-I` 는 조건부 축이라 **발동한 라운드에만** 범례에 싣는다.)
 
 **게시 언어는 한국어다.**
 
