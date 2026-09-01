@@ -4,6 +4,7 @@ import com.tech.n.ai.common.security.filter.JwtAuthenticationFilter;
 import com.tech.n.ai.common.security.handler.SecurityAccessDeniedHandler;
 import com.tech.n.ai.common.security.handler.SecurityAuthenticationEntryPoint;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -25,6 +26,13 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final SecurityAuthenticationEntryPoint authenticationEntryPoint;
     private final SecurityAccessDeniedHandler accessDeniedHandler;
+
+    /**
+     * CORS 를 허용할 오리진 목록. 환경별로 다르므로 설정으로 받는다.
+     * 기본값은 로컬에서 띄우는 프런트엔드 두 개(app 3000, admin 3001)다.
+     */
+    @Value("${security.cors.allowed-origins:http://localhost:3000,http://localhost:3001}")
+    private List<String> allowedOrigins;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -54,8 +62,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // TODO: 운영 환경에서는 특정 도메인 지정 필요
-        configuration.setAllowedOrigins(List.of("*"));
+        configuration.setAllowedOrigins(allowedOrigins);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of("Authorization", "X-Request-Id"));
