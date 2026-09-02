@@ -319,7 +319,7 @@ cmd_post_review() {
   jq -e '[.[] | select((.code|not) or (.axis|not) or (.body|not))] | length == 0' "$cfile" >/dev/null \
     || die "$E_GATE" "PG5 위반 — code/axis/body 가 빠진 코멘트가 있다"
   # 축은 코드만이 아니라 이름까지 본문에 있어야 한다 — 저자가 프로파일을 열지 않고 읽을 수 있어야 한다.
-  local noname; noname="$(jq -r '[.[] | select((.body | test("R-[A-H] \\(")) | not) | .code] | join(", ")' "$cfile")"
+  local noname; noname="$(jq -r '[.[] | select((.body | test("R-[A-I] \\(")) | not) | .code] | join(", ")' "$cfile")"
   [ -z "$noname" ] || die "$E_GATE" "PG5 위반 — 축 이름이 없다(\`R-x (이름)\` 형식이어야 한다): $noname"
   # 요약에는 축 범례표를 한 번 싣는다 — blocking 순서표 칸에는 코드만 들어가기 때문이다.
   if [ "$stage" = "stage1" ]; then

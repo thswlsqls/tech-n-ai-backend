@@ -30,19 +30,46 @@ http/
 
 ### 2. 환경 설정
 
-환경별 변수는 `http-client.env.json` 파일에서 관리됩니다:
+환경 변수는 두 파일로 나뉩니다.
+
+| 파일 | 무엇이 들어가나 | 커밋 |
+|---|---|---|
+| `http-client.env.json` | URL, 사용자명처럼 누구에게나 같은 값 | 한다 |
+| `http-client.private.env.json` | 토큰·비밀번호·이메일처럼 사람마다 다른 값 | **안 한다** (`.gitignore`) |
+
+처음 받았다면 같은 폴더의 `http-client.private.env.json.template` 을
+`http-client.private.env.json` 으로 복사하고 값을 채우세요.
+IntelliJ HTTP Client 가 private 파일의 값을 공용 파일 위에 덮어쓰므로, `.http` 파일이 쓰는
+변수 이름(`{{testPassword}}` 등)은 그대로입니다.
+
+공용 파일 — `http-client.env.json`:
 
 ```json
 {
   "local": {
     "baseUrl": "http://localhost:8080",
-    "testEmail": "test@example.com",
-    "testUsername": "testuser",
-    "testPassword": "Password123!"
+    "gatewayUrl": "http://localhost:8081",
+    "testUsername": "testuser"
   },
   "dev": {
     "baseUrl": "https://dev-api.example.com",
     ...
+  }
+}
+```
+
+개인 파일 — `http-client.private.env.json`:
+
+```json
+{
+  "local": {
+    "testEmail": "YOUR_TEST_EMAIL_HERE",
+    "testPassword": "YOUR_TEST_PASSWORD_HERE",
+    "newTestPassword": "YOUR_NEW_TEST_PASSWORD_HERE",
+    "adminEmail": "YOUR_ADMIN_EMAIL_HERE",
+    "adminPassword": "YOUR_ADMIN_PASSWORD_HERE",
+    "adminAccessToken": "YOUR_ADMIN_ACCESS_TOKEN_HERE",
+    "adminRefreshToken": "YOUR_ADMIN_REFRESH_TOKEN_HERE"
   }
 }
 ```
