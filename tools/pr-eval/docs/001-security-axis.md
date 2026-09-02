@@ -1,7 +1,7 @@
 # 001. 보안 축(`R-I`) 추가 설계
 
 **상태**: **반영됨** — §8 을 통과해 §7 의 파일 여섯을 고쳤다. 검증 기록은 `runs/tech-n-ai-backend-pr33/verify-001/`(추적되지 않는다).
-**적은 날**: 2026-09-01 · **고친 날**: 2026-09-01 (적대적 검토 반영은 §10, 검증 결과 반영은 §8-2)
+**적은 날**: 2026-09-01 · **고친 날**: 2026-09-01 (적대적 검토 반영은 §10, 검증 결과 반영은 §8-2, 살아 있는 PR 검증은 §11)
 
 ---
 
@@ -80,7 +80,7 @@ B=<meta.base_sha>; S=<meta.eval_sha>
 git diff --name-only $B...$S | grep -cE '^(common/security|api/auth|api/gateway)/'          # 신호1
 git diff -U0 $B...$S | grep '^+' | grep -cE '@(Get|Post|Put|Delete|Request)Mapping'         # 신호2
 git diff --name-only $B...$S | grep -cE '^(api/bookmark|common/conversation)/'              # 신호3
-git diff -U0 $B...$S -- '*.java' '*.kt' '*.yml' '*.yaml' '*.properties' '*.gradle' '*.tf' '*.sh' 'Dockerfile*' \
+git diff -U0 $B...$S -- '*.java' '*.kt' '*.yml' '*.yaml' '*.properties' '*.gradle' '*.tf' '*.sh' '*.json' 'Dockerfile*' \
   | grep '^+' | grep -icE 'password|secret|credential|api[-_]?key|access[-_]?token|refresh[-_]?token|authorization'   # 신호4
 git diff --name-only $B...$S | grep -cE '^(api/agent|api/chatbot|client/(scraper|rss)|batch/source)/'   # 신호5
 ```
@@ -391,3 +391,66 @@ J3 3축 위원은 `중대` 를 매겼다(기존 판 C-01 은 `치명`). 축을 �
 조건부 축 방식(§3-2) · `scripts/pr-eval.sh` 를 안 고치는 것(§7). 근거를 하나씩 대조했고 전부 성립했다.
 특히 §2 의 시간 근거(라운드 1 약 50분 · 락 TTL 3시간)는 `CLAUDE.md` §6-1 과 정확히 맞고,
 조건부 축 선례는 `profiles/frontend.md:37` 에 실제로 있다.
+
+---
+
+## 11. 살아 있는 PR 로 한 번 더 검증한다 (§8 이후)
+
+§8 은 **이미 끝난 PR 의 동결 SHA** 에 위원 세션을 따로 띄워 돌린 것이다. 실제 하니스가
+Phase 0 부터 게시까지 도는 라운드에서 `R-I` 가 돈 적은 아직 없다. 그 한 번을 만드는 것이 이 절이다.
+
+### 11-1. 무엇을 대상으로 하는가
+
+§8-2 의 `R-I` 단독 위원이 **찾아 놓고 I-8(이 PR 이 만든 것인가) 로 접어 둔** 두 가지가 main 에 그대로 있다.
+
+| 접어 둔 것 | 어디 | 지금 상태 |
+|---|---|---|
+| 평문 JWT 가 커밋돼 있다 | `api/bookmark/.../http-client.private.env.json` | main 에 그대로. `api/auth`·`api/agent` 의 `http-client.env.json` 에도 ADMIN 토큰 쌍과 비밀번호가 있다 |
+| CORS 오리진이 `*` | `common/security/.../SecurityConfig.java` | main 에 그대로. `// TODO: 운영 환경에서는 특정 도메인 지정 필요` 주석만 있다 |
+
+이 둘을 고치는 PR 은 `R-I` 발동 신호 1(`common/security/`)과 4(자격증명 키워드)에 함께 걸린다.
+**하니스에게 자기가 만든 축이 잡아야 할 것을 실제로 주는 것**이라 검증 대상으로 맞다.
+
+### 11-2. 신호4 확장자 목록에 `.json` 을 넣는다 — 실측
+
+이 PR 을 설계하며 §3-2 신호4 가 위 세 파일을 **하나도 못 잡는다**는 것을 발견했다.
+확장자 화이트리스트에 `.json` 이 없기 때문이다. §3-2 각주의 실측은 거짓 매치를 낸 형식(`.md`·`.mmd`·`.drawio`)만 다뤘고,
+**빠진 형식이 조용히 0을 내는 쪽**은 재지 않았다.
+
+각 파일을 처음 추가한 커밋에 신호4 를 두 판으로 돌린 결과다.
+
+| 파일을 추가한 커밋 | 현행 신호4 | `.json` 추가 후 |
+|---|---|---|
+| `ade9de9` (`api/bookmark/.../http-client.private.env.json`, 평문 JWT 2개) | **0** | **4** |
+| `1bb20e8` (`api/auth/.../http-client.env.json`, ADMIN 토큰 쌍·비밀번호) | 94 | 97 |
+| `e306db6` (`api/agent/.../http-client.env.json`, ADMIN 토큰 쌍) | 6 | 8 |
+
+`ade9de9` 가 결정적이다 — 평문 JWT 를 커밋하는 자리를 **보안 축의 시크릿 신호가 통째로 놓쳤다.**
+
+거짓 매치가 늘지 않는지도 같이 쟀다. 최근 main 커밋 60건에 현행 판과 `.json` 판을 나란히 돌렸더니
+**매치 수가 달라진 커밋이 하나도 없었다.** 이 저장소의 `.json` 은 대부분 `package-lock`·설정 스냅샷이라
+신호4 키워드를 안 쓴다. 그래서 `.json` 을 넣는다 — 놓치던 자리를 잡고 거짓 매치는 늘지 않는다.
+
+§7 의 반영 범위에 `profiles/backend.md` §1 신호4 명령 한 줄과 그 각주가 더해졌다.
+
+### 11-3. 검증 PR 자체의 신호 계수
+
+브랜치 `fix/security-secrets-and-cors` 의 `main…head` 에 §3-2 명령을 그대로 돌린 결과다.
+
+| 신호1 | 신호2 | 신호3 | 신호4 | 신호5 | 판정 |
+|---|---|---|---|---|---|
+| **3** | 0 | **2** | 0 | **2** | **해당** |
+
+> **이 PR 은 신호4 로는 안 걸린다. `.json` 을 넣어도 0 이다.** 고치는 방향의 diff 라서 그렇다 —
+> 자격증명이 들어 있는 줄은 전부 `-` 쪽이고, `+` 쪽에 남는 것은 `.template` 파일의 자리표시자인데
+> 그 파일은 확장자가 `.template` 이라 `*.json` 글롭에도 안 걸린다.
+> **그러므로 11-2 의 근거는 이 PR 의 diff 가 아니라 §11-2 표의 과거 커밋 셋이다.**
+> 이 PR 로 `.json` 추가를 정당화하면 `01-stages.md` §10 이 금지한 상수 검사가 된다 — 여기서 신호4 는 거짓이 될 수 없다.
+
+`R-I` 는 신호1(`common/security/`·`api/auth/` 아래 3파일)로 발동한다.
+
+### 11-4. 이 절이 성립했다고 보는 조건
+
+- 검증 PR 의 base…head 에 §3-2 다섯 신호를 돌려 **해당** 이 나온다.
+- 그 PR 에 하니스를 돌렸을 때 `R-I` 절이 J3 프롬프트에 실리고, 커버리지 판정에 `R-I` 가 음성이든 양성이든 **근거와 함께** 적힌다.
+- 아니면 그 자리를 문서에 적고 §3-2 를 다시 고친다.

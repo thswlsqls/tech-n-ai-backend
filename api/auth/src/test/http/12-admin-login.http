@@ -36,7 +36,7 @@ Content-Type: application/json
 
 {
   "email": "notexist@example.com",
-  "password": "Admin123!"
+  "password": "{{adminPassword}}"
 }
 
 > {%

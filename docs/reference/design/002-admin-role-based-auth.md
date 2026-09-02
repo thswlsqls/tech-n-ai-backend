@@ -1010,7 +1010,7 @@ Authorization: Bearer {{adminAccessToken}}
 {
   "email": "newadmin@example.com",
   "username": "newadmin",
-  "password": "Admin123!"
+  "password": "관리자 비밀번호"
 }
 
 > {%
@@ -1054,7 +1054,7 @@ Authorization: Bearer {{adminAccessToken}}
 {
   "email": "newadmin@example.com",
   "username": "newadmin2",
-  "password": "Admin123!"
+  "password": "관리자 비밀번호"
 }
 
 > {%
