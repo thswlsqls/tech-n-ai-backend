@@ -91,7 +91,75 @@
 
 ### 전체 시스템 아키텍처
 
-전체 시스템 구조 다이어그램은 아래 [AWS 배포 인프라 아키텍처](#aws-배포-인프라-아키텍처) 섹션의 `devops/aws/` 다이어그램으로 대체했습니다.
+prod 환경 기준 Reference Architecture입니다. ALB가 경로별로 ECS Fargate 서비스 6개에 요청을 나누고, 이벤트 흐름은 점선으로 표시했습니다. 원본과 환경별 차이는 [devops/aws/mermaid/architecture.md](devops/aws/mermaid/architecture.md)에 있습니다.
+
+```mermaid
+flowchart LR
+    client["Client / API consumer"]
+
+    subgraph aws["AWS Cloud · ap-northeast-2"]
+        alb["ALB<br/>(HTTPS :443, path-based)<br/>HTTP :80 → :443 redirect"]
+
+        subgraph ecs["ECS Cluster (Fargate, ARM64)"]
+            gw["api-gateway :8081<br/>/*"]
+            auth["api-auth :8083<br/>/auth/*"]
+            et["api-emerging-tech :8082<br/>/emerging-tech/*"]
+            chat["api-chatbot :8084<br/>/chatbot/*"]
+            book["api-bookmark :8085<br/>/bookmark/*"]
+            agent["api-agent :8086<br/>/agent/*"]
+        end
+
+        subgraph data["Data layer"]
+            aurora[("Aurora MySQL<br/>write store :3306")]
+            valkey[("ElastiCache Valkey<br/>cache :6379")]
+            msk["MSK Kafka<br/>event bus :9098"]
+        end
+
+        logs["CloudWatch Logs<br/>/aws/ecs/{env}/{service}"]
+    end
+
+    mongo[("MongoDB Atlas<br/>external · CQRS read store<br/>RAG DB · Vector Search<br/>지식 그래프 tech_graph_nodes/edges")]
+
+    client -->|HTTPS :443| alb
+    alb --> gw & auth & et & chat & book & agent
+
+    auth --> aurora
+    book --> aurora
+    auth --> valkey
+    chat --> valkey
+    book --> valkey
+
+    chat -.->|produce/consume| msk
+    agent -.->|produce/consume| msk
+
+    chat --> mongo
+    agent --> mongo
+    et --> mongo
+
+    ecs --> logs
+
+    %% 환경 차이: dev 에는 MSK 노드와 점선 연결이 없음. beta=MSK Serverless, prod=MSK Provisioned(3 broker).
+    %% ALB 프로토콜: prod=HTTPS 443(+80 리다이렉트), dev/beta=HTTP 80. 위 그림은 prod 기준.
+    %% 프런트(Amplify/CloudFront)는 모듈만 있고 미배포 → 진입점은 ALB 뿐.
+    %% 배치(batch-source·batch-eval·batch-graph)는 ECS 서비스로 배포되지 않는다(facts §3). batch-graph가 만든 지식 그래프만 Atlas에 남아 api-chatbot이 읽는다.
+
+    %% 색상: 공식 브랜드·AWS 카테고리 색으로 계층을 한눈에 구분
+    classDef cons fill:#5F6B7A,stroke:#3B4453,color:#fff
+    classDef lb fill:#8C4FFF,stroke:#5B2FB0,color:#fff
+    classDef svc fill:#ED7100,stroke:#B35600,color:#fff
+    classDef rdb fill:#4479A1,stroke:#2D5570,color:#fff
+    classDef cache fill:#DC382D,stroke:#9E241C,color:#fff
+    classDef bus fill:#231F20,stroke:#000000,color:#fff
+    classDef mongodb fill:#00ED64,stroke:#00684A,color:#001E2B
+
+    class client cons
+    class alb lb
+    class gw,auth,et,chat,book,agent svc
+    class aurora rdb
+    class valkey cache
+    class msk bus
+    class mongo mongodb
+```
 
 ### CQRS 패턴 기반 아키텍처
 
@@ -218,16 +286,6 @@ CQRS 데이터 플로우와 전체 구조는 [AWS 배포 인프라 아키텍처]
 **AI Agent 자동화 시스템**은 LangChain4j를 기반으로 설계된 완전 자율 Agent로, 빅테크 AI 서비스(OpenAI, Anthropic, Google, Meta, xAI)의 최신 업데이트를 자동으로 추적, 수집하고 데이터를 분석합니다. 인간의 개입 없이 자연어 목표(Goal)만 입력하면 필요한 작업을 자동으로 판단하고 실행하며, MongoDB Aggregation 기반 통계 집계와 키워드 빈도 분석 결과를 Mermaid 차트와 Markdown 표로 시각화합니다.
 
 **ADMIN 역할 JWT 인증** 기반으로 동작하며, `sessionId` 기반 **멀티 턴 대화**를 지원합니다. `MongoDbChatMemoryStore`를 통해 세션별 대화 이력을 영속 저장소에서 로드하고, 전체 대화는 Aurora MySQL + MongoDB에 CQRS 패턴으로 저장됩니다. 분석 Tool 실행 시 구조화된 **ChartData**를 응답에 포함하여 프론트엔드에서 차트 컴포넌트로 직접 시각화할 수 있습니다.
-
-#### Admin 앱 Agent 채팅 실행 화면
-
-![Admin Agent 채팅 - 통계 표](contents/20260719091109/admin/admin-agent-stats-top.png)
-
-![Admin Agent 채팅 - Pie 차트 시각화](contents/20260719091109/admin/admin-agent-charts.png)
-
-![Admin Agent 채팅 - 실행 요약(Tool 12회 자동 호출)](contents/20260719091109/admin/admin-agent-toolcalls.png)
-
-> Admin 앱에서 Agent에게 "Provider별 수집 현황을 통계로 보여주세요"를 요청한 결과입니다. Agent가 Tool을 12회 자동으로 호출해 통계를 집계하고, Markdown 표와 Pie 차트로 Provider·SourceType·UpdateType별 통계를 시각화합니다. (2026-07-19 캡처, 총 578건 기준)
 
 ### 3단계 자동화 파이프라인
 
