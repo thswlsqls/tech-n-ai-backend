@@ -7,6 +7,7 @@ import com.tech.n.ai.common.core.config.RedisConfig;
 import com.tech.n.ai.common.security.config.PasswordEncoderConfig;
 import com.tech.n.ai.common.security.config.SecurityConfig;
 import com.tech.n.ai.domain.aurora.config.ApiDomainConfig;
+import com.tech.n.ai.domain.mongodb.config.MongoClientConfig;
 
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
@@ -24,6 +25,7 @@ import org.springframework.context.annotation.Import;
 })
 @Import({
     ApiDomainConfig.class,
+    MongoClientConfig.class,
 
     RedisConfig.class,
     PasswordEncoderConfig.class,
