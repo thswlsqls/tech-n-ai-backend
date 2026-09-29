@@ -30,7 +30,7 @@
 핵심은 두 가지입니다. (1) 공식 소스만 수집해 **구조화된 코퍼스**로 쌓고, (2) 그 위에서 **결정적 쿼리로 집계·시각화**합니다. RAG 챗봇은 이 코퍼스에 자연어로 접근하는 보조 인터페이스입니다.
 
 1. **구조화된 공식 코퍼스 구축 (완결성 + 출처 통제)**
-   - **수집 소스를 코드에 화이트리스트로 고정**: GitHub 릴리스, 각 사 RSS, 공식 블로그 스크래핑만 사용하고, 목록에 없는 저장소·호스트는 `ToolInputValidator`가 거부합니다(사설망 접근을 막는 SSRF 방어 포함). 그래서 답변의 출처가 항상 공식 소스로만 이어집니다.
+   - **수집 소스를 코드에 화이트리스트로 고정**: GitHub 릴리스, 공식 RSS, 공식 블로그 스크래핑만 사용합니다. GitHub 저장소는 목록에 없으면 `ToolInputValidator`가 거부하고, RSS·스크래핑 Tool은 URL을 받지 않고 정해진 provider만 고를 수 있어 설정에 적힌 공식 주소만 읽습니다. 그래서 답변의 출처가 항상 공식 소스로만 이어집니다.
    - **이종 소스를 하나의 스키마로 정규화**: GitHub·RSS·스크래핑에서 온 데이터를 `EmergingTechDocument` 하나로 통합하고 provider·sourceType·updateType·status·publishedAt 같은 구조화 메타데이터를 붙입니다.
    - **저장 단계에서 중복 차단**: 각 항목에 `externalId`(예: `github:{id}`, `rss:{hash}`)를 부여하고, 저장 서비스가 `externalId`→`url` 순으로 기존 도큐먼트를 조회해 이미 있으면 건너뜁니다(`url`에 unique 인덱스). 그래서 정기 수집을 반복해도 코퍼스에는 새 정보만 쌓입니다.
    - **수집 실행 경로**: 배치 Job은 `--job.name` 지정으로 외부에서 실행하고, 에이전트 스케줄러(6시간 주기)는 `AGENT_SCHEDULER_ENABLED=true`일 때만 동작합니다(기본 비활성).
@@ -44,7 +44,7 @@
    - 위 코퍼스를 OpenAI text-embedding-3-small로 임베딩해 MongoDB Atlas Vector Search(1536차원, cosine similarity)를 구성하고, status가 `PUBLISHED`인 문서만 대상으로 검색합니다.
    - 사용자 질문에 관련 문서를 검색해 컨텍스트로 붙이고 GPT-4o-mini가 답을 생성합니다. 다만 **최종 답변 문자열은 LLM이 생성하므로 이 경로에는 환각 가능성이 남습니다.** 그래서 검증이 중요한 정량 정보는 챗봇의 서술이 아니라 위 2번의 결정적 집계·차트로 제공하는 것이 이 설계의 역할 분담입니다.
 
-정리하면 강점은 임베딩이 아니라 **공식 소스를 완결·구조화해 모으는 수집 파이프라인과 그 위의 결정적 집계**에 있습니다. 챗봇은 코퍼스를 자연어로 묻는 창구이고, 정확성은 집계가 보증합니다.
+강점은 임베딩이 아니라 **공식 소스를 완결·구조화해 모으는 수집 파이프라인과 그 위의 결정적 집계**에 있습니다. 챗봇은 코퍼스를 자연어로 묻는 창구이고, 정확성은 집계가 보증합니다.
 
 ### 문제 해결을 보여주는 실제 화면
 
@@ -74,9 +74,9 @@
 ### 핵심 기능
 
 - **구조화된 공식 코퍼스**: GitHub 릴리스·RSS·공식 블로그 스크래핑을 하나의 `EmergingTechDocument` 스키마로 정규화하고, 수집 소스는 화이트리스트로 고정, 저장 전 `externalId`→`url` 조회와 `url` unique 인덱스로 중복을 차단
-- **📊 결정적 집계·시각화**: provider/sourceType/updateType별 통계와 키워드 빈도를 LLM이 아니라 MongoDB Aggregation이 서버에서 계산하고, 그 수치를 `ChartData`(pie/bar)·Markdown 표·Mermaid로 제공 — 차트가 주장하는 수가 코퍼스에서 곧장 나온 검증 가능한 값
-- **🤖 LangChain4j 기반 AI Agent**: 자연어 목표를 받아 수집·조회·분석 툴을 스스로 선택해 실행. 화이트리스트·입력 검증·루프 감지·순차 툴 호출 상한 등 안전장치로 LLM의 잘못된 호출을 막음
-- **🌟 langchain4j RAG 멀티턴 챗봇 (보조)**: `PUBLISHED` 문서만 대상으로 한 MongoDB Atlas Vector Search 결과를 컨텍스트로 GPT-4o-mini가 답을 생성하는 자연어 질의 창구. 최종 답변은 LLM이 생성하므로 검증이 중요한 정량 정보는 위 결정적 집계로 제공
+- **결정적 집계·시각화**: provider/sourceType/updateType별 통계와 키워드 빈도를 LLM이 아니라 MongoDB Aggregation이 서버에서 계산하고, 그 수치를 `ChartData`(pie/bar)·Markdown 표·Mermaid로 제공 — 차트가 주장하는 수가 코퍼스에서 곧장 나온 검증 가능한 값
+- **LangChain4j 기반 AI Agent**: 자연어 목표를 받아 수집·조회·분석 툴을 스스로 선택해 실행. 화이트리스트·입력 검증·루프 감지·순차 툴 호출 상한 등 안전장치로 LLM의 잘못된 호출을 막음
+- **langchain4j RAG 멀티턴 챗봇 (보조)**: `PUBLISHED` 문서만 대상으로 한 MongoDB Atlas Vector Search 결과를 컨텍스트로 GPT-4o-mini가 답을 생성하는 자연어 질의 창구. 최종 답변은 LLM이 생성하므로 검증이 중요한 정량 정보는 위 결정적 집계로 제공
 - **AI 업데이트 수집 파이프라인**: GitHub Release 추적, 웹 스크래핑, RSS 수집, 중복 차단, 데이터 분석. 배치는 외부 실행, 에이전트 스케줄러는 기본 비활성(opt-in)
 - **CQRS 패턴 기반 아키텍처**: Command Side (Aurora MySQL)와 Query Side (MongoDB Atlas) 분리
 - **Kafka 기반 실시간 동기화**: 이벤트 기반 CQRS 동기화 (1초 이내 목표)
@@ -163,7 +163,7 @@ flowchart LR
 
 ### CQRS 패턴 기반 아키텍처
 
-이 프로젝트는 **CQRS (Command Query Responsibility Segregation) 패턴**을 적용하여 읽기와 쓰기 작업을 완전히 분리합니다.
+이 프로젝트는 **CQRS (Command Query Responsibility Segregation) 패턴**으로 읽기와 쓰기 작업을 완전히 분리합니다.
 
 #### Command Side (쓰기 전용)
 - **데이터베이스**: Amazon Aurora MySQL 3.x
@@ -172,7 +172,7 @@ flowchart LR
   - TSID (Time-Sorted Unique Identifier) Primary Key 전략
   - 높은 정규화 수준 (최소 3NF)
   - Soft Delete 지원
-  - 히스토리 테이블을 통한 변경 이력 추적
+  - 히스토리 테이블로 변경 이력 추적
 
 #### Query Side (읽기 전용)
 - **데이터베이스**: MongoDB Atlas 7.0+
@@ -180,12 +180,12 @@ flowchart LR
 - **특징**:
   - 읽기 최적화된 비정규화 구조
   - ESR 규칙을 준수한 인덱스 설계
-  - 프로젝션을 통한 네트워크 트래픽 최소화
+  - 프로젝션으로 네트워크 트래픽 최소화
   - **Vector Search 지원** (RAG 챗봇용)
 
 #### Kafka 기반 실시간 동기화
 
-**Apache Kafka**를 통한 이벤트 기반 CQRS 동기화 메커니즘:
+CQRS 양쪽은 **Apache Kafka** 이벤트로 동기화합니다:
 
 - **Event Publisher**: 대화 세션·메시지 이벤트 4종만 Kafka로 발행 (북마크는 Kafka 미사용 — Aurora 단독)
 - **Event Consumer**: Kafka 이벤트를 수신하여 Query Side (MongoDB Atlas)에 동기화
@@ -229,7 +229,7 @@ CQRS 데이터 플로우와 전체 구조는 [AWS 배포 인프라 아키텍처]
 ### 주요 특징
 
 - **Emerging Tech 전용 RAG**: `emerging_techs` 컬렉션 벡터 검색 (status: PUBLISHED pre-filter)
-- **하이브리드 검색 (Score Fusion + RRF)**: 벡터 유사도와 최신성 정렬을 MongoDB Pipeline 내 Exponential Decay Score Fusion + RRF(k=60)로 결합해 최신 문서 누락 방지
+- **하이브리드 검색 (Score Fusion + RRF)**: MongoDB Pipeline 안에서 벡터 유사도에 최신성을 Exponential Decay Score Fusion으로 반영하고, 이 결과와 최신순 조회 결과를 애플리케이션 코드에서 RRF(k=60)로 합쳐 최신 문서 누락 방지
 - **검색 결과 재순위**: Cohere `rerank-multilingual-v3.0` (opt-in: 기본 비활성, `chatbot.reranking.enabled=true` + API Key 설정 시 활성화, 점수 0.3 미만 제외)
 - **의도 분류**: LLM을 부르지 않는 키워드 규칙 — `@agent` 접두는 Agent 위임(ADMIN 전용), 실시간 키워드는 웹 검색(Google Custom Search opt-in), AI 기술·질문형은 RAG, 그 외 일반 대화. 영어 키워드는 단어 경계로 확인하고 한국어는 조사가 붙으므로 부분 문자열로 확인
 - **검색 경로 단일화**: `RetrievalService`가 벡터 검색·그래프 검색·재검색을 묶어, 운영 챗봇과 평가 배치(`batch-eval`)가 같은 코드를 탐
@@ -238,7 +238,7 @@ CQRS 데이터 플로우와 전체 구조는 [AWS 배포 인프라 아키텍처]
 - **세션 타이틀 자동생성**: 첫 응답 후 `@Async` LLM 호출로 3~5단어 생성, 수동 변경 지원 (`PATCH /sessions/{id}/title`)
 - **대화 메모리**: `MessageWindowChatMemory`, 창 크기는 `chatbot.chat-memory.max-messages`(기본 10)
 - **세션 생명주기**: 30분 미사용 시 비활성(매시 정각), 90일 경과 시 만료(매일 02시) 배치
-- **비용 통제**: 토큰 상한(입력 4,000 / 출력 2,000, 80% 경고) + Redis 캐싱(TTL 1시간)
+- **비용 통제**: 토큰 상한(입력 4,000 / 출력 2,000, 입력이 80%를 넘으면 경고)
 - **토큰 사용량 실측**: OpenAI 응답에 실려 오는 값을 그대로 미터에 기록 (`chatbot.llm.input.tokens`·`chatbot.llm.output.tokens`)
 
 ### RAG 파이프라인 시퀀스 다이어그램  
@@ -247,7 +247,7 @@ CQRS 데이터 플로우와 전체 구조는 [AWS 배포 인프라 아키텍처]
 
 ### 데이터 소스
 
-챗봇은 `emerging_techs` 컬렉션의 **EmergingTechDocument**(AI 서비스 업데이트 정보, `title + summary + metadata`)를 벡터 검색합니다. (status: PUBLISHED pre-filter)
+챗봇은 `emerging_techs` 컬렉션의 **EmergingTechDocument**(AI 서비스 업데이트 정보, `provider + githubRepo + title + summary + tags`를 임베딩)를 벡터 검색합니다. (status: PUBLISHED pre-filter)
 
 ### API 엔드포인트
 
@@ -283,21 +283,21 @@ CQRS 데이터 플로우와 전체 구조는 [AWS 배포 인프라 아키텍처]
 
 ### 개요
 
-**AI Agent 자동화 시스템**은 LangChain4j를 기반으로 설계된 완전 자율 Agent로, 빅테크 AI 서비스(OpenAI, Anthropic, Google, Meta, xAI)의 최신 업데이트를 자동으로 추적, 수집하고 데이터를 분석합니다. 인간의 개입 없이 자연어 목표(Goal)만 입력하면 필요한 작업을 자동으로 판단하고 실행하며, MongoDB Aggregation 기반 통계 집계와 키워드 빈도 분석 결과를 Mermaid 차트와 Markdown 표로 시각화합니다.
+**AI Agent 자동화 시스템**은 LangChain4j로 만든 완전 자율 Agent입니다. 빅테크 AI 서비스(OpenAI, Anthropic, Google, Meta, xAI)의 최신 업데이트를 추적·수집하고 데이터를 분석합니다. 자연어 목표(Goal)만 입력하면 사람이 개입하지 않아도 필요한 작업을 스스로 판단해 실행하고, MongoDB Aggregation 기반 통계 집계와 키워드 빈도 분석 결과를 Mermaid 차트와 Markdown 표로 시각화합니다.
 
-**ADMIN 역할 JWT 인증** 기반으로 동작하며, `sessionId` 기반 **멀티 턴 대화**를 지원합니다. `MongoDbChatMemoryStore`를 통해 세션별 대화 이력을 영속 저장소에서 로드하고, 전체 대화는 Aurora MySQL + MongoDB에 CQRS 패턴으로 저장됩니다. 분석 Tool 실행 시 구조화된 **ChartData**를 응답에 포함하여 프론트엔드에서 차트 컴포넌트로 직접 시각화할 수 있습니다.
+ADMIN 역할 JWT 인증으로 동작하고, 같은 `sessionId`로 **멀티 턴 대화**를 이어갑니다. 세션별 대화 이력은 `MongoDbChatMemoryStore`가 영속 저장소에서 불러오고, 전체 대화는 Aurora MySQL + MongoDB에 CQRS 패턴으로 저장됩니다. 분석 Tool을 실행하면 구조화된 ChartData를 응답에 담으므로, 프론트엔드가 차트 컴포넌트로 바로 그릴 수 있습니다.
 
 ### 3단계 자동화 파이프라인
 
-AI 업데이트 자동화 시스템은 3단계로 구성된 파이프라인을 통해 동작합니다:
+AI 업데이트 자동화 시스템은 3단계 파이프라인으로 동작합니다:
 
 **Phase 1: 데이터 수집 (batch-source)**
 - Spring Batch Job 3종을 통한 GitHub Release, RSS 피드, Web Scraping 수집 (`emerging-tech.github.job`, `emerging-tech.rss.job`, `emerging-tech.scraper.job`)
-- OpenAI, Anthropic, Google, Meta의 업데이트 정보를 수집하여 api-emerging-tech 내부 API로 전달
+- OpenAI, Anthropic, Google, Meta, xAI의 업데이트 정보를 수집하여 api-emerging-tech 내부 API로 전달
 
 **Phase 2: 저장 및 관리 (api-emerging-tech)**
 - MongoDB에 EmergingTechDocument 저장
-- REST API를 통한 목록/상세 조회, 검색, 상태 관리
+- REST API로 목록/상세 조회, 검색, 상태 관리
 - Draft/Published 상태 관리
 
 **Phase 3~7: AI Agent (api-agent)**
@@ -352,16 +352,16 @@ Agent가 사용할 수 있는 9가지 Tool:
 
 #### 5. 안전한 실행 보장
 - **3종 Error Handler**: Tool 실행 오류, Tool 인자 오류, Hallucinated Tool Name 각각에 대한 전용 핸들러
-- **입력값 검증**: `ToolInputValidator`를 통한 LLM hallucination 방어 (잘못된 Provider·날짜 형식 거부, GitHub owner/repo 화이트리스트 검증, 자주 틀리는 저장소 이름 자동 교정(`anthropic`→`anthropics` 등), URL SSRF 방어)
+- **입력값 검증**: `ToolInputValidator`로 LLM hallucination 방어 (잘못된 Provider·날짜 형식 거부, GitHub owner/repo 화이트리스트 검증, 자주 틀리는 저장소 이름 자동 교정(`anthropic`→`anthropics` 등))
 - **루프 감지**: 동일 인자 연속 중복 호출 감지 및 `AgentLoopDetectedException` 기반 강제 종료
 - **통계 중복 차단**: 동일 groupBy+기간 조합의 비연속 중복 호출도 차단
-- **순차 Tool 호출 상한**: LangChain4j AiServices `maxSequentialToolsInvocations`로 한 실행당 최대 30회로 제한
+- **순차 Tool 호출 상한**: LangChain4j AiServices `maxSequentialToolsInvocations`를 30으로 설정. Tool 호출을 요청하는 LLM 응답이 한 실행에서 30번을 넘으면 중단하며, 한 응답에 Tool 호출이 여러 개 담겨도 1번으로 셈
 - **ThreadLocal 메트릭**: 동시 실행 시 메트릭 격리 (`ToolExecutionMetrics`)
 
 #### 6. 스케줄 자동 실행
 - **주기**: 6시간마다 자동 실행 (`AGENT_SCHEDULER_ENABLED=true`일 때만 동작, 기본 비활성화)
 - **목표**: "OpenAI, Anthropic, Google, Meta, xAI의 최신 업데이트를 확인하고 중요한 것만 초안으로 생성, 이미 포스팅된 것은 제외하고 Slack 알림"
-- **실패 알림**: 실행 실패 시 Slack 에러 알림 전송 (`agent.slack.enabled=false`이면 Mock 처리)
+- **실패 알림**: 실행 실패 시 Slack 에러 알림 전송 (`agent.slack.enabled`와 상관없이 Slack 클라이언트로 바로 보내며, 실제 전송 여부는 `slack.webhook.enabled`(`SLACK_WEBHOOK_ENABLED`, 기본 `true`)가 정함)
 
 #### 7. 대상 AI 서비스
 
@@ -369,17 +369,17 @@ GitHub 저장소는 `ToolInputValidator`의 화이트리스트로 고정되어 �
 
 | Provider | GitHub Repository (화이트리스트) | 수집 소스 |
 |----------|-------------------|---------|
-| OpenAI | openai/openai-python, openai/whisper, openai/tiktoken | RSS (https://openai.com/blog) |
+| OpenAI | openai/openai-python, openai/whisper, openai/tiktoken | RSS (https://openai.com/blog/rss.xml) |
 | Anthropic | anthropics/anthropic-sdk-python, anthropics/claude-code | 웹 스크래핑 (https://www.anthropic.com/news) |
-| Google | google/generative-ai-python, google/gemma.cpp, google-deepmind/gemma | RSS (https://blog.google/technology/ai/) |
+| Google | google/generative-ai-python, google/gemma.cpp, google-deepmind/gemma | RSS (https://blog.google/technology/ai/rss/) |
 | Meta | meta-llama/llama-models, meta-llama/llama-stack | 웹 스크래핑 (https://ai.meta.com/blog/) |
 | xAI | xai-org/grok-1 | GitHub 릴리스만 |
 
-AI Agent는 REST API(ADMIN JWT 인증) 또는 Scheduler로 트리거되며, AgentFacade를 거쳐 LangChain4j AiServices로 OpenAI GPT-4o-mini와 통신합니다. 9개 Tool로 GitHub API·웹 페이지·api-emerging-tech·MongoDB Atlas(Aggregation 분석)·Slack과 상호작용하며, 조회/분석뿐 아니라 자율 수집 후 MongoDB 저장도 수행합니다. AgentFacade는 대화를 `common-conversation`으로 Aurora MySQL + MongoDB에 CQRS 영속화하고 새 세션 타이틀을 비동기 생성하며, `ToolExecutionMetrics`가 `ChartData`를 모아 응답에 포함합니다.
+AI Agent는 REST API(ADMIN JWT 인증) 또는 Scheduler로 트리거되며, AgentFacade를 거쳐 LangChain4j AiServices로 OpenAI GPT-4o-mini와 통신합니다. 9개 Tool로 GitHub API·웹 페이지·api-emerging-tech·MongoDB Atlas(Aggregation 분석)·Slack을 호출하고, 조회·분석 외에 직접 수집해 MongoDB에 저장하는 일도 합니다. AgentFacade는 대화를 `common-conversation`으로 Aurora MySQL + MongoDB에 CQRS 영속화하고 새 세션 타이틀을 비동기 생성하며, `ToolExecutionMetrics`가 `ChartData`를 모아 응답에 포함합니다.
 
 ### API 엔드포인트
 
-모든 Agent API는 **ADMIN 역할 JWT 인증**이 필요합니다. Gateway에서 JWT 역할 기반 인증을 수행합니다.
+모든 Agent API는 **ADMIN 역할 JWT 인증**이 필요합니다. JWT 역할 확인은 Gateway가 합니다.
 
 | Method | Endpoint | 설명 |
 |--------|---------|------|
@@ -398,7 +398,7 @@ Content-Type: application/json
 
 {
   "goal": "최근 AI 업데이트 현황을 수집해주세요",
-  "sessionId": "admin-123-abc12345"
+  "sessionId": "742017053896130304"
 }
 ```
 
@@ -412,7 +412,7 @@ Content-Type: application/json
   "data": {
     "success": true,
     "summary": "## Provider별 통계\n\n| Provider | 건수 |\n|---|---|\n| OPENAI | 145 |\n| ANTHROPIC | 98 |",
-    "sessionId": "admin-123-abc12345",
+    "sessionId": "742017053896130304",
     "toolCallCount": 8,
     "analyticsCallCount": 2,
     "executionTimeMs": 48612,
@@ -491,7 +491,7 @@ api/emerging-tech/               # Emerging Tech API 모듈 (Port 8082)
 
 ### 개요
 
-**API Gateway**는 Spring Cloud Gateway 기반의 중앙화된 API Gateway 서버로, 모든 외부 요청을 중앙에서 관리하고 적절한 백엔드 API 서버로 라우팅하는 역할을 수행합니다. JWT 토큰 기반 인증, CORS 정책 관리, 연결 풀 최적화 등의 기능을 제공합니다.
+**API Gateway**는 Spring Cloud Gateway로 만든 단일 진입점입니다. 모든 외부 요청을 받아 알맞은 백엔드 API 서버로 라우팅하고, JWT 토큰 인증·CORS 정책 관리·연결 풀 최적화를 맡습니다.
 
 ### 주요 기능
 
@@ -512,7 +512,7 @@ api/emerging-tech/               # Emerging Tech API 모듈 (Port 8082)
 ```
 Client (웹 브라우저, 모바일 앱)
   ↓ HTTP/HTTPS
-ALB (AWS Application Load Balancer, 600초 timeout)
+ALB (AWS Application Load Balancer, idle timeout 미설정 → 기본값 60초)
   ↓
 API Gateway (Spring Cloud Gateway)
   ├── JWT 인증 필터
@@ -615,9 +615,9 @@ api/gateway/
 
 ### 지원 Provider
 
-- **Google OAuth 2.0**: Google 계정을 통한 로그인
-- **Naver OAuth 2.0**: 네이버 계정을 통한 로그인
-- **Kakao OAuth 2.0**: 카카오 계정을 통한 로그인
+- **Google OAuth 2.0**: Google 계정으로 로그인
+- **Naver OAuth 2.0**: 네이버 계정으로 로그인
+- **Kakao OAuth 2.0**: 카카오 계정으로 로그인
 
 ### 인증 플로우 다이어그램
 
@@ -640,13 +640,13 @@ OAuth 2.0 인증 플로우에서 **CSRF 공격 방지**를 위한 State 파라�
 
 ### 개요
 
-관리자(Admin) 계정에 대한 별도의 보안 강화 체계를 구축하여, 사용자 토큰과 관리자 토큰을 분리하고, 무차별 대입 공격 방지를 위한 로그인 잠금, 감사 추적(Audit Trail) 기능을 제공합니다.
+관리자(Admin) 계정에는 보안 장치를 따로 둡니다. 사용자 토큰과 관리자 토큰을 분리하고, 무차별 대입 공격을 막는 로그인 잠금과 감사 추적(Audit Trail)을 넣었습니다.
 
 ### 주요 기능
 
 #### 1. 관리자/사용자 토큰 분리
 
-관리자와 사용자의 JWT 토큰 유효기간을 분리하여 보안을 강화합니다:
+보안을 위해 관리자와 사용자의 JWT 토큰 유효기간을 따로 둡니다:
 
 | 토큰 | 사용자 (USER) | 관리자 (ADMIN) |
 |------|-------------|---------------|
@@ -658,7 +658,7 @@ OAuth 2.0 인증 플로우에서 **CSRF 공격 방지**를 위한 State 파라�
 
 #### 2. 로그인 잠금 (Brute Force Protection)
 
-연속 로그인 실패 시 2단계 점진적 계정 잠금:
+로그인에 연달아 실패하면 2단계로 점점 길게 계정을 잠급니다:
 
 | 연속 실패 횟수 | 잠금 기간 |
 |-------------|---------|
@@ -720,12 +720,12 @@ OAuth 2.0 인증 플로우에서 **CSRF 공격 방지**를 위한 State 파라�
 - **MyBatis**: starter 의존성만 선언 (매퍼 없음, reader는 Spring Data JPA 인터페이스)
 - **Spring REST Docs**: API 문서화
 - **OpenFeign**: 외부 API 클라이언트
-- **Redis**: 캐싱, OAuth State 관리, 멱등성 보장, 세션 관리
+- **Redis**: OAuth State 관리, Kafka 이벤트 멱등성 보장, Gateway Rate Limiting, Slack 전송 속도 제한
 - **Micrometer / Prometheus**: LLM 호출 지연·실패·토큰, RAG 검색 결과 건수, 에이전트 Tool 호출 횟수를 커스텀 미터로 노출 (`monitoring/README.md` 5절)
 
 ## 프로젝트 구조
 
-이 프로젝트는 Gradle 멀티모듈 구조로 구성되어 있으며, `settings.gradle`의 자동 모듈 검색 로직을 통해 모듈이 자동으로 등록됩니다.
+Gradle 멀티모듈 프로젝트이고, `settings.gradle`의 자동 모듈 검색 로직이 모듈을 자동으로 등록합니다.
 
 ```
 tech-n-ai/
@@ -761,11 +761,11 @@ tech-n-ai/
 
 `api`/`batch` 모듈이 필요한 `common-*`, `datasource-*`, `client-*`를 조합합니다. 실측 의존 관계는 다음과 같습니다.
 
-- **api/batch 모듈**: common, datasource, client 모듈 의존. 예외로 `batch-eval`은 운영과 같은 검색 코드를 타려고 `api-chatbot`을 의존합니다 (그래서 `api-chatbot`은 `jar.enabled = true`)
+- **api/batch 모듈**: common, datasource, client 모듈 의존. 예외로 `batch-eval`은 운영과 같은 검색 코드를 타려고 `api-chatbot`을 의존하고 (그래서 `api-chatbot`은 `jar.enabled = true`), `batch-source`도 `api-emerging-tech`를 의존합니다
 - **common-core**: 트리 안 어떤 모듈에도 의존하지 않는 유일한 모듈
 - **common-exception, common-kafka**: `common-core` + `datasource-mongodb` 의존
 - **common-conversation**: `common-core`·`common-exception`·`common-kafka` + `datasource-aurora`·`datasource-mongodb` 의존
-- **client 모듈**: `common-core` 의존 (일부는 `common-exception`, feign은 `common-kafka`도)
+- **client 모듈**: `common-core`·`common-exception` 의존 (feign은 `common-kafka`·`datasource-aurora`·`datasource-mongodb`도)
 
 ### 모듈 네이밍 규칙
 
@@ -786,8 +786,8 @@ Command Side (쓰기 전용)로 사용되는 Aurora MySQL의 주요 테이블:
 - **RefreshToken**: JWT Refresh Token
 - **EmailVerification**: 이메일 인증 토큰
 - **Provider**: OAuth Provider 정보
-- **ConversationSession**: 대화 세션 정보 (RAG 챗봇용)
-- **ConversationMessage**: 대화 메시지 히스토리 (RAG 챗봇용)
+- **ConversationSession**: 대화 세션 정보 (RAG 챗봇 및 AI Agent용)
+- **ConversationMessage**: 대화 메시지 히스토리 (RAG 챗봇 및 AI Agent용)
 - **히스토리 테이블**: UserHistory, AdminHistory, BookmarkHistory
 
 #### TSID Primary Key 전략
@@ -797,7 +797,7 @@ Command Side (쓰기 전용)로 사용되는 Aurora MySQL의 주요 테이블:
 - **타입**: `BIGINT UNSIGNED`
 - **생성 방식**: 애플리케이션 레벨에서 자동 생성
 - **장점**: 시간 기반 정렬, 분산 환경에서 고유성 보장, 인덱스 효율성 향상
-- **JavaScript 안전 직렬화**: TSID는 64비트 Long이므로 JavaScript의 `Number.MAX_SAFE_INTEGER`(2^53-1)를 초과합니다. Jackson `LongToString` 글로벌 직렬화를 통해 모든 Long 필드를 JSON String으로 변환하여 정밀도 손실을 방지합니다.
+- **JavaScript 안전 직렬화**: TSID는 64비트 Long이므로 JavaScript의 `Number.MAX_SAFE_INTEGER`(2^53-1)를 초과합니다. Jackson `LongToString` 글로벌 직렬화로 모든 Long 필드를 JSON String으로 바꿔 정밀도 손실을 막습니다.
 
 #### Aurora MySQL ERD
 
@@ -844,7 +844,7 @@ Flyway는 의존성과 `src/main/resources/db/migration/` 디렉토리만 준비
 
 ### 로컬 개발 환경 (Docker Compose)
 
-로컬 개발 시 AWS RDS Aurora MySQL 의존성을 제거하기 위해 Docker Compose로 MySQL 8.0 인스턴스를 제공합니다:
+로컬에서는 AWS RDS Aurora MySQL 없이 개발할 수 있도록 Docker Compose로 MySQL 8.0 인스턴스를 띄웁니다:
 
 | 컨테이너 | 호스트 포트 | 스키마 | 대상 모듈 |
 |---------|----------|-------|---------|
@@ -861,7 +861,7 @@ docker compose up -d
 cp .env.example .env
 ```
 
-각 MySQL 인스턴스는 모듈별 독립 스키마로 격리되며, UTF-8mb4 문자셋과 KST 타임존이 사전 설정되어 있습니다.
+각 MySQL 인스턴스는 모듈별 독립 스키마로 격리되며, UTF-8mb4 문자셋과 KST 타임존이 미리 설정돼 있습니다.
 
 자세한 설정은 [MySQL Docker 로컬 환경 구축 가이드](docs/reference/guide/003-mysql-docker-local-setup.md)를 참고하세요.
 
@@ -873,7 +873,7 @@ cp .env.example .env
   - Amazon Aurora MySQL 클러스터 (또는 MySQL 8.0+ 호환 데이터베이스)
   - MongoDB Atlas 클러스터 (또는 MongoDB 7.0+)
 - **메시징 시스템**: Apache Kafka
-- **캐싱**: Redis
+- **인메모리 저장소**: Redis
 
 ### 환경 변수 설정
 
@@ -901,7 +901,8 @@ export JWT_REFRESH_TOKEN_VALIDITY_DAYS=7      # 사용자(USER) Refresh Token �
 # 관리자(ADMIN) 토큰은 기본값(Access 15분 / Refresh 1일)을 사용하며,
 # 필요 시 jwt.admin.access-token-validity-minutes / jwt.admin.refresh-token-validity-days 로 재정의합니다.
 
-# OAuth 클라이언트 정보는 환경 변수가 아니라 Aurora `providers` 테이블(ProviderEntity)에서 읽습니다.
+# OAuth 클라이언트 ID·Secret은 환경 변수가 아니라 Aurora `providers` 테이블(ProviderEntity)에서 읽습니다.
+# Authorization endpoint·redirect URI(Google은 scope도)는 OAUTH_{GOOGLE,NAVER,KAKAO}_* 환경 변수로 바꿀 수 있습니다 (application-auth-api.yml).
 
 # OpenAI API 설정 (RAG 챗봇·임베딩용)
 export OPENAI_API_KEY=your-openai-api-key
@@ -945,9 +946,9 @@ export MYSQL_PASSWORD=admin1234
 
 ### API Gateway를 통한 접근
 
-모든 API는 **API Gateway**를 통해 접근합니다:
+모든 API는 **API Gateway**를 거쳐 호출합니다:
 - **Gateway Base URL**: `http://localhost:8081` (Local 환경)
-- **Gateway 경로**: Gateway는 요청 URI 경로를 기준으로 적절한 백엔드 API 서버로 라우팅합니다.
+- **Gateway 경로**: Gateway는 요청 URI 경로를 보고 알맞은 백엔드 API 서버로 라우팅합니다.
 
 ### 주요 API 엔드포인트
 
@@ -1020,7 +1021,7 @@ export MYSQL_PASSWORD=admin1234
 #### 인증 필요 여부
 
 - **인증 필요 (일반 User)**: `/api/v1/bookmark/**`, `/api/v1/chatbot/**`
-- **인증 필요 (ADMIN 전용)**: `/api/v1/agent/**`, `/api/v1/auth/admin/**`
+- **인증 필요 (ADMIN 전용)**: `/api/v1/agent/**`, `/api/v1/auth/admin/**` (`admin/login`·`admin/refresh`는 공개)
 - **인증 불필요**: `/api/v1/auth/**`, `/api/v1/emerging-tech/**`
 
 #### 인증 헤더
@@ -1031,7 +1032,7 @@ Authorization: Bearer {access_token}
 
 #### 토큰 발급
 
-1. 회원가입 또는 로그인을 통해 `access_token`과 `refresh_token`을 받습니다.
+1. 로그인(OAuth 로그인 포함)하면 `access_token`과 `refresh_token`을 받습니다. 회원가입 응답에는 토큰이 없습니다.
 2. `access_token`은 60분 후 만료됩니다. (관리자 계정은 15분)
 3. `refresh_token`을 사용하여 새로운 `access_token`을 발급받을 수 있습니다.
 4. `refresh_token`은 7일 후 만료됩니다. (관리자 계정은 1일)
@@ -1045,16 +1046,14 @@ Authorization: Bearer {access_token}
 
 ### 배포 환경
 
-- **개발 환경**: 로컬 개발 환경
-- **베타 환경**: 베타 테스트 환경
-- **프로덕션 환경**: 운영 환경
+- **로컬 환경** (`local`): 로컬 개발 환경
+- **개발 환경** (`dev`): AWS 개발 환경
+- **베타 환경** (`beta`): 베타 테스트 환경
+- **프로덕션 환경** (`prod`): 운영 환경
 
-각 환경별 설정 파일은 각 API 모듈의 `src/main/resources/` 디렉토리에 위치합니다:
-- `application.yml`: 공통 설정
-- `application-local.yml`: 로컬 환경 설정
-- `application-dev.yml`: 개발 환경 설정
-- `application-beta.yml`: 베타 환경 설정
-- `application-prod.yml`: 프로덕션 환경 설정
+환경별 설정 파일 위치는 모듈마다 다릅니다:
+- `api/gateway`: `src/main/resources/`에 공통 `application.yml`과 환경별 `application-{local,dev,beta,prod}.yml`을 둡니다.
+- 나머지 API 모듈: `src/main/resources/`에는 `application.yml`과 `application-{모듈}-api.yml`만 둡니다(`api/auth`만 `application-local.yml`을 더 둠). 환경별 DB 접속 값은 datasource 모듈의 공유 설정(`application-api-domain.yml`, `application-mongodb-domain.yml`) 안에 `on-profile`로 나눠 둡니다.
 
 **API Gateway 설정**:
 - Gateway는 모든 클라이언트 요청의 단일 진입점으로, 환경별 백엔드 서비스 URL을 설정합니다.
@@ -1066,7 +1065,7 @@ Authorization: Bearer {access_token}
 
 ### 개요
 
-TECH-N-AI API 서버와 연동하기 위한 프론트엔드 클라이언트 랜딩페이지입니다. API Gateway(포트 8081)를 통해 각 모듈의 API 스펙을 준수하여 연동합니다.
+TECH-N-AI API 서버와 연동하는 프론트엔드 클라이언트 랜딩페이지입니다. API Gateway(포트 8081)를 거쳐 각 모듈의 API 스펙대로 호출합니다.
 
 ### 연동 대상 API
 
