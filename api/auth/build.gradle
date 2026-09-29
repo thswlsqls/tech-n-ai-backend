@@ -10,6 +10,7 @@ apply from: "${rootDir.absolutePath}/jpa.gradle"
 
 dependencies {
 	implementation project(':datasource-aurora')
+	implementation project(':datasource-mongodb')
 	implementation project(':common-core')
 	implementation project(':common-security')
 	implementation project(':common-exception')
