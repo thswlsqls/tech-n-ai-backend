@@ -167,7 +167,102 @@ tools/pr-eval/scripts/pr-eval.sh unlock $2 $3
 **어느 쪽으로 끝나든 게시 직전에 4-5 를 거친다.**
 
 **수렴을 게시 조건으로 걸지 않는다.**
+
+## `--auto` — 체인 모드 (`scripts/chain.sh` 가 붙인다)
+
+사람이 응답하지 않는다. 위 절차에서 "사람에게 보고하고 멈춘다" 류의 자리는 아래처럼 정하고,
+정한 것을 `runs/<repo>-pr<N>/decisions.md` 에 한 줄씩 적는다.
+
+| 자리 | 대화형 | `--auto` |
+|---|---|---|
+| `lock` 이 5 | 멈추고 보고 | 게시하지 않고 종료한다. 체인이 기록이 없는 것을 보고 다시 부른다 |
+| `lock` 이 3 | 이유를 보고하고 멈춤 | 같다 — 순서는 체인이 맞춘다 |
+| 대형 PR 컷 | `보류(대형PR)` | 같다. 리뷰할 수 없는 크기를 머지 쪽으로 넘기지 않는 것이 권장안이다 |
+| Stage 3 판정 "Stage 1 재실행 필요·권고" | 사람에게 보고 | Stage 1 을 다시 돌리지 않는다. `P` 는 게시만 하고 저자 반영 회차로 넘긴다 |
+| 그 밖에 판단이 갈리는 자리 | 사람에게 묻는다 | 규칙 문서가 권하는 쪽. 권하는 쪽이 없으면 **게시하지 않는 쪽** |
+
+**Stage 2 를 두 번째 이상 부를 때** — `meta.json` 의 `stage2` 에 판정 기록이 이미 있으면 새 회차다.
+`post-review` 는 `stage2` 의 마지막 원소에 합치므로, 게시하기 전에 `{round, stage_sha, last_judged_sha}` 를
+새 원소로 먼저 붙인다. 판정은 그 원소의 `verdicts` 에 적는다 — 체인은 `verdicts` 가 있는 원소 수로 완료를 센다.
 CMDEOF
+
+AUTHOR_CMD="$REPO_ROOT/.claude/commands/pr-eval-author.md"
+cat > "$AUTHOR_CMD" <<'AUTHOREOF'
+---
+description: 체인 모드의 저자 역할. 봇 리뷰를 PR 브랜치에 반영하고 스레드에 답한다. 인자 — <저장소명> <PR번호>
+---
+
+`/pr-eval-author $1 $2` — PR 작성자 입장에서 `tech-n-ai-eval-bot` 의 리뷰를 반영한다. `scripts/chain.sh` 가 부른다.
+
+## 맨 앞에서 지킬 것
+
+1. **너는 리뷰어가 아니라 저자다.** 봇 토큰·`pr-eval.sh` 의 게시 서브커맨드를 쓰지 않는다. 답글은 사용자 gh 계정으로 단다.
+2. **PR 브랜치에만 push 한다.** force push·main push·머지·승인을 하지 않는다. 머지는 체인이 게이트를 보고 한다.
+3. 저장소 `CLAUDE.md` 의 코딩 지침(외과적 수정, 테스트로 확인)과 커밋 메시지 형식(`fix : [main] 리뷰 반영 — …`)을 따른다.
+   커밋 끝에 `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` 를 붙인다.
+
+## 절차
+
+### 0. 무엇에 답할지 모은다
+
+```bash
+gh pr view $2 --json headRefName,headRefOid,body
+gh api repos/thswlsqls/$1/pulls/$2/comments --paginate
+gh api repos/thswlsqls/$1/pulls/$2/reviews --paginate
+```
+
+`tools/pr-eval/runs/$1-pr$2/outputs/stage*/summary.md` 와 `outputs/author/` 의 지난 회차 기록도 읽는다.
+
+**답할 항목** = 봇의 스레드 가운데 **마지막 말이 봇이고, 할 일을 남긴 것**.
+`praise` 와 `판정: 반영` 만 적고 새 요청이 없는 reply 는 답할 항목이 아니다.
+`부분`·`미반영`·`역행` 판정, 새 코멘트(`C-`·`S2-`·`P-`), 요약에만 적힌 blocking 은 답할 항목이다.
+
+### 1. 항목마다 정한다 — 기본은 반영
+
+- 기본값은 **반영**이다. 봇의 처방(④방향)을 따른다.
+- **거절**은 둘 중 하나일 때만 한다 — 코드를 열어 보니 지적이 사실과 다르다, 또는 이 PR 범위 밖이다.
+  거절 이유에는 근거 `파일:줄` 을 단다.
+- `issue (blocking)` 을 거절하면 `blocking_open` 에 센다. 체인은 이 수가 0 이 아니면 머지하지 않는다.
+
+### 2. 워크트리에서 고친다
+
+```bash
+git fetch origin <headRefName>
+git worktree add ../tech-n-ai-backend-worktrees/pr-author-$2 origin/<headRefName>   # 없을 때만
+cd ../tech-n-ai-backend-worktrees/pr-author-$2 && git checkout -B <headRefName> origin/<headRefName>
+```
+
+메인 작업 트리는 건드리지 않는다. 고친 뒤 영향 모듈 테스트를 돌린다(`./gradlew :<모듈>:test`).
+**실패하면 push 하지 않는다.** 고쳐서 통과시키지 못하면 `tests.result` 를 `fail` 로 적고 끝낸다.
+
+반영한 것이 있으면 한 커밋으로 묶어 `git push origin <headRefName>` 한다.
+PR 본문의 서술이 바뀐 코드와 어긋나게 됐으면 `gh pr edit $2 --body-file <파일>` 로 그 문장만 고친다.
+
+### 3. 스레드에 답한다
+
+push 한 뒤, 항목마다 그 스레드에 한 건씩 답한다. 첫 줄은 `반영했습니다(\`<짧은sha>\`).` 또는 `반영하지 않았습니다.` 로 시작하고,
+무엇을 어디서 바꿨는지 `파일:줄` 로 적는다.
+
+```bash
+gh api repos/thswlsqls/$1/pulls/$2/comments/<comment_id>/replies -F body=@<본문파일>
+```
+
+요약에만 있던 항목은 `gh pr comment $2 --body-file <파일>` 로 한 건에 모아 답한다.
+
+### 4. 회차 기록을 남긴다 — 체인은 이 파일로만 판단한다
+
+`tools/pr-eval/runs/$1-pr$2/outputs/author/round-NN.json` (NN 은 기존 파일 수 + 1, 두 자리):
+
+```json
+{ "round": 1, "from_sha": "<시작 head>", "to_sha": "<끝난 뒤 head>", "pushed": true,
+  "fixed": ["C-01"], "declined": [{"code": "C-03", "label": "suggestion", "reason": "…"}],
+  "blocking_open": 0,
+  "tests": {"cmd": "./gradlew :api-auth:test", "result": "pass"} }
+```
+
+답할 항목이 없으면 `pushed: false`, `to_sha` = `from_sha`, `tests.result: "skip"` 으로 적는다.
+같은 이름의 `.md` 에 항목별 결정과 답글 id 를 사람이 읽을 수 있게 적는다.
+AUTHOREOF
 
 cat > "$AGENT" <<'AGENTEOF'
 ---
@@ -217,3 +312,4 @@ AGENTEOF
 echo "생성:"
 echo "  $CMD"
 echo "  $AGENT"
+echo "  $AUTHOR_CMD"

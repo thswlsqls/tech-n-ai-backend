@@ -139,3 +139,7 @@ docs/monitoring/.venv/
 # PR eval harness(tools/pr-eval) 는 추적한다. runs/ 만 제외한다 —
 # PR 마다 버려지는 작업 폴더이고, 누적 자산(_memory/learnings.md)은 추적 대상이다.
 /tools/pr-eval/runs/
+# 아키텍처 평가 도구(tools/architecture-eval)는 로컬에서만 쓰고 추적하지 않는다.
+/tools/architecture-eval/
+# 하니스 작업 중 쓴 이슈·PR 초안(tools/pr-eval/docs)은 제출용 임시 파일이라 추적하지 않는다.
+/tools/pr-eval/docs/

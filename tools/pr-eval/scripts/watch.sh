@@ -75,23 +75,11 @@ run_once() {
     "$PR_EVAL" init "$repo" "$pr" >/dev/null
     "$PR_EVAL" attempt "$repo" "$pr" inc >/dev/null
 
-    local add_dirs=() d
-    for d in "$WS_ROOT/tech-n-ai-backend-worktrees" "$WS_ROOT/tech-n-ai-frontend" \
-             "$WS_ROOT/tech-n-ai-frontend-worktrees"; do
-      [ -d "$d" ] && add_dirs+=("$d")
-    done
-
-    # 세션 하나가 Stage 1 의 N 라운드를 끝까지 돈다. 여기서 끝날 때까지 기다린다 —
+    # Stage 1 부터 머지까지 체인 하나가 끝까지 돈다(scripts/chain.sh). 끝날 때까지 기다린다 —
     # 그래야 launchd 가 StartInterval 회차를 건너뛰어 이중 실행이 이중으로 막힌다.
-    # --settings 는 로컬 설정을 대체하고, --strict-mcp-config 는 MCP 를 mcp.json 하나로 묶는다(실측).
-    # 둘 다 "이 머신 설정에 기대지 않는다" 는 같은 이유다 — 없으면 다른 머신에서 다르게 돈다.
-    ( cd "$REPO_ROOT" && claude -p --permission-mode acceptEdits \
-        --settings tools/pr-eval/settings.json \
-        --mcp-config tools/pr-eval/mcp.json --strict-mcp-config \
-        ${add_dirs[0]+--add-dir "${add_dirs[@]}"} \
-        -- "/pr-eval stage1 $repo $pr" ) < /dev/null || log "세션이 비정상 종료했다 — $repo#$pr"
+    "$HARNESS_DIR/scripts/chain.sh" "$repo" "$pr" || log "체인이 멈췄다 — $repo#$pr (chain.state=$(jq -r '.chain.state // "?"' "$m" 2>/dev/null))"
 
-    log "Stage 1 종료 — $repo#$pr (status=$(jq -r '.status' "$m" 2>/dev/null || echo '?'))"
+    log "체인 종료 — $repo#$pr (status=$(jq -r '.status' "$m" 2>/dev/null || echo '?'))"
   done
 }
 

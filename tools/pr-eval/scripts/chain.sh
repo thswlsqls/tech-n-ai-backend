@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+# chain.sh — PR 하나를 Stage 1 → 저자 반영 → Stage 2 → Stage 3 → (저자 반영 → Stage 2)* → 머지까지 사람 없이 돌린다.
+# 어디까지 했는지는 meta.json 과 outputs/author/round-NN.json 으로 판단하므로, 중간에 죽어도 다시 부르면 이어서 간다.
+# 사람에게 물을 자리는 세션 쪽에서 권장안으로 정한다(--auto). 머지 여부만은 세션이 아니라 여기서 판정한다.
+set -euo pipefail
+
+OWNER="${PR_EVAL_OWNER:-thswlsqls}"
+HARNESS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$HARNESS_DIR/../.." && pwd)"
+WS_ROOT="$(cd "$REPO_ROOT/.." && pwd)"
+PR_EVAL="$HARNESS_DIR/scripts/pr-eval.sh"
+MAX_AUTHOR_ROUNDS=2   # 저자 반영 회차 상한 — Stage 1 반영 한 번, Stage 3 반영 한 번
+MAX_STEP_TRIES=2      # 한 단계가 기록을 못 남기고 끝나면 한 번 더 돌린다
+
+log() { echo "[$(date -u +%H:%M:%S)] chain $REPO#$PR — $*"; }
+die() { log "$1"; exit "${2:-1}"; }
+
+[ $# -eq 2 ] || { echo "usage: chain.sh <repo> <pr>" >&2; exit 1; }
+REPO="$1"; PR="$2"
+RUN="$HARNESS_DIR/runs/$REPO-pr$PR"
+M="$RUN/meta.json"
+AUTHOR_DIR="$RUN/outputs/author"
+
+meta_set() {  # meta_set <jq 프로그램> [jq 인자...] — pr-eval.sh 와 같은 임시파일 → mv 방식
+  local prog="$1"; shift
+  jq "$@" "$prog" "$M" > "$M.tmp.$$" && mv "$M.tmp.$$" "$M"
+}
+chain_state() { meta_set '.chain = ((.chain // {}) + {state:$s, reason:$r, at:$at})' \
+                  --arg s "$1" --arg r "${2:-}" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)"; log "state=$1 ${2:-}"; }
+
+head_sha() { "$PR_EVAL" sha "$REPO" "$PR"; }
+stage1_done() { [ "$(jq '[.stage1[]?.review_id | select(. != null)] | length' "$M")" -gt 0 ]; }
+stage2_count() { jq '[.stage2[]? | select(.verdicts != null)] | length' "$M"; }
+stage3_done() { [ "$(jq '.stage3 != null' "$M")" = "true" ]; }
+# ls 는 파일이 없으면 실패해 pipefail·set -e 로 스크립트가 끝난다. find 는 빈 결과로 성공한다
+author_count() { find "$AUTHOR_DIR" -name 'round-*.json' | wc -l | tr -d ' '; }
+last_author() { find "$AUTHOR_DIR" -name 'round-*.json' | sort | tail -1; }
+
+# 헤드리스 세션 하나를 띄운다. 도구 권한·MCP 를 이 머신 설정과 떼어 놓는 이유는 watch.sh 주석과 같다.
+run_session() {  # run_session <settings.json> <프롬프트>
+  local settings="$1" prompt="$2" add_dirs=() d
+  for d in "$WS_ROOT/tech-n-ai-backend-worktrees" "$WS_ROOT/tech-n-ai-frontend" \
+           "$WS_ROOT/tech-n-ai-frontend-worktrees"; do
+    [ -d "$d" ] && add_dirs+=("$d")
+  done
+  ( cd "$REPO_ROOT" && claude -p --permission-mode acceptEdits \
+      --settings "$settings" \
+      --mcp-config tools/pr-eval/mcp.json --strict-mcp-config \
+      --disallowedTools AskUserQuestion \
+      --append-system-prompt "체인 모드다. 사람은 응답하지 않는다. 사람에게 묻거나 확인을 기다리지 말고, 규칙 문서가 권하는 쪽(권장안)으로 정해 진행한다. 정한 것은 tools/pr-eval/runs/$REPO-pr$PR/decisions.md 에 '시각 · 단계 · 상황 · 고른 쪽 · 이유' 한 줄로 덧붙인다." \
+      ${add_dirs[0]+--add-dir "${add_dirs[@]}"} \
+      -- "$prompt" ) < /dev/null || log "세션이 0 이 아닌 코드로 끝났다 — 기록으로 성공 여부를 판단한다"
+}
+
+# 단계 하나를 돌리고, 기대한 기록이 남았는지로 성공을 판정한다. 두 번 다 실패하면 체인을 멈춘다.
+step() {  # step <이름> <완료 판정 함수> <settings> <프롬프트>
+  local name="$1" check="$2" settings="$3" prompt="$4" t
+  for (( t=1; t<=MAX_STEP_TRIES; t++ )); do
+    chain_state "$name" "시도 $t"
+    run_session "$settings" "$prompt"
+    "$check" && return 0
+    log "$name 이 기록을 남기지 못했다 (시도 $t)"
+  done
+  chain_state "blocked" "$name 이 $MAX_STEP_TRIES 회 연속 기록을 남기지 못했다"
+  exit 4
+}
+
+EVAL_SETTINGS="tools/pr-eval/settings.json"
+AUTHOR_SETTINGS="tools/pr-eval/author-settings.json"
+
+run_stage1() { step stage1 stage1_done "$EVAL_SETTINGS" "/pr-eval stage1 $REPO $PR --auto"; }
+run_stage3() { step stage3 stage3_done "$EVAL_SETTINGS" "/pr-eval stage3 $REPO $PR --auto"; }
+
+run_stage2() {
+  local before; before="$(stage2_count)"
+  stage2_grew() { [ "$(stage2_count)" -gt "$before" ]; }
+  step stage2 stage2_grew "$EVAL_SETTINGS" "/pr-eval stage2 $REPO $PR --auto"
+}
+
+run_author() {  # 기록 파일이 하나 늘었으면 성공
+  local before; before="$(author_count)"
+  author_grew() { [ "$(author_count)" -gt "$before" ]; }
+  step author author_grew "$AUTHOR_SETTINGS" "/pr-eval-author $REPO $PR"
+}
+
+author_pushed() { [ "$(jq -r '.pushed' "$(last_author)")" = "true" ]; }
+
+# ---------- 머지 게이트 — 세션의 자기보고가 아니라 기록과 GitHub 상태로 본다 ----------
+merge_gate() {
+  local a head pr_json reasons=()
+  a="$(last_author)"
+  head="$(head_sha)"
+  pr_json="$(gh pr view "$PR" --repo "$OWNER/$REPO" --json state,isDraft,mergeable)"
+
+  [ "$(jq -r '.state' <<<"$pr_json")" = "OPEN" ] || reasons+=("PR 이 열려 있지 않다")
+  [ "$(jq -r '.isDraft' <<<"$pr_json")" = "false" ] || reasons+=("draft 다")
+  [ "$(jq -r '.mergeable' <<<"$pr_json")" = "MERGEABLE" ] || reasons+=("mergeable=$(jq -r '.mergeable' <<<"$pr_json")")
+  [ "$(jq -r '.tests.result' "$a")" != "fail" ] || reasons+=("마지막 저자 회차 테스트가 실패했다")
+  [ "$(jq -r '.blocking_open' "$a")" = "0" ] || reasons+=("반영하지 않은 blocking 지적이 $(jq -r '.blocking_open' "$a") 건 남았다")
+  [ "$(jq '[.stage2[-1].verdicts // {} | .[] | select(. == "역행")] | length' "$M")" = "0" ] \
+    || reasons+=("마지막 Stage 2 판정에 역행이 있다")
+  # 지금 head 가 누군가 판정한 커밋이어야 한다 — 마지막 Stage 2 가 본 커밋이거나, 저자가 더 고칠 게 없다고 한 커밋
+  if [ "$head" != "$(jq -r '.stage2[-1].stage_sha // empty' "$M")" ] \
+     && ! { [ "$(jq -r '.pushed' "$a")" = "false" ] && [ "$head" = "$(jq -r '.to_sha' "$a")" ]; }; then
+    reasons+=("head $head 를 아무 단계도 판정하지 않았다")
+  fi
+
+  if [ ${#reasons[@]} -gt 0 ]; then
+    chain_state "blocked" "머지 게이트: $(IFS='; '; echo "${reasons[*]}")"
+    exit 3
+  fi
+}
+
+do_merge() {
+  local head; head="$(head_sha)"
+  # --match-head-commit: 게이트를 본 뒤 누가 push 했으면 머지하지 않는다
+  gh pr merge "$PR" --repo "$OWNER/$REPO" --merge --match-head-commit "$head" \
+    || { chain_state "blocked" "gh pr merge 실패"; exit 4; }
+  meta_set '.chain.merged_sha = $s' --arg s "$head"
+  chain_state "merged" "head=$head"
+}
+
+# ---------- 본체 ----------
+[ -f "$M" ] || "$PR_EVAL" init "$REPO" "$PR" >/dev/null
+mkdir -p "$AUTHOR_DIR"
+
+case "$(jq -r '.chain.state // empty' "$M")" in
+  merged) log "이미 머지됐다"; exit 0 ;;
+esac
+case "$(jq -r '.status' "$M")" in
+  보류*) chain_state "blocked" "status=$(jq -r '.status' "$M") — 스테이지가 보류로 끝났다"; exit 3 ;;
+esac
+
+# 이중 실행 막기 — watcher 의 이어 돌리기와 수동 호출이 겹치지 않게
+other="$(jq -r '.chain.pid // empty' "$M")"
+if [ -n "$other" ] && [ "$other" != "$$" ] && kill -0 "$other" 2>/dev/null; then
+  die "다른 chain(pid=$other)이 돌고 있다" 5
+fi
+meta_set '.chain = ((.chain // {}) + {pid:$p})' --argjson p "$$"
+trap 'meta_set ".chain.pid = null" 2>/dev/null || true' EXIT
+
+stage1_done || run_stage1
+[ "$(jq -r '.status' "$M")" = "보류(대형PR)" ] && { chain_state "blocked" "대형 PR 로 Stage 1 이 보류됐다"; exit 3; }
+
+[ "$(author_count)" -ge 1 ] || run_author
+[ "$(stage2_count)" -ge 1 ] || run_stage2
+stage3_done || run_stage3
+
+# Stage 3 뒤: 저자가 더 고칠 게 없다고 할 때까지 (저자 → Stage 2) 를 돈다
+while :; do
+  # 마지막 저자 회차 뒤에 Stage 2 가 아직 안 돌았으면 먼저 돌린다(중간에 죽은 경우)
+  if author_pushed && [ "$(head_sha)" != "$(jq -r '.stage2[-1].stage_sha // empty' "$M")" ]; then
+    run_stage2
+  fi
+  # 첫 회차는 Stage 1 반영이다. Stage 3 이후 회차가 아직 없으면 한 번은 돈다
+  if [ "$(author_count)" -ge "$MAX_AUTHOR_ROUNDS" ]; then
+    log "저자 회차 상한($MAX_AUTHOR_ROUNDS)에 닿았다"; break
+  fi
+  if [ "$(author_count)" -ge 2 ] && ! author_pushed; then break; fi
+  run_author
+  author_pushed || break
+  run_stage2
+done
+
+chain_state "merge-gate"
+merge_gate
+do_merge
