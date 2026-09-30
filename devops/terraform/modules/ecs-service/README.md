@@ -1,21 +1,20 @@
 # `modules/ecs-service` — Fargate 서비스
 
-> 09 §5.2 + 03 §2 spec 구현. ALB Target Group(blue/green) + ECS Service + CodeDeploy + 워크로드 SG + Auto Scaling + 자동 롤백 알람.
+> 09 §5.2 + 03 §2 spec 구현. ALB Target Group(blue/green) + ECS Service(ECS 자체 blue/green 배포) + 워크로드 SG + Auto Scaling + 자동 롤백 알람.
 
 ## 무엇을 만드는가
 
 | 자원 | 개수 |
 |---|---|
 | `aws_security_group` (워크로드 SG) | 1 |
-| `aws_lb_target_group` (blue/green) | 2 |
-| `aws_lb_listener_rule` | 1 |
-| `aws_ecs_task_definition` | 1 (이후 CodeDeploy 가 revision 생성) |
-| `aws_ecs_service` | 1 (deployment_controller=CODE_DEPLOY) |
-| `aws_codedeploy_app` + `aws_codedeploy_deployment_group` | 1+1 |
+| `aws_lb_target_group` (blue/green, 이름 접미사 `-b`/`-g`) | 2 |
+| `aws_lb_listener_rule` (blue 가중치 1, green 가중치 0 으로 forward) | 1 |
+| `aws_ecs_task_definition` | 1 (이후 revision 은 CI 가 등록) |
+| `aws_ecs_service` | 1 (deployment_controller=ECS, strategy=BLUE_GREEN) |
 | Auto Scaling Target + 2 Policy (CPU, Memory) | 1+2 |
 | CloudWatch Alarm (5xx rate, p95 latency) — 자동 롤백 | 2 |
 | CloudWatch Log Group | 1 (자동 생성 모드) |
-| CodeDeploy 서비스 Role | 1 |
+| ECS 인프라 IAM Role (`AmazonECSInfrastructureRolePolicyForLoadBalancers`) | 1 (`enable_blue_green = true` 일 때) |
 
 ## 사용 예 — api-auth (8083)
 
@@ -80,14 +79,28 @@ resource "aws_security_group_rule" "auth_from_gateway" {
 }
 ```
 
-## 자동 롤백 안전망 (D-2 — Hook 람다 미사용)
+## 배포 방식 — ECS 자체 blue/green
+
+`enable_blue_green = true`(기본값)면 `deployment_configuration.strategy = "BLUE_GREEN"` 으로 배포한다.
+
+1. ECS 가 새 task definition 으로 green 태스크를 띄워 green 대상 그룹에 등록한다.
+2. green 이 health check 를 통과하면 ECS 가 리스너 규칙 가중치를 바꿔 운영 트래픽을 한 번에 green 으로 넘긴다.
+3. bake time(5분) 동안 blue 태스크를 그대로 둔다. 이 사이에 알람이 울리면 트래픽을 blue 로 되돌린다.
+4. bake time 이 끝나면 blue 태스크를 내린다.
+
+bake time 동안에는 blue·green 태스크가 함께 떠 있어 태스크 수가 잠시 두 배가 될 수 있다.
+`enable_blue_green = false` 면 `ROLLING` 으로 배포하고 ECS 인프라 역할은 만들지 않는다.
+
+리스너 규칙의 `action` 과 서비스의 `load_balancer`·`task_definition` 은 배포 때마다 ECS·CI 가 바꾸므로 `lifecycle.ignore_changes` 로 Terraform 이 되돌리지 않게 한다.
+
+## 자동 롤백 안전망 (D-2 — 라이프사이클 훅 미사용)
 
 - ALB Target Group health check `/actuator/health/readiness` (HTTP 200)
-- ALB 5xx 비율 알람 (1% over 2분)
-- Target Response Time p95 (1.5s over 3분)
-- CodeDeploy `auto_rollback_configuration.events = [DEPLOYMENT_FAILURE, DEPLOYMENT_STOP_ON_ALARM]`
+- ALB 5xx 비율 알람 `<name>-alb-5xx-rate` — blue·green 대상 그룹 합계 기준, 1% 초과가 2분 연속
+- Target Response Time p95 알람 `<name>-latency-p95` — 두 대상 그룹 중 큰 값 기준, 1.5s 초과가 3분 연속
+- `aws_ecs_service` 의 `alarms { enable = true, rollback = true }` 와 `deployment_circuit_breaker { rollback = true }`
 
-세 알람 중 어느 하나라도 트리거되면 즉시 이전 revision 으로 복귀.
+알람 중 하나가 ALARM 이 되거나 서킷 브레이커가 배포 실패를 판단하면, 먼저 걸린 쪽이 배포를 실패로 처리하고 마지막으로 성공한 배포로 되돌린다.
 
 ## 주의
 

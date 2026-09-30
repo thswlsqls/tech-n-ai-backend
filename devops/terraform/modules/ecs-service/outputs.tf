@@ -9,7 +9,7 @@ output "service_arn" {
 }
 
 output "task_definition_arn" {
-  description = "최초 Task Definition ARN. CodeDeploy 가 이후 revision 관리."
+  description = "최초 Task Definition ARN. 이후 revision 은 CI 가 등록하고 update-service 로 배포."
   value       = aws_ecs_task_definition.this.arn
 }
 
@@ -21,16 +21,6 @@ output "blue_target_group_arn" {
 output "green_target_group_arn" {
   description = "Green Target Group ARN."
   value       = aws_lb_target_group.green.arn
-}
-
-output "codedeploy_app_name" {
-  description = "CodeDeploy Application 이름."
-  value       = try(aws_codedeploy_app.this[0].name, null)
-}
-
-output "codedeploy_deployment_group_name" {
-  description = "CodeDeploy Deployment Group 이름."
-  value       = try(aws_codedeploy_deployment_group.this[0].deployment_group_name, null)
 }
 
 output "security_group_id" {
@@ -50,10 +40,10 @@ output "listener_rule_arn" {
 
 output "alarm_5xx_arn" {
   description = "5xx 비율 알람 ARN."
-  value       = try(aws_cloudwatch_metric_alarm.alb_5xx_rate[0].arn, null)
+  value       = aws_cloudwatch_metric_alarm.alb_5xx_rate.arn
 }
 
 output "alarm_latency_p95_arn" {
   description = "p95 latency 알람 ARN."
-  value       = try(aws_cloudwatch_metric_alarm.target_response_time[0].arn, null)
+  value       = aws_cloudwatch_metric_alarm.target_response_time.arn
 }

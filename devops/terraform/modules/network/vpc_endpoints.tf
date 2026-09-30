@@ -50,7 +50,7 @@ resource "aws_vpc_endpoint" "s3" {
   count = var.enable_vpc_endpoints ? 1 : 0
 
   vpc_id            = aws_vpc.this.id
-  service_name      = "com.amazonaws.${data.aws_region.current.name}.s3"
+  service_name      = "com.amazonaws.${data.aws_region.current.region}.s3"
   vpc_endpoint_type = "Gateway"
 
   route_table_ids = concat(
@@ -67,7 +67,7 @@ resource "aws_vpc_endpoint" "dynamodb" {
   count = var.enable_vpc_endpoints ? 1 : 0
 
   vpc_id            = aws_vpc.this.id
-  service_name      = "com.amazonaws.${data.aws_region.current.name}.dynamodb"
+  service_name      = "com.amazonaws.${data.aws_region.current.region}.dynamodb"
   vpc_endpoint_type = "Gateway"
 
   route_table_ids = concat(
@@ -102,7 +102,7 @@ resource "aws_vpc_endpoint" "interface" {
   for_each = local.interface_endpoints
 
   vpc_id              = aws_vpc.this.id
-  service_name        = "com.amazonaws.${data.aws_region.current.name}.${each.value}"
+  service_name        = "com.amazonaws.${data.aws_region.current.region}.${each.value}"
   vpc_endpoint_type   = "Interface"
   private_dns_enabled = true
 

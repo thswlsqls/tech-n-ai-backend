@@ -1,7 +1,8 @@
-# ECS Fargate Service + Target Group(blue/green) + CodeDeploy + 워크로드 SG
+# ECS Fargate Service + Target Group(blue/green) + 워크로드 SG
 # - 03 §2 + 09 §5.2 spec 구현
 # - 단일 ECR 리포 전제 (D-1) — container_image 는 digest 형태 권장
-# - CodeDeploy Hook 미사용 (D-2) — ALB readiness + CW 알람 자동 롤백
+# - 배포는 ECS 자체 blue/green (deployment_controller=ECS, strategy=BLUE_GREEN)
+# - 라이프사이클 훅 미사용 (D-2) — ALB readiness + CW 알람 자동 롤백
 
 locals {
   name = "${var.project}-${var.environment}-${var.service_name}"
@@ -79,7 +80,7 @@ resource "aws_security_group_rule" "ingress_from_alb" {
 # ----------------------------------------------------------------------------
 
 resource "aws_lb_target_group" "blue" {
-  name                 = "${local.name}-blue"
+  name                 = "${local.name}-b"
   port                 = var.container_port
   protocol             = "HTTP"
   vpc_id               = var.vpc_id
@@ -98,7 +99,7 @@ resource "aws_lb_target_group" "blue" {
   }
 
   tags = merge(local.common_tags, {
-    Name      = "${local.name}-blue"
+    Name      = "${local.name}-b"
     BlueGreen = "blue"
   })
 
@@ -108,7 +109,7 @@ resource "aws_lb_target_group" "blue" {
 }
 
 resource "aws_lb_target_group" "green" {
-  name                 = "${local.name}-green"
+  name                 = "${local.name}-g"
   port                 = var.container_port
   protocol             = "HTTP"
   vpc_id               = var.vpc_id
@@ -127,7 +128,7 @@ resource "aws_lb_target_group" "green" {
   }
 
   tags = merge(local.common_tags, {
-    Name      = "${local.name}-green"
+    Name      = "${local.name}-g"
     BlueGreen = "green"
   })
 
@@ -144,9 +145,22 @@ resource "aws_lb_listener_rule" "this" {
   listener_arn = var.alb_listener_arn
   priority     = var.listener_rule_priority
 
+  # ECS blue/green 은 운영 리스너 규칙이 두 대상 그룹을 가중치로 들고 있어야 한다.
+  # 처음에는 blue 100%, 배포 중에는 ECS 가 가중치를 바꿔 green 으로 넘긴다.
   action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.blue.arn
+    type = "forward"
+
+    forward {
+      target_group {
+        arn    = aws_lb_target_group.blue.arn
+        weight = 1
+      }
+
+      target_group {
+        arn    = aws_lb_target_group.green.arn
+        weight = 0
+      }
+    }
   }
 
   dynamic "condition" {
@@ -167,7 +181,7 @@ resource "aws_lb_listener_rule" "this" {
     }
   }
 
-  # CodeDeploy 가 listener rule 의 forward target 을 blue↔green 으로 토글하므로 무시
+  # 배포 때마다 ECS 가 가중치를 바꾸므로 Terraform 이 되돌리지 않게 무시
   lifecycle {
     ignore_changes = [action]
   }
@@ -198,7 +212,7 @@ locals {
     logDriver = "awslogs"
     options = {
       awslogs-group         = local.log_group_name
-      awslogs-region        = data.aws_region.current.name
+      awslogs-region        = data.aws_region.current.region
       awslogs-stream-prefix = var.service_name
     }
   }
@@ -255,7 +269,7 @@ locals {
     command = ["--config=/etc/ecs/otel-config.yaml"]
 
     environment = [
-      { name = "AWS_REGION", value = data.aws_region.current.name },
+      { name = "AWS_REGION", value = data.aws_region.current.region },
       { name = "ENVIRONMENT", value = var.environment },
       { name = "SERVICE_NAME", value = var.service_name },
     ]
@@ -268,7 +282,7 @@ locals {
       logDriver = "awslogs"
       options = {
         awslogs-group         = local.log_group_name
-        awslogs-region        = data.aws_region.current.name
+        awslogs-region        = data.aws_region.current.region
         awslogs-stream-prefix = "otel-collector"
       }
     }
@@ -294,7 +308,7 @@ locals {
     }
 
     environment = [
-      { name = "AWS_REGION", value = data.aws_region.current.name },
+      { name = "AWS_REGION", value = data.aws_region.current.region },
       { name = "ENVIRONMENT", value = var.environment },
       { name = "SERVICE_NAME", value = var.service_name },
     ]
@@ -303,7 +317,7 @@ locals {
       logDriver = "awslogs"
       options = {
         awslogs-group         = local.log_group_name
-        awslogs-region        = data.aws_region.current.name
+        awslogs-region        = data.aws_region.current.region
         awslogs-stream-prefix = "firelens"
       }
     }
@@ -354,14 +368,32 @@ resource "aws_ecs_service" "this" {
     assign_public_ip = false
   }
 
+  # provider 6.12.0 부터 Terraform 기본값이 사라져 5.100.0 때 값(DISABLED)을 명시
+  availability_zone_rebalancing = "DISABLED"
+
   load_balancer {
     target_group_arn = aws_lb_target_group.blue.arn
     container_name   = var.service_name
     container_port   = var.container_port
+
+    dynamic "advanced_configuration" {
+      for_each = var.enable_blue_green ? [1] : []
+      content {
+        alternate_target_group_arn = aws_lb_target_group.green.arn
+        production_listener_rule   = aws_lb_listener_rule.this.arn
+        role_arn                   = aws_iam_role.ecs_infrastructure[0].arn
+      }
+    }
   }
 
   deployment_controller {
-    type = var.enable_blue_green ? "CODE_DEPLOY" : "ECS"
+    type = "ECS"
+  }
+
+  # BLUE_GREEN: green 에 트래픽을 한 번에 넘기고 bake time(5분) 동안 blue 를 남겨 둔다.
+  deployment_configuration {
+    strategy             = var.enable_blue_green ? "BLUE_GREEN" : "ROLLING"
+    bake_time_in_minutes = var.enable_blue_green ? 5 : null
   }
 
   deployment_circuit_breaker {
@@ -369,12 +401,51 @@ resource "aws_ecs_service" "this" {
     rollback = true
   }
 
-  # CodeDeploy 가 task_definition 토글을 관리하므로 무시
+  # 알람이 ALARM 으로 바뀌면 배포를 실패로 보고 이전 배포로 되돌린다.
+  alarms {
+    alarm_names = [
+      aws_cloudwatch_metric_alarm.alb_5xx_rate.alarm_name,
+      aws_cloudwatch_metric_alarm.target_response_time.alarm_name,
+    ]
+    enable   = true
+    rollback = true
+  }
+
+  # CI 가 update-service 로 task definition 을 바꾸고, blue/green 배포 중에는
+  # ECS 가 대상 그룹을 서로 바꾸므로 Terraform 이 되돌리지 않게 무시
   lifecycle {
     ignore_changes = [task_definition, load_balancer, desired_count]
   }
 
   tags = local.common_tags
+}
+
+# ----------------------------------------------------------------------------
+# ECS 인프라 역할 — blue/green 배포 중 ECS 가 대상 그룹·리스너 규칙을 바꿀 때 쓴다
+# ----------------------------------------------------------------------------
+
+resource "aws_iam_role" "ecs_infrastructure" {
+  count = var.enable_blue_green ? 1 : 0
+
+  name = "${local.name}-ecs-infra"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "ecs.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_infrastructure_lb" {
+  count = var.enable_blue_green ? 1 : 0
+
+  role       = aws_iam_role.ecs_infrastructure[0].name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonECSInfrastructureRolePolicyForLoadBalancers"
 }
 
 # ----------------------------------------------------------------------------
