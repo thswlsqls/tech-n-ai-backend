@@ -89,7 +89,9 @@ resource "aws_security_group_rule" "auth_from_gateway" {
 4. bake time(5분) 동안 blue 태스크를 그대로 둔다. 이 사이에 알람이 울려도 blue 로 되돌린다.
 5. bake time 이 끝나면 blue 태스크를 내린다.
 
-카나리 구간에서는 green 이 트래픽의 10% 만 받으므로 5xx 비율 알람(두 대상 그룹 합계)은 green 오류가 희석돼 보인다. green 요청이 모두 실패하면 합계 비율이 10% 안팎이 되어 1% 임계를 넘는다. p95 알람은 대상 그룹별 값 중 큰 값을 보므로 희석되지 않는다.
+카나리 구간에서는 green 이 트래픽의 10% 만 받는다. 그래서 두 알람 모두 대상 그룹마다 따로 값을 낸 뒤 큰 값을 본다. 두 대상 그룹을 합쳐 5xx 비율을 내면 green 오류가 1/10 로 희석되어, green 요청의 5% 가 실패해도 합계는 0.5% 라 1% 임계를 넘지 못한다. 새 버전이 어느 대상 그룹에 붙는지는 배포마다 바뀌므로 green 대상 그룹 하나에만 알람을 걸지 않는다.
+
+대신 트래픽이 적으면 알람이 쉽게 울린다. 카나리 구간에 green 으로 가는 요청이 분당 수십 건이면 5xx 한두 건으로도 1% 를 넘을 수 있다. 이렇게 울리면 배포가 롤백되므로, 트래픽이 적은 dev·beta 에서 롤백이 잦으면 `rollback_alarm_5xx_threshold` 를 올린다.
 
 **비용.** green 태스크는 카나리 단계 전에 전체 수만큼 뜨고, blue 는 bake time 이 끝날 때까지 남는다. 그래서 배포마다 약 10분(카나리 5분 + bake time 5분) 동안 태스크 수가 두 배가 된다([문서](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/deployment-type-blue-green.html) "may double your resource usage during deployments"). 예전 CodeDeploy 설정도 카나리 5분 뒤 blue 를 5분 더 남겼으므로(`termination_wait_time_in_minutes = 5`) 겹치는 시간은 같다.
 `enable_blue_green = false` 면 `ROLLING` 으로 배포하고 ECS 인프라 역할은 만들지 않는다.
@@ -103,7 +105,7 @@ resource "aws_security_group_rule" "auth_from_gateway" {
 ## 자동 롤백 안전망 (D-2 — 라이프사이클 훅 미사용)
 
 - ALB Target Group health check `/actuator/health/readiness` (HTTP 200)
-- ALB 5xx 비율 알람 `<name>-alb-5xx-rate` — blue·green 대상 그룹 합계 기준, 1% 초과가 2분 연속
+- ALB 5xx 비율 알람 `<name>-alb-5xx-rate` — 두 대상 그룹 중 큰 값 기준, 1% 초과가 2분 연속
 - Target Response Time p95 알람 `<name>-latency-p95` — 두 대상 그룹 중 큰 값 기준, 1.5s 초과가 3분 연속
 - `aws_ecs_service` 의 `alarms { enable = true, rollback = true }` 와 `deployment_circuit_breaker { rollback = true }`
 

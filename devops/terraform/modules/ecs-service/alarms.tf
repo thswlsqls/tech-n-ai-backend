@@ -17,8 +17,10 @@ locals {
   }
 }
 
-# 두 대상 그룹의 5xx 합계 / 요청 합계. 데이터가 없는 대상 그룹은 FILL 로 0 처리.
-# 요청이 전혀 없으면 0 으로 나누게 되어 데이터 포인트가 빠지고 notBreaching 으로 본다.
+# 대상 그룹별 5xx 비율 중 큰 값.
+# 두 대상 그룹을 합쳐 비율을 내면 카나리 구간(새 버전이 10% 만 받음)에서 새 버전의 오류가
+# 1/10 로 희석된다. 새 버전이 어느 대상 그룹에 붙는지는 배포마다 바뀌므로 green 하나만 보지 않고
+# 대상 그룹마다 따로 비율을 낸다. 요청이 없는 대상 그룹은 0 으로 나누게 되어 데이터 포인트가 빠진다.
 resource "aws_cloudwatch_metric_alarm" "alb_5xx_rate" {
   alarm_name          = "${local.name}-alb-5xx-rate"
   alarm_description   = "${var.service_name} ALB 5xx 비율 ${var.rollback_alarm_5xx_threshold}% 초과"
@@ -28,10 +30,19 @@ resource "aws_cloudwatch_metric_alarm" "alb_5xx_rate" {
   treat_missing_data  = "notBreaching"
 
   metric_query {
-    id          = "rate"
-    expression  = "100 * (FILL(m_5xx_blue, 0) + FILL(m_5xx_green, 0)) / (FILL(m_total_blue, 0) + FILL(m_total_green, 0))"
+    id          = "rate_max"
+    expression  = "MAX([rate_blue, rate_green])"
     label       = "5xx 비율(%)"
     return_data = true
+  }
+
+  dynamic "metric_query" {
+    for_each = local.alarm_target_groups
+    content {
+      id          = "rate_${metric_query.key}"
+      expression  = "100 * FILL(m_5xx_${metric_query.key}, 0) / m_total_${metric_query.key}"
+      return_data = false
+    }
   }
 
   dynamic "metric_query" {
