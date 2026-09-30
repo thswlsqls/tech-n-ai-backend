@@ -91,6 +91,10 @@ resource "aws_security_group_rule" "auth_from_gateway" {
 bake time 동안에는 blue·green 태스크가 함께 떠 있어 태스크 수가 잠시 두 배가 될 수 있다.
 `enable_blue_green = false` 면 `ROLLING` 으로 배포하고 ECS 인프라 역할은 만들지 않는다.
 
+서비스 6개가 ALB 리스너 하나를 같이 쓴다. ECS 는 서비스마다 `advanced_configuration.production_listener_rule` 로 받은 리스너 규칙 하나의 가중치를 바꾼다([문서](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/alb-resources-for-blue-green.html)). 다만 같은 리스너의 다른 규칙을 건드리지 않는다는 문장은 문서에 없으므로, 첫 배포 때 다른 서비스의 규칙이 그대로인지 확인한다.
+
+예전 CodeDeploy 설정(`ECSCanary10Percent5Minutes`)처럼 트래픽 10%를 먼저 보내고 싶다면 ECS 의 `CANARY` 전략을 쓸 수 있다([문서](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/canary-deployment.html)). Terraform 에서는 provider 6.21.0 부터 `deployment_configuration.canary_configuration` 으로 설정한다. 지금은 이슈 #42 에서 정한 대로 `BLUE_GREEN` 만 쓴다.
+
 리스너 규칙의 `action` 과 서비스의 `load_balancer`·`task_definition` 은 배포 때마다 ECS·CI 가 바꾸므로 `lifecycle.ignore_changes` 로 Terraform 이 되돌리지 않게 한다.
 
 그래서 **서비스를 만든 뒤에는 `enable_blue_green` 을 바꾸지 않는다.** green 대상 그룹·리스너 규칙·인프라 역할을 넘기는 `advanced_configuration` 이 `load_balancer` 안에 있어 무시되고, `strategy` 와 인프라 역할만 바뀐다. 바꿔야 한다면 서비스를 다시 만든다.
@@ -103,6 +107,8 @@ bake time 동안에는 blue·green 태스크가 함께 떠 있어 태스크 수�
 - `aws_ecs_service` 의 `alarms { enable = true, rollback = true }` 와 `deployment_circuit_breaker { rollback = true }`
 
 알람 중 하나가 ALARM 이 되거나 서킷 브레이커가 배포 실패를 판단하면, 먼저 걸린 쪽이 배포를 실패로 처리하고 마지막으로 성공한 배포로 되돌린다.
+
+배포를 시작하는 순간 이미 ALARM 상태인 알람이 있으면, ECS 는 그 배포가 끝날 때까지 알람을 보지 않는다([문서](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/deployment-alarm-failure.html)). 장애를 고치려고 다시 배포하는 경우를 위한 동작이지만, 이때는 알람으로 자동 롤백이 일어나지 않으므로 배포 상태를 직접 지켜본다.
 
 ## 주의
 
