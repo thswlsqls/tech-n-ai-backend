@@ -1,12 +1,14 @@
 # tech-n-ai Architecture (Mermaid)
 
-> 근거: `devops/aws/architecture-facts.md` (Terraform 코드에서 추출). drawio 다이어그램과 같은 사실을 텍스트로 표현합니다.
+> 근거: `devops/aws/architecture-facts.md` (Terraform 코드에서 추출). drawio 다이어그램과 같은 사실을 텍스트로 표현합니다. 단, 1장 Reference Architecture는 요청이 api-gateway를 거치는 흐름으로 고쳤고 drawio에는 아직 반영하지 않았습니다.
 >
 > 현재 **배포되는** 구조 기준입니다. CloudFront·Amplify는 모듈만 있고 어느 env에서도 호출되지 않아(facts §3) 진입점은 ALB 뿐입니다. ALB 프로토콜은 환경마다 다릅니다 — prod 는 HTTPS(443) + HTTP(80)→443 리다이렉트(`alb_certificate_arn` 설정), dev/beta 는 HTTP(80) 단독입니다.
 
 ## 1. Reference Architecture
 
-ALB(prod=HTTPS 443, dev/beta=HTTP 80, path 라우팅) → ECS Fargate 서비스 6개 → 데이터 저장소. 이벤트 흐름은 점선.
+ALB(prod=HTTPS 443, dev/beta=HTTP 80) → api-gateway → 나머지 ECS Fargate 서비스 5개 → 데이터 저장소. 이벤트 흐름은 점선.
+ALB에는 서비스별 경로 규칙(`/auth/*` 등)도 있지만, 실제 API 주소는 `/api/v1/`로 시작해서 이 규칙들과 맞지 않습니다. 그래서 API 요청은 모두 `/*` 규칙으로 api-gateway에 들어갑니다.
+api-gateway → 서비스 화살표는 게이트웨이 라우트 설정에 따른 설계 의도이고, 현재 Terraform으로는 AWS에서 아직 동작하지 않습니다. 게이트웨이가 다른 서비스의 주소를 찾는 설정(Service Connect/Cloud Map)과 게이트웨이 → 서비스 보안 그룹 규칙이 없고, 라우트 대상 포트(8080)도 서비스 실제 포트(8082~8086)와 다릅니다.
 MSK에 붙는 서비스는 api-chatbot과 api-agent 둘뿐입니다 — 이 둘만 `common-kafka` 모듈을 의존해 대화 세션·메시지 이벤트를 주고받습니다.
 MSK는 env별로 다릅니다(prod=Provisioned, beta=Serverless, dev=없음). 아래는 prod 기준이며, dev는 MSK 노드와 연결이 빠집니다.
 
@@ -15,15 +17,15 @@ flowchart LR
     client["Client / API consumer"]
 
     subgraph aws["AWS Cloud · ap-northeast-2"]
-        alb["ALB<br/>(HTTPS :443, path-based)<br/>HTTP :80 → :443 redirect"]
+        alb["ALB<br/>(HTTPS :443)<br/>HTTP :80 → :443 redirect"]
 
         subgraph ecs["ECS Cluster (Fargate, ARM64)"]
-            gw["api-gateway :8081<br/>/*"]
-            auth["api-auth :8083<br/>/auth/*"]
-            et["api-emerging-tech :8082<br/>/emerging-tech/*"]
-            chat["api-chatbot :8084<br/>/chatbot/*"]
-            book["api-bookmark :8085<br/>/bookmark/*"]
-            agent["api-agent :8086<br/>/agent/*"]
+            gw["api-gateway :8081<br/>Spring Cloud Gateway<br/>JWT 검증 · Rate Limit · Circuit Breaker"]
+            auth["api-auth :8083<br/>/api/v1/auth/**"]
+            et["api-emerging-tech :8082<br/>/api/v1/emerging-tech/**"]
+            chat["api-chatbot :8084<br/>/api/v1/chatbot/**"]
+            book["api-bookmark :8085<br/>/api/v1/bookmark/**"]
+            agent["api-agent :8086<br/>/api/v1/agent/**"]
         end
 
         subgraph data["Data layer"]
@@ -38,7 +40,8 @@ flowchart LR
     mongo[("MongoDB Atlas<br/>external · CQRS read store<br/>RAG DB · Vector Search<br/>지식 그래프 tech_graph_nodes/edges")]
 
     client -->|HTTPS :443| alb
-    alb --> gw & auth & et & chat & book & agent
+    alb -->|"/* (모든 API 요청)"| gw
+    gw --> auth & et & chat & book & agent
 
     auth --> aurora
     book --> aurora
@@ -55,6 +58,8 @@ flowchart LR
 
     ecs --> logs
 
+    %% ALB 경로 규칙: /auth/*·/chatbot/* 같은 서비스별 규칙도 Terraform에 있지만, 실제 API 주소는 /api/v1/ 로 시작해서 이 규칙들과 맞지 않는다. 그래서 API 요청은 모두 /* 규칙(우선순위 1000)으로 api-gateway에 들어간다.
+    %% gw → 서비스 화살표는 설계 의도(api-gateway 라우트 설정)이고 AWS에서는 아직 동작하지 않는다. 게이트웨이가 서비스 주소를 찾는 설정(Service Connect/Cloud Map), gw → 서비스 보안 그룹 규칙이 없고, 라우트 대상 포트(8080)도 실제 포트(8082~8086)와 다르다. 게이트웨이 Rate Limit이 쓰는 Valkey도 접근 허용과 REDIS_HOST 설정이 없어 gw → valkey 선은 그리지 않았다.
     %% 환경 차이: dev 에는 MSK 노드와 점선 연결이 없음. beta=MSK Serverless, prod=MSK Provisioned(3 broker).
     %% ALB 프로토콜: prod=HTTPS 443(+80 리다이렉트), dev/beta=HTTP 80. 위 그림은 prod 기준.
     %% 프런트(Amplify/CloudFront)는 모듈만 있고 미배포 → 진입점은 ALB 뿐.

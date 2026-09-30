@@ -4,7 +4,7 @@
 
 빅테크 AI 서비스(OpenAI, Anthropic, Google, Meta, xAI)의 공식 업데이트만 빠짐없이·구조화해 추적하고, 그 위에서 검증 가능한 수치로 트렌드를 집계·시각화하는 Spring Boot 기반 백엔드입니다. 범용 AI 챗봇을 지향하지 않고, 정해진 벤더군의 공식 소스만 다루는 좁은 인텔리전스 도구를 목표로 합니다.
 
-강점은 두 가지입니다. 화이트리스트로 고정한 공식 소스(GitHub 릴리스·RSS·블로그)를 하나의 스키마로 정규화해 쌓는 **수집 파이프라인**과, 그 코퍼스 위에서 통계·키워드 빈도를 LLM이 아니라 MongoDB Aggregation으로 계산하는 **결정적 집계**입니다. langchain4j RAG 챗봇은 이 코퍼스에 자연어로 접근하는 보조 창구입니다. 인프라는 CQRS(Aurora 쓰기 / MongoDB 읽기)를 Kafka 이벤트로 잇고 Redis로 멱등성을 보장하는 MSA로 구성했으며, 외부 요청은 API Gateway를 거칩니다.
+강점은 두 가지입니다. 화이트리스트로 고정한 공식 소스(GitHub 릴리스·RSS·블로그)를 하나의 스키마로 정규화해 쌓는 **수집 파이프라인**과, 그 코퍼스 위에서 통계·키워드 빈도를 LLM이 아니라 MongoDB Aggregation으로 계산하는 **결정적 집계**입니다. langchain4j RAG 챗봇은 이 코퍼스에 자연어로 접근하는 보조 창구입니다. 인프라는 CQRS(Aurora 쓰기 / MongoDB 읽기)를 Kafka 이벤트로 잇고 Redis로 멱등성을 보장하는 MSA로 구성했으며, 외부 API 요청은 `api-gateway` 모듈(Spring Cloud Gateway)이 받아 각 서비스로 전달합니다.
 
 ## 데모 영상
 
@@ -91,22 +91,24 @@
 
 ### 전체 시스템 아키텍처
 
-prod 환경 기준 Reference Architecture입니다. ALB가 경로별로 ECS Fargate 서비스 6개에 요청을 나누고, 이벤트 흐름은 점선으로 표시했습니다. 원본과 환경별 차이는 [devops/aws/mermaid/architecture.md](devops/aws/mermaid/architecture.md)에 있습니다.
+prod 환경 기준 Reference Architecture입니다. 외부 요청은 ALB를 지나 `api-gateway`로 들어오고, `api-gateway`가 요청 경로(`/api/v1/{서비스}/**`)를 보고 나머지 서비스 5개로 전달합니다. 이벤트 흐름은 점선으로 표시했습니다. 원본과 환경별 차이는 [devops/aws/mermaid/architecture.md](devops/aws/mermaid/architecture.md)에 있습니다.
+
+> api-gateway에서 각 서비스로 가는 화살표는 설계 의도입니다. 로컬에서는 이대로 동작하지만, 현재 Terraform 설정으로 AWS에 올리면 아직 동작하지 않습니다. 게이트웨이가 다른 서비스의 주소를 찾는 설정(ECS Service Connect 또는 Cloud Map)과 게이트웨이 → 서비스 보안 그룹 규칙이 없고, 게이트웨이가 요청을 보내는 포트(8080)도 서비스 실제 포트(8082~8086)와 다르기 때문입니다.
 
 ```mermaid
 flowchart LR
     client["Client / API consumer"]
 
     subgraph aws["AWS Cloud · ap-northeast-2"]
-        alb["ALB<br/>(HTTPS :443, path-based)<br/>HTTP :80 → :443 redirect"]
+        alb["ALB<br/>(HTTPS :443)<br/>HTTP :80 → :443 redirect"]
 
         subgraph ecs["ECS Cluster (Fargate, ARM64)"]
-            gw["api-gateway :8081<br/>/*"]
-            auth["api-auth :8083<br/>/auth/*"]
-            et["api-emerging-tech :8082<br/>/emerging-tech/*"]
-            chat["api-chatbot :8084<br/>/chatbot/*"]
-            book["api-bookmark :8085<br/>/bookmark/*"]
-            agent["api-agent :8086<br/>/agent/*"]
+            gw["api-gateway :8081<br/>Spring Cloud Gateway<br/>JWT 검증 · Rate Limit · Circuit Breaker"]
+            auth["api-auth :8083<br/>/api/v1/auth/**"]
+            et["api-emerging-tech :8082<br/>/api/v1/emerging-tech/**"]
+            chat["api-chatbot :8084<br/>/api/v1/chatbot/**"]
+            book["api-bookmark :8085<br/>/api/v1/bookmark/**"]
+            agent["api-agent :8086<br/>/api/v1/agent/**"]
         end
 
         subgraph data["Data layer"]
@@ -121,7 +123,8 @@ flowchart LR
     mongo[("MongoDB Atlas<br/>external · CQRS read store<br/>RAG DB · Vector Search<br/>지식 그래프 tech_graph_nodes/edges")]
 
     client -->|HTTPS :443| alb
-    alb --> gw & auth & et & chat & book & agent
+    alb -->|"/* (모든 API 요청)"| gw
+    gw --> auth & et & chat & book & agent
 
     auth --> aurora
     book --> aurora
@@ -138,6 +141,8 @@ flowchart LR
 
     ecs --> logs
 
+    %% ALB 경로 규칙: /auth/*·/chatbot/* 같은 서비스별 규칙도 Terraform에 있지만, 실제 API 주소는 /api/v1/ 로 시작해서 이 규칙들과 맞지 않는다. 그래서 API 요청은 모두 /* 규칙(우선순위 1000)으로 api-gateway에 들어간다.
+    %% gw → 서비스 화살표는 설계 의도(api-gateway 라우트 설정)이고 AWS에서는 아직 동작하지 않는다. 게이트웨이가 서비스 주소를 찾는 설정(Service Connect/Cloud Map), gw → 서비스 보안 그룹 규칙이 없고, 라우트 대상 포트(8080)도 실제 포트(8082~8086)와 다르다. 게이트웨이 Rate Limit이 쓰는 Valkey도 접근 허용과 REDIS_HOST 설정이 없어 gw → valkey 선은 그리지 않았다.
     %% 환경 차이: dev 에는 MSK 노드와 점선 연결이 없음. beta=MSK Serverless, prod=MSK Provisioned(3 broker).
     %% ALB 프로토콜: prod=HTTPS 443(+80 리다이렉트), dev/beta=HTTP 80. 위 그림은 prod 기준.
     %% 프런트(Amplify/CloudFront)는 모듈만 있고 미배포 → 진입점은 ALB 뿐.
@@ -199,7 +204,7 @@ CQRS 데이터 플로우와 전체 구조는 [AWS 배포 인프라 아키텍처]
 
 위 애플리케이션 아키텍처를 실제로 올리는 AWS 인프라는 `devops/terraform/`에 Terraform으로 정의돼 있습니다. `dev`·`beta`·`prod` 세 환경을 같은 모듈로 조립하고, 환경 차이는 `terraform.tfvars` 값으로만 둡니다.
 
-핵심 구성은 ECS Fargate(ARM64) 마이크로서비스 6개가 ALB 경로 라우팅 뒤에서 돌고, 쓰기는 Aurora MySQL, 읽기는 MongoDB Atlas, 캐시는 ElastiCache Valkey, 이벤트 동기화는 MSK(Kafka)를 쓰는 형태입니다.
+핵심 구성은 ECS Fargate(ARM64) 마이크로서비스 6개가 ALB와 api-gateway 뒤에서 돌고, 쓰기는 Aurora MySQL, 읽기는 MongoDB Atlas, 캐시는 ElastiCache Valkey, 이벤트 동기화는 MSK(Kafka)를 쓰는 형태입니다.
 
 > MSK는 환경별로 다릅니다: prod=Provisioned, beta=Serverless, dev=없음. 프런트(Amplify/CloudFront) 모듈은 정의돼 있으나 현재 어느 환경에서도 배포되지 않아, 진입점은 ALB뿐입니다.
 
