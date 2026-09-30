@@ -4,6 +4,8 @@
 
 locals {
   # 알람의 CloudWatch LoadBalancer 디멘션 값(app/<alb-name>/<lb-id>) — listener ARN 에서 추출
+  #   예) arn:aws:elasticloadbalancing:ap-northeast-2:123456789012:listener/app/techai-dev-alb/50dc6c495c0c9188/f2f7dc8efc522ab2
+  #    → app/techai-dev-alb/50dc6c495c0c9188
   load_balancer_dimension = join("/", slice(split("/", var.alb_listener_arn), 1, 4))
 
   # 알람이 보는 대상 그룹 — metric_query id 접미사 => arn_suffix

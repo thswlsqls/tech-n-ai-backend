@@ -10,7 +10,7 @@
 | `aws_lb_target_group` (blue/green, 이름 접미사 `-b`/`-g`) | 2 |
 | `aws_lb_listener_rule` (blue 가중치 1, green 가중치 0 으로 forward) | 1 |
 | `aws_ecs_task_definition` | 1 (이후 revision 은 CI 가 등록) |
-| `aws_ecs_service` | 1 (deployment_controller=ECS, strategy=BLUE_GREEN) |
+| `aws_ecs_service` | 1 (deployment_controller=ECS, strategy=BLUE_GREEN — `enable_blue_green = true` 일 때, false 면 ROLLING) |
 | Auto Scaling Target + 2 Policy (CPU, Memory) | 1+2 |
 | CloudWatch Alarm (5xx rate, p95 latency) — 자동 롤백 | 2 |
 | CloudWatch Log Group | 1 (자동 생성 모드) |
@@ -92,6 +92,8 @@ bake time 동안에는 blue·green 태스크가 함께 떠 있어 태스크 수�
 `enable_blue_green = false` 면 `ROLLING` 으로 배포하고 ECS 인프라 역할은 만들지 않는다.
 
 리스너 규칙의 `action` 과 서비스의 `load_balancer`·`task_definition` 은 배포 때마다 ECS·CI 가 바꾸므로 `lifecycle.ignore_changes` 로 Terraform 이 되돌리지 않게 한다.
+
+그래서 **서비스를 만든 뒤에는 `enable_blue_green` 을 바꾸지 않는다.** green 대상 그룹·리스너 규칙·인프라 역할을 넘기는 `advanced_configuration` 이 `load_balancer` 안에 있어 무시되고, `strategy` 와 인프라 역할만 바뀐다. 바꿔야 한다면 서비스를 다시 만든다.
 
 ## 자동 롤백 안전망 (D-2 — 라이프사이클 훅 미사용)
 
