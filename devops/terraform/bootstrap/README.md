@@ -10,7 +10,7 @@
 | State | KMS CMK (`alias/{project}/tfstate`) | state SSE-KMS, DynamoDB SSE |
 | State | DynamoDB Lock 테이블 (`techai-tflock`) | terraform 동시 실행 잠금 |
 | OIDC | IAM OIDC Provider (`token.actions.githubusercontent.com`) | GitHub Actions 신뢰 기반 |
-| OIDC | `gha-deploy-{env}` × 3 | ECR push, ECS update-service, CodeDeploy 배포 |
+| OIDC | `gha-deploy-{env}` × 3 | ECR push, ECS update-service, ECS 서비스 배포 조회·중지 |
 | OIDC | `gha-terraform-readonly` × 1 | PR plan 단계 (ReadOnlyAccess + state read) |
 | OIDC | `gha-terraform-apply-{env}` × 3 | apply 단계 (PowerUserAccess + IAM + state RW) |
 | OIDC | `gha-security-scan` × 1 | 주간 ECR/Inspector 스캔 |

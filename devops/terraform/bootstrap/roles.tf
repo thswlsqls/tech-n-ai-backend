@@ -18,7 +18,7 @@ locals {
 }
 
 # ----------------------------------------------------------------------------
-# 1. gha-deploy-{env}: 워크로드 배포 (ECR push, ECS update, CodeDeploy create)
+# 1. gha-deploy-{env}: 워크로드 배포 (ECR push, ECS update, ECS 서비스 배포 조회·중지)
 # ----------------------------------------------------------------------------
 
 data "aws_iam_policy_document" "gha_deploy_trust" {
@@ -87,16 +87,14 @@ data "aws_iam_policy_document" "gha_deploy_inline" {
     resources = ["*"]
   }
 
-  # CodeDeploy 배포 트리거
+  # ECS 서비스 배포(blue/green·canary) 진행 상황 조회와 수동 중지
   statement {
-    sid = "CodeDeployTrigger"
+    sid = "EcsServiceDeployment"
     actions = [
-      "codedeploy:CreateDeployment",
-      "codedeploy:GetApplication",
-      "codedeploy:GetDeployment",
-      "codedeploy:GetDeploymentConfig",
-      "codedeploy:GetDeploymentGroup",
-      "codedeploy:RegisterApplicationRevision",
+      "ecs:DescribeServiceDeployments",
+      "ecs:DescribeServiceRevisions",
+      "ecs:ListServiceDeployments",
+      "ecs:StopServiceDeployment",
     ]
     resources = ["*"]
   }

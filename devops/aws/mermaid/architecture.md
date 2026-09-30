@@ -223,7 +223,7 @@ flowchart LR
     end
 
     gha --> oidc --> rdep & rapply & rro & rscan
-    rdep -->|ECR push / ECS / CodeDeploy| exec
+    rdep -->|ECR push / ECS 배포| exec
 
     t_auth -->|reads| s_jwt
     t_chat -->|reads| s_oai & s_mongo
