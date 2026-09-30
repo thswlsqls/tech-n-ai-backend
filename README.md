@@ -6,11 +6,11 @@
 
 강점은 두 가지입니다. 화이트리스트로 고정한 공식 소스(GitHub 릴리스·RSS·블로그)를 하나의 스키마로 정규화해 쌓는 **수집 파이프라인**과, 그 코퍼스 위에서 통계·키워드 빈도를 LLM이 아니라 MongoDB Aggregation으로 계산하는 **결정적 집계**입니다. langchain4j RAG 챗봇은 이 코퍼스에 자연어로 접근하는 보조 창구입니다. 인프라는 CQRS(Aurora 쓰기 / MongoDB 읽기)를 Kafka 이벤트로 잇고 Redis로 멱등성을 보장하는 MSA로 구성했으며, 외부 요청은 API Gateway를 거칩니다.
 
-## 초안 데모 영상
+## 데모 영상
 
-<video src="https://github.com/user-attachments/assets/e2fc8fa9-26bb-48cb-acb4-3b3fde3e9c6d" controls width="100%"></video>
+<video src="https://github.com/user-attachments/assets/6f0500b6-4672-47c6-9bc6-1265271aa4b1" controls width="100%"></video>
 
-> 프론트엔드 랜딩페이지 연동, RAG 챗봇 멀티턴 대화 구현 초안을 확인할 수 있습니다.
+> 사용자 앱에서는 로그인, 필터로 목록 좁히기, 상세 보기, 북마크, 출처가 달린 RAG 챗봇 답변을 보여줍니다. 관리자 앱에서는 AI 에이전트에 Provider별 수집 현황을 요청해 통계 표와 차트로 받는 과정을 보여줍니다.
 
 ## 프로젝트 기획 의도 (해결하려고 하는 문제)
 
