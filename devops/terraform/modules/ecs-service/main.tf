@@ -1,7 +1,7 @@
 # ECS Fargate Service + Target Group(blue/green) + 워크로드 SG
 # - 03 §2 + 09 §5.2 spec 구현
 # - 단일 ECR 리포 전제 (D-1) — container_image 는 digest 형태 권장
-# - 배포는 ECS 자체 blue/green (deployment_controller=ECS, strategy=BLUE_GREEN)
+# - 배포는 ECS 자체 배포 (deployment_controller=ECS, strategy=CANARY — 10% 를 5분 먼저 보낸 뒤 전환)
 # - 라이프사이클 훅 미사용 (D-2) — ALB readiness + CW 알람 자동 롤백
 
 locals {
@@ -390,10 +390,19 @@ resource "aws_ecs_service" "this" {
     type = "ECS"
   }
 
-  # BLUE_GREEN: green 에 트래픽을 한 번에 넘기고 bake time(5분) 동안 blue 를 남겨 둔다.
+  # CANARY: 예전 CodeDeployDefault.ECSCanary10Percent5Minutes 와 같게 10% 를 먼저 보내고
+  # 5분 뒤 나머지를 넘긴 다음, bake time(5분) 동안 blue 를 남겨 둔다.
   deployment_configuration {
-    strategy             = var.enable_blue_green ? "BLUE_GREEN" : "ROLLING"
+    strategy             = var.enable_blue_green ? "CANARY" : "ROLLING"
     bake_time_in_minutes = var.enable_blue_green ? 5 : null
+
+    dynamic "canary_configuration" {
+      for_each = var.enable_blue_green ? [1] : []
+      content {
+        canary_percent              = 10
+        canary_bake_time_in_minutes = 5
+      }
+    }
   }
 
   deployment_circuit_breaker {

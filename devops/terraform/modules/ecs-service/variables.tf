@@ -169,7 +169,7 @@ variable "autoscaling_memory_target" {
 }
 
 variable "enable_blue_green" {
-  description = "ECS 자체 blue/green 배포 사용 여부. true 면 strategy=BLUE_GREEN(bake time 5분), false 면 ROLLING. 서비스를 만든 뒤에는 바꾸지 않는다 — advanced_configuration 은 ignore_changes 대상인 load_balancer 안에 있어 따라 바뀌지 않는다."
+  description = "ECS 자체 blue/green 계열 배포 사용 여부. true 면 strategy=CANARY(10% 를 5분 먼저 보낸 뒤 전환, bake time 5분), false 면 ROLLING. 서비스를 만든 뒤에는 바꾸지 않는다 — advanced_configuration 은 ignore_changes 대상인 load_balancer 안에 있어 따라 바뀌지 않는다."
   type        = bool
   default     = true
 }

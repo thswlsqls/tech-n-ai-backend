@@ -10,7 +10,7 @@
 | `aws_lb_target_group` (blue/green, 이름 접미사 `-b`/`-g`) | 2 |
 | `aws_lb_listener_rule` (blue 가중치 1, green 가중치 0 으로 forward) | 1 |
 | `aws_ecs_task_definition` | 1 (이후 revision 은 CI 가 등록) |
-| `aws_ecs_service` | 1 (deployment_controller=ECS, strategy=BLUE_GREEN — `enable_blue_green = true` 일 때, false 면 ROLLING) |
+| `aws_ecs_service` | 1 (deployment_controller=ECS, strategy=CANARY — `enable_blue_green = true` 일 때, false 면 ROLLING) |
 | Auto Scaling Target + 2 Policy (CPU, Memory) | 1+2 |
 | CloudWatch Alarm (5xx rate, p95 latency) — 자동 롤백 | 2 |
 | CloudWatch Log Group | 1 (자동 생성 모드) |
@@ -81,19 +81,20 @@ resource "aws_security_group_rule" "auth_from_gateway" {
 
 ## 배포 방식 — ECS 자체 blue/green
 
-`enable_blue_green = true`(기본값)면 `deployment_configuration.strategy = "BLUE_GREEN"` 으로 배포한다.
+`enable_blue_green = true`(기본값)면 `deployment_configuration.strategy = "CANARY"` 로 배포한다([문서](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/canary-deployment.html)). 예전 CodeDeploy 설정 `CodeDeployDefault.ECSCanary10Percent5Minutes` 와 같은 순서로 트래픽을 넘긴다.
 
 1. ECS 가 새 task definition 으로 green 태스크를 띄워 green 대상 그룹에 등록한다.
-2. green 이 health check 를 통과하면 ECS 가 리스너 규칙 가중치를 바꿔 운영 트래픽을 한 번에 green 으로 넘긴다.
-3. bake time(5분) 동안 blue 태스크를 그대로 둔다. 이 사이에 알람이 울리면 트래픽을 blue 로 되돌린다.
-4. bake time 이 끝나면 blue 태스크를 내린다.
+2. green 이 health check 를 통과하면 ECS 가 리스너 규칙 가중치를 바꿔 운영 트래픽의 10% 를 green 으로 보낸다(`canary_percent = 10`).
+3. 5분(`canary_bake_time_in_minutes = 5`) 동안 지켜본 뒤 나머지 90% 를 green 으로 넘긴다. 이 사이에 알람이 울리면 트래픽을 blue 로 되돌린다.
+4. bake time(5분) 동안 blue 태스크를 그대로 둔다. 이 사이에 알람이 울려도 blue 로 되돌린다.
+5. bake time 이 끝나면 blue 태스크를 내린다.
 
-bake time 동안에는 blue·green 태스크가 함께 떠 있어 태스크 수가 잠시 두 배가 될 수 있다.
+카나리 구간에서는 green 이 트래픽의 10% 만 받으므로 5xx 비율 알람(두 대상 그룹 합계)은 green 오류가 희석돼 보인다. green 요청이 모두 실패하면 합계 비율이 10% 안팎이 되어 1% 임계를 넘는다. p95 알람은 대상 그룹별 값 중 큰 값을 보므로 희석되지 않는다.
+
+**비용.** green 태스크는 카나리 단계 전에 전체 수만큼 뜨고, blue 는 bake time 이 끝날 때까지 남는다. 그래서 배포마다 약 10분(카나리 5분 + bake time 5분) 동안 태스크 수가 두 배가 된다([문서](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/deployment-type-blue-green.html) "may double your resource usage during deployments"). 예전 CodeDeploy 설정도 카나리 5분 뒤 blue 를 5분 더 남겼으므로(`termination_wait_time_in_minutes = 5`) 겹치는 시간은 같다.
 `enable_blue_green = false` 면 `ROLLING` 으로 배포하고 ECS 인프라 역할은 만들지 않는다.
 
 서비스 6개가 ALB 리스너 하나를 같이 쓴다. ECS 는 서비스마다 `advanced_configuration.production_listener_rule` 로 받은 리스너 규칙 하나의 가중치를 바꾼다([문서](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/alb-resources-for-blue-green.html)). 다만 같은 리스너의 다른 규칙을 건드리지 않는다는 문장은 문서에 없으므로, 첫 배포 때 다른 서비스의 규칙이 그대로인지 확인한다.
-
-예전 CodeDeploy 설정(`ECSCanary10Percent5Minutes`)처럼 트래픽 10%를 먼저 보내고 싶다면 ECS 의 `CANARY` 전략을 쓸 수 있다([문서](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/canary-deployment.html)). Terraform 에서는 provider 6.21.0 부터 `deployment_configuration.canary_configuration` 으로 설정한다. 지금은 이슈 #42 에서 정한 대로 `BLUE_GREEN` 만 쓴다.
 
 리스너 규칙의 `action` 과 서비스의 `load_balancer`·`task_definition` 은 배포 때마다 ECS·CI 가 바꾸므로 `lifecycle.ignore_changes` 로 Terraform 이 되돌리지 않게 한다.
 
