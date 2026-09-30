@@ -13,11 +13,11 @@
 - 이름 `${project}-${environment}` (예: `techai-prod`), Container Insights `enabled`, ECS Exec logging `DEFAULT`. (`envs/prod/cluster.tf:4`, `:7`, `:13`)
 
 ### Fargate / 태스크 공통
-- launch type = `FARGATE`, network mode `awsvpc`, `requires_compatibilities = ["FARGATE"]`. (`modules/ecs-service/main.tf:347`, `:321`, `:322`)
-- CPU architecture = **ARM64** (Graviton), OS family `LINUX`. (`modules/ecs-service/main.tf:329`, `:330`)
-- Task ENI는 Private-App 서브넷에 배치, `assign_public_ip = false`. (`modules/ecs-service/main.tf:352`, `:354`)
-- 메인 컨테이너 헬스체크: `wget --spider http://localhost:{port}{health_check_path}`, interval 30 / timeout 5 / retries 3 / startPeriod 60. (`modules/ecs-service/main.tf:236`)
-- `readonlyRootFilesystem = false` (Spring Boot가 /tmp 사용). (`modules/ecs-service/main.tf:244`)
+- launch type = `FARGATE`, network mode `awsvpc`, `requires_compatibilities = ["FARGATE"]`. (`modules/ecs-service/main.tf:361`, `:335`, `:336`)
+- CPU architecture = **ARM64** (Graviton), OS family `LINUX`. (`modules/ecs-service/main.tf:343`, `:344`)
+- Task ENI는 Private-App 서브넷에 배치, `assign_public_ip = false`. (`modules/ecs-service/main.tf:366`, `:368`)
+- 메인 컨테이너 헬스체크: `wget --spider http://localhost:{port}{health_check_path}`, interval 30 / timeout 5 / retries 3 / startPeriod 60. (`modules/ecs-service/main.tf:250`)
+- `readonlyRootFilesystem = false` (Spring Boot가 /tmp 사용). (`modules/ecs-service/main.tf:258`)
 
 ### 서비스 목록 (모든 env 공통 — services.tf 동일)
 ECS 모듈 호출은 6개. **`batch-source`는 ECS 서비스로 배포되지 않는다** (services.tf에 없음 — `placeholder_image_for` map에도 batch-source 제외, `envs/prod/services.tf:19`). batch-source는 ECR 리포로만 존재(§6 참고).
@@ -42,21 +42,21 @@ ECS 모듈 호출은 6개. **`batch-source`는 ECS 서비스로 배포되지 않
 - ALB는 env당 1개, `internal=false`, type `application`, Public 서브넷, `drop_invalid_header_fields=true`. `enable_deletion_protection`은 `var.alb_enable_deletion_protection`(prod tfvars=true, dev/beta=default false). (`envs/prod/cluster.tf` `aws_lb.main`)
 - **HTTPS 토글**: `var.alb_certificate_arn`이 비어있지 않으면 HTTPS(443) 리스너 생성 + HTTP(80)→443 301 리다이렉트 + ALB SG 443 인바운드를 켠다. prod tfvars는 ACM ARN을 지정해 HTTPS, dev/beta는 빈 값이라 HTTP(80) 단독. (`envs/prod/cluster.tf` `local.alb_https_enabled`; `prod/terraform.tfvars`)
 - Listener: **prod = HTTPS 443** (보안정책 `var.alb_ssl_policy` 기본 `ELBSecurityPolicy-TLS13-1-2-2021-06`, cert = `var.alb_certificate_arn`), 서비스 path 규칙이 443 리스너에 부착되고 80 리스너는 443 으로 리다이렉트. **dev/beta = HTTP 80**, default action = 404 fixed-response. (`envs/prod/cluster.tf` `aws_lb_listener.https`/`aws_lb_listener.http`)
-- 라우팅은 **path-based** (위 표의 path), 우선순위로 매칭. host header 조건은 사용 안 함(빈 리스트). (`modules/ecs-service/main.tf:143`~`:168`)
-- Target Group은 서비스마다 blue/green 2개, `target_type=ip`, protocol HTTP, health check path 기본 `/actuator/health/readiness` (matcher 200, healthy 2 / unhealthy 3 / interval 15 / timeout 5). (`modules/ecs-service/main.tf:81`, `:110`; default path `modules/ecs-service/variables.tf:99`)
+- 라우팅은 **path-based** (위 표의 path), 우선순위로 매칭. host header 조건은 사용 안 함(빈 리스트). (`modules/ecs-service/main.tf:144`~`:182`)
+- Target Group은 서비스마다 blue/green 2개, `target_type=ip`, protocol HTTP, health check path 기본 `/actuator/health/readiness` (matcher 200, healthy 2 / unhealthy 3 / interval 15 / timeout 5). (`modules/ecs-service/main.tf:82`, `:111`; default path `modules/ecs-service/variables.tf:99`)
 
 ### ECS 자체 배포 (Canary)
 - `deployment_controller.type = ECS`. `enable_blue_green` default true → `deployment_configuration.strategy = CANARY`, false → `ROLLING`. (`modules/ecs-service/main.tf:389`, `:396`, `modules/ecs-service/variables.tf:171`)
 - 카나리 설정: 트래픽 10% 를 먼저 보내고 5분 뒤 나머지를 넘긴다(`canary_percent = 10`, `canary_bake_time_in_minutes = 5`). 전환 뒤 bake time 5분 동안 blue 를 남긴다(`bake_time_in_minutes = 5`). (`modules/ecs-service/main.tf:397`, `:402`~`:403`)
-- 자동 롤백: 서비스 `alarms { enable=true, rollback=true }` + 알람 2종(ALB 5xx 비율 기본 임계 1%, Target p95 지연 기본 1.5s — chatbot은 5.0s). 두 알람 모두 blue·green 대상 그룹을 함께 본다. (`modules/ecs-service/main.tf:414`, `modules/ecs-service/alarms.tf:22`, `:75`; 임계 default `modules/ecs-service/variables.tf:177`, `:183`)
+- 자동 롤백: 서비스 `alarms { enable=true, rollback=true }` + 알람 2종(ALB 5xx 비율 기본 임계 1%, Target p95 지연 기본 1.5s — chatbot은 5.0s). 두 알람 모두 blue·green 대상 그룹을 함께 본다. (`modules/ecs-service/main.tf:414`, `modules/ecs-service/alarms.tf:24`, `:86`; 임계 default `modules/ecs-service/variables.tf:177`, `:183`)
 - ECS 인프라 Role(리스너 규칙 가중치를 바꾸는 역할)은 모듈이 자체 생성 + `AmazonECSInfrastructureRolePolicyForLoadBalancers` 부착. (`modules/ecs-service/main.tf:436`, `:457`)
 - ECS 서비스에 `deployment_circuit_breaker { enable=true, rollback=true }`도 설정. (`modules/ecs-service/main.tf:408`)
 
 ### Sidecar (ADOT / FireLens)
-- 둘 다 옵션이며 **default false** (모든 env에서 tfvars가 켜지 않음 → 비활성). (`modules/ecs-service/variables.tf:209`, `:227`; prod `variables.tf:230`, `:236`)
-- ADOT: image `public.ecr.aws/aws-observability/aws-otel-collector:latest`, cpu 64 / memReservation 128, 활성 시 메인 컨테이너에 `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317` 자동 주입. (`modules/ecs-service/main.tf:186`, `:248`)
-- FireLens(Fluent Bit): image `public.ecr.aws/aws-observability/aws-for-fluent-bit:stable`, 활성 시 메인 logDriver를 `awsfirelens`로 전환. (`modules/ecs-service/main.tf:192`, `:278`)
-- sidecar 미사용 시 메인 로그는 `awslogs` → CloudWatch Log Group `/aws/ecs/{env}/{service}`. (`modules/ecs-service/main.tf:199`, `:14`)
+- 둘 다 옵션이며 **default false** (모든 env에서 tfvars가 켜지 않음 → 비활성). (`modules/ecs-service/variables.tf:203`, `:221`; prod `variables.tf:230`, `:236`)
+- ADOT: image `public.ecr.aws/aws-observability/aws-otel-collector:latest`, cpu 64 / memReservation 128, 활성 시 메인 컨테이너에 `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317` 자동 주입. (`modules/ecs-service/main.tf:200`, `:262`)
+- FireLens(Fluent Bit): image `public.ecr.aws/aws-observability/aws-for-fluent-bit:stable`, 활성 시 메인 logDriver를 `awsfirelens`로 전환. (`modules/ecs-service/main.tf:206`, `:292`)
+- sidecar 미사용 시 메인 로그는 `awslogs` → CloudWatch Log Group `/aws/ecs/{env}/{service}`. (`modules/ecs-service/main.tf:213`, `:15`)
 
 ---
 
@@ -182,10 +182,10 @@ ECS 모듈 호출은 6개. **`batch-source`는 ECS 서비스로 배포되지 않
 - MSK IAM 권한을 받는 건 api-chatbot·api-agent 둘뿐이다. 대상 ARN(클러스터·토픽 `{project}.conversation.*`·그룹 `{project}.*`)은 두 역할이 `local.msk_iam_resources` 로 공유한다. 코드상 `common-kafka` 를 의존하는 모듈도 이 둘뿐이다(`api/chatbot/build.gradle`, `api/agent/build.gradle`). (`envs/prod/task_roles.tf:17`)
 - Workload Role 모듈(`iam-role-workload`): trust service + 조건 + managed/inline 정책을 입력으로 받는 범용 모듈. (`modules/iam-role-workload/main.tf:22`)
 - GitHub OIDC Role 4종 (bootstrap, `${project}-` 접두어): (`bootstrap/roles.tf`)
-  - `gha-deploy-{env}` — sub `repo:{org}/{repo}:environment:{env}`. 권한: ECR push/pull(techai/*), ECS update/RegisterTaskDef, ECS 서비스 배포 조회·중지, PassRole(task/exec role), SSM/Secrets read, Amplify start-job, Signer sign. max session 3600. (`:24`, `:50`, `:161`)
-  - `gha-terraform-readonly` — sub `pull_request`, `ReadOnlyAccess` managed + tfstate read 인라인. (`:181`, `:214`)
-  - `gha-terraform-apply-{env}` — sub `environment:tf-{env}`, `PowerUserAccess` + IAM 관리 인라인 + tfstate RW. (`:248`, `:284`)
-  - `gha-security-scan` — sub `ref:refs/heads/main`, ECR describe/pull + Inspector findings. (`:383`, `:412`)
+  - `gha-deploy-{env}` — sub `repo:{org}/{repo}:environment:{env}`. 권한: ECR push/pull(techai/*), ECS update/RegisterTaskDef, ECS 서비스 배포 조회·중지, PassRole(task/exec role), SSM/Secrets read, Amplify start-job, Signer sign. max session 3600. (`:24`, `:50`, `:159`)
+  - `gha-terraform-readonly` — sub `pull_request`, `ReadOnlyAccess` managed + tfstate read 인라인. (`:179`, `:212`)
+  - `gha-terraform-apply-{env}` — sub `environment:tf-{env}`, `PowerUserAccess` + IAM 관리 인라인 + tfstate RW. (`:246`, `:282`)
+  - `gha-security-scan` — sub `ref:refs/heads/main`, ECR describe/pull + Inspector findings. (`:381`, `:410`)
 - OIDC Provider: `token.actions.githubusercontent.com`, aud `sts.amazonaws.com`. (`bootstrap/oidc.tf:5`)
 
 ### Secrets Manager (env별)
@@ -202,7 +202,7 @@ ECS 모듈 호출은 6개. **`batch-source`는 ECS 서비스로 배포되지 않
 | SG | inbound | source | 출처 |
 |---|---|---|---|
 | ALB | 80/TCP (+443/TCP, HTTPS 토글 시) | 0.0.0.0/0 | `envs/prod/cluster.tf` `aws_security_group.alb` |
-| Workload(서비스별) | container_port(8081~8086) | ALB SG | `modules/ecs-service/main.tf:67` |
+| Workload(서비스별) | container_port(8081~8086) | ALB SG | `modules/ecs-service/main.tf:68` |
 | Aurora | 3306 | 워크로드 SG들(services.tf rule) | `modules/aurora-mysql/main.tf:53`; `envs/prod/services.tf:305` |
 | Valkey | 6379 | 워크로드 SG들 | `modules/elasticache-valkey/main.tf:56`; `envs/prod/services.tf:317` |
 | MSK Provisioned | 9098(IAM), 9094(TLS), 11001-11002(monitoring), self all | 워크로드 SG들 | `modules/msk-provisioned/main.tf:54`, `:66`, `:90` |
