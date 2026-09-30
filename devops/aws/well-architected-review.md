@@ -8,7 +8,7 @@
 
 | 기둥 | 상태 | 한 줄 평 |
 |---|---|---|
-| 운영 우수성 | 🟢 양호 | Terraform 모듈화 + GitHub OIDC + CodeDeploy Blue/Green. 관측성 사이드카는 꺼져 있음 |
+| 운영 우수성 | 🟢 양호 | Terraform 모듈화 + GitHub OIDC + ECS 카나리 배포. 관측성 사이드카는 꺼져 있음 |
 | 보안 | 🟢 양호 | KMS 키 분리, 최소권한 task role, 키리스 OIDC, private-data 격리. prod ALB 는 HTTPS(:443) 토글 적용(실 인증서 ARN 필요), dev/beta 는 HTTP(:80) |
 | 신뢰성 | 🟡 주의 | prod는 Multi-AZ·다중 NAT로 견고. dev/beta는 단일 NAT·단일 노드라 SPOF 존재(의도된 비용 절감) |
 | 성능 효율 | 🟢 양호 | Graviton(ARM64) + Aurora Serverless v2 + VPC Endpoint. 적절한 사이징 |
@@ -24,7 +24,7 @@
 **현재 구현**
 - 인프라가 Terraform으로 모듈화돼 있고(`modules/` 11개), 환경 조립 계층(`envs/{dev,beta,prod}`)이 모듈 호출만 한다. 환경 파일이 byte 단위로 동일하고 차이는 tfvars로만 둬서, 환경 간 드리프트가 구조적으로 줄어든다(facts 머리말).
 - 배포는 GitHub Actions OIDC 역할로 수행된다(`gha-deploy-{env}`). 키리스 연합이라 장기 자격증명을 두지 않는다(facts §5).
-- 릴리스는 CodeDeploy Blue/Green(`Canary10Percent5Minutes`) + ECS circuit breaker로, ALB 5xx·p95 지연 알람에 걸리면 자동 롤백한다(facts §1).
+- 릴리스는 ECS 자체 카나리 배포(10% 를 5분 먼저 보낸 뒤 전환) + ECS circuit breaker로, ALB 5xx·p95 지연 알람에 걸리면 자동 롤백한다(facts §1).
 - 상태는 S3+DynamoDB 원격 백엔드(버전닝·Object Lock·PITR)로 관리된다(facts §6).
 
 **위험·격차**
@@ -33,7 +33,7 @@
 
 **권고**
 - 최소한 prod에서 ADOT 사이드카를 켜 X-Ray 추적을 확보한다(`enable_adot=true`). 비용은 작고 운영 가시성 이득이 크다.
-- CodeDeploy 알람 임계(5xx 1%, p95 1.5s, chatbot 5.0s)가 실제 트래픽에 맞는지 초기 운영 후 재조정한다.
+- 배포 롤백 알람 임계(5xx 1%, p95 1.5s, chatbot 5.0s)가 실제 트래픽에 맞는지 초기 운영 후 재조정한다.
 
 ### EB vs ECS Fargate (대안 비교)
 

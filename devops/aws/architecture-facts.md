@@ -7,7 +7,7 @@
 
 ---
 
-## 1. 컴퓨팅 (ECS / Fargate / ALB / CodeDeploy)
+## 1. 컴퓨팅 (ECS / Fargate / ALB / 배포)
 
 ### ECS Cluster
 - 이름 `${project}-${environment}` (예: `techai-prod`), Container Insights `enabled`, ECS Exec logging `DEFAULT`. (`envs/prod/cluster.tf:4`, `:7`, `:13`)
@@ -45,13 +45,12 @@ ECS 모듈 호출은 6개. **`batch-source`는 ECS 서비스로 배포되지 않
 - 라우팅은 **path-based** (위 표의 path), 우선순위로 매칭. host header 조건은 사용 안 함(빈 리스트). (`modules/ecs-service/main.tf:143`~`:168`)
 - Target Group은 서비스마다 blue/green 2개, `target_type=ip`, protocol HTTP, health check path 기본 `/actuator/health/readiness` (matcher 200, healthy 2 / unhealthy 3 / interval 15 / timeout 5). (`modules/ecs-service/main.tf:81`, `:110`; default path `modules/ecs-service/variables.tf:99`)
 
-### CodeDeploy Blue/Green
-- `enable_blue_green` default true → `deployment_controller.type = CODE_DEPLOY`. (`modules/ecs-service/main.tf:364`, `modules/ecs-service/variables.tf:174`)
-- deployment config 기본 `CodeDeployDefault.ECSCanary10Percent5Minutes`. (`modules/ecs-service/variables.tf:180`)
-- deployment style `BLUE_GREEN` + `WITH_TRAFFIC_CONTROL`, 성공 시 blue 종료(5분 대기). (`modules/ecs-service/codedeploy.tf:131`, `:160`)
-- 자동 롤백: 이벤트 `DEPLOYMENT_FAILURE`, `DEPLOYMENT_STOP_ON_ALARM` + 알람 2종(ALB 5xx 비율 기본 임계 1%, Target p95 지연 기본 1.5s — chatbot은 5.0s). (`modules/ecs-service/codedeploy.tf:166`~`:177`; 임계 default `modules/ecs-service/variables.tf:186`, `:192`)
-- CodeDeploy 서비스 Role은 모듈이 자체 생성 + `AWSCodeDeployRoleForECS` 부착. (`modules/ecs-service/codedeploy.tf:99`, `:120`)
-- ECS 서비스에 `deployment_circuit_breaker { enable=true, rollback=true }`도 설정. (`modules/ecs-service/main.tf:367`)
+### ECS 자체 배포 (Canary)
+- `deployment_controller.type = ECS`. `enable_blue_green` default true → `deployment_configuration.strategy = CANARY`, false → `ROLLING`. (`modules/ecs-service/main.tf:389`, `:396`, `modules/ecs-service/variables.tf:171`)
+- 카나리 설정: 트래픽 10% 를 먼저 보내고 5분 뒤 나머지를 넘긴다(`canary_percent = 10`, `canary_bake_time_in_minutes = 5`). 전환 뒤 bake time 5분 동안 blue 를 남긴다(`bake_time_in_minutes = 5`). (`modules/ecs-service/main.tf:397`, `:402`~`:403`)
+- 자동 롤백: 서비스 `alarms { enable=true, rollback=true }` + 알람 2종(ALB 5xx 비율 기본 임계 1%, Target p95 지연 기본 1.5s — chatbot은 5.0s). 두 알람 모두 blue·green 대상 그룹을 함께 본다. (`modules/ecs-service/main.tf:414`, `modules/ecs-service/alarms.tf:22`, `:75`; 임계 default `modules/ecs-service/variables.tf:177`, `:183`)
+- ECS 인프라 Role(리스너 규칙 가중치를 바꾸는 역할)은 모듈이 자체 생성 + `AmazonECSInfrastructureRolePolicyForLoadBalancers` 부착. (`modules/ecs-service/main.tf:436`, `:457`)
+- ECS 서비스에 `deployment_circuit_breaker { enable=true, rollback=true }`도 설정. (`modules/ecs-service/main.tf:408`)
 
 ### Sidecar (ADOT / FireLens)
 - 둘 다 옵션이며 **default false** (모든 env에서 tfvars가 켜지 않음 → 비활성). (`modules/ecs-service/variables.tf:209`, `:227`; prod `variables.tf:230`, `:236`)
@@ -183,7 +182,7 @@ ECS 모듈 호출은 6개. **`batch-source`는 ECS 서비스로 배포되지 않
 - MSK IAM 권한을 받는 건 api-chatbot·api-agent 둘뿐이다. 대상 ARN(클러스터·토픽 `{project}.conversation.*`·그룹 `{project}.*`)은 두 역할이 `local.msk_iam_resources` 로 공유한다. 코드상 `common-kafka` 를 의존하는 모듈도 이 둘뿐이다(`api/chatbot/build.gradle`, `api/agent/build.gradle`). (`envs/prod/task_roles.tf:17`)
 - Workload Role 모듈(`iam-role-workload`): trust service + 조건 + managed/inline 정책을 입력으로 받는 범용 모듈. (`modules/iam-role-workload/main.tf:22`)
 - GitHub OIDC Role 4종 (bootstrap, `${project}-` 접두어): (`bootstrap/roles.tf`)
-  - `gha-deploy-{env}` — sub `repo:{org}/{repo}:environment:{env}`. 권한: ECR push/pull(techai/*), ECS update/RegisterTaskDef, CodeDeploy create, PassRole(task/exec role), SSM/Secrets read, Amplify start-job, Signer sign. max session 3600. (`:24`, `:50`, `:161`)
+  - `gha-deploy-{env}` — sub `repo:{org}/{repo}:environment:{env}`. 권한: ECR push/pull(techai/*), ECS update/RegisterTaskDef, ECS 서비스 배포 조회·중지, PassRole(task/exec role), SSM/Secrets read, Amplify start-job, Signer sign. max session 3600. (`:24`, `:50`, `:161`)
   - `gha-terraform-readonly` — sub `pull_request`, `ReadOnlyAccess` managed + tfstate read 인라인. (`:181`, `:214`)
   - `gha-terraform-apply-{env}` — sub `environment:tf-{env}`, `PowerUserAccess` + IAM 관리 인라인 + tfstate RW. (`:248`, `:284`)
   - `gha-security-scan` — sub `ref:refs/heads/main`, ECR describe/pull + Inspector findings. (`:383`, `:412`)
