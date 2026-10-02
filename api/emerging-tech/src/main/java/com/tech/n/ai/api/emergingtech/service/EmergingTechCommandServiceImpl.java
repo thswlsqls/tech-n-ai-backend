@@ -153,7 +153,7 @@ public class EmergingTechCommandServiceImpl implements EmergingTechCommandServic
     }
 
     /**
-     * 임베딩 벡터를 한 번의 호출로 생성한다.
+     * 임베딩 벡터를 요청 하나로 묶어 부른다.
      *
      * 실패해도 문서 저장은 진행한다. 다만 <b>실패 단위가 문서 하나가 아니라 목록 전체다</b> —
      * 건별로 부르던 때는 실패한 문서만 벡터를 잃었지만, 지금은 이 호출이 실패하면
