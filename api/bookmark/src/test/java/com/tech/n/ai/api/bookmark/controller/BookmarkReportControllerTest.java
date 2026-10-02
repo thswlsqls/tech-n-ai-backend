@@ -93,6 +93,18 @@ class BookmarkReportControllerTest {
         }
 
         @Test
+        @DisplayName("본문 없이 보내도 200 OK")
+        void recordView_본문없음() throws Exception {
+            when(bookmarkReportFacade.recordView(anyLong(), anyString(), org.mockito.ArgumentMatchers.isNull()))
+                .thenReturn(BookmarkViewEventResponse.of(100L, LocalDateTime.now(), 1L));
+
+            mockMvc.perform(post(BASE_URL + "/100/views"))
+                .andExpect(status().isOk());
+
+            verify(bookmarkReportFacade).recordView(eq(TEST_USER_ID), eq("100"), org.mockito.ArgumentMatchers.isNull());
+        }
+
+        @Test
         @DisplayName("삭제된 북마크 - 404")
         void recordView_없는북마크() throws Exception {
             when(bookmarkReportFacade.recordView(anyLong(), anyString(), any(BookmarkViewEventRequest.class)))

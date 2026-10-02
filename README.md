@@ -943,6 +943,8 @@ export MYSQL_PASSWORD=admin1234
 - `GET /api/v1/bookmark/history/{entityId}` - 변경 이력 조회 (`operationType`, `startDate`, `endDate` 필터)
 - `GET /api/v1/bookmark/history/{entityId}/at` - 특정 시점 데이터 조회 (`timestamp` 필수)
 - `POST /api/v1/bookmark/history/{entityId}/restore` - 특정 버전으로 복구 (`historyId` 필수)
+- `POST /api/v1/bookmark/{id}/views` - 조회 이벤트 기록 (body: `source` 선택)
+- `GET /api/v1/bookmark/reports/daily` - 일별 조회 리포트 (`from`·`to` 필수, 최대 90일, `provider` 필터)
 
 > 이 모듈은 Kafka 없이 읽기·쓰기를 모두 Aurora MySQL에서 처리합니다. MongoDB는 북마크 생성 시 원본 EmergingTech 문서를 한 번 조회해 필드를 복사하는 용도로만 씁니다. 자세한 내용은 [`api/bookmark/README.md`](api/bookmark/README.md)를 참고하세요.
 

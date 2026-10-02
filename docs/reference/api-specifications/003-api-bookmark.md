@@ -588,6 +588,8 @@ BookmarkDetailResponse 형식
 | GET | `/api/v1/bookmark/history/{entityId}` | O | 변경 이력 조회 |
 | GET | `/api/v1/bookmark/history/{entityId}/at` | O | 특정 시점 데이터 조회 |
 | POST | `/api/v1/bookmark/history/{entityId}/restore` | O | 특정 버전으로 복구 |
+| POST | `/api/v1/bookmark/{id}/views` | O | 조회 이벤트 기록 |
+| GET | `/api/v1/bookmark/reports/daily` | O | 일별 조회 리포트 |
 
 ---
 

@@ -21,6 +21,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -139,6 +140,38 @@ class BookmarkViewEventServiceTest {
             verify(bookmarkDailyStatWriterJpaRepository, times(1))
                 .saveAndFlush(org.mockito.ArgumentMatchers.any(BookmarkDailyStatEntity.class));
             assertThat(response.todayViewCount()).isEqualTo(1L);
+        }
+
+        @Test
+        @DisplayName("첫 행 생성이 UNIQUE 충돌로 실패하면 다시 시도하지 않고 그대로 실패한다")
+        void recordView_첫행경합() {
+            givenOwnedBookmark();
+            when(bookmarkDailyStatWriterJpaRepository
+                .increaseViewCount(TEST_USER_ID, EXPECTED_STAT_DATE, PROVIDER)).thenReturn(0);
+            when(bookmarkDailyStatWriterJpaRepository
+                .saveAndFlush(org.mockito.ArgumentMatchers.any(BookmarkDailyStatEntity.class)))
+                .thenThrow(new DataIntegrityViolationException("uk_bookmark_daily_stats_user_date_provider"));
+
+            assertThatThrownBy(() -> bookmarkViewEventService.recordView(
+                TEST_USER_ID, TEST_BOOKMARK_ID, new BookmarkViewEventRequest("web")))
+                .isInstanceOf(DataIntegrityViolationException.class);
+
+            verify(bookmarkDailyStatWriterJpaRepository, times(1))
+                .increaseViewCount(TEST_USER_ID, EXPECTED_STAT_DATE, PROVIDER);
+        }
+
+        @Test
+        @DisplayName("본문 없이 와도 source 를 비워 두고 기록한다")
+        void recordView_본문없음() {
+            givenOwnedBookmark();
+            when(bookmarkDailyStatWriterJpaRepository
+                .increaseViewCount(TEST_USER_ID, EXPECTED_STAT_DATE, PROVIDER)).thenReturn(1);
+            givenStatAfterUpdate(1L);
+
+            bookmarkViewEventService.recordView(TEST_USER_ID, TEST_BOOKMARK_ID, null);
+
+            verify(bookmarkViewEventWriterJpaRepository).save(eventCaptor.capture());
+            assertThat(eventCaptor.getValue().getSource()).isNull();
         }
 
         @Test

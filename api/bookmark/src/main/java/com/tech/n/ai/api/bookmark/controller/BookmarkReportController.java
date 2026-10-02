@@ -36,7 +36,7 @@ public class BookmarkReportController {
     @PostMapping("/{id}/views")
     public ResponseEntity<ApiResponse<BookmarkViewEventResponse>> recordView(
             @PathVariable String id,
-            @Valid @RequestBody BookmarkViewEventRequest request,
+            @Valid @RequestBody(required = false) BookmarkViewEventRequest request,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
         BookmarkViewEventResponse response =
             bookmarkReportFacade.recordView(userPrincipal.userId(), id, request);

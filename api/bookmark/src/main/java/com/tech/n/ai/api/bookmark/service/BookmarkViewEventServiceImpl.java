@@ -87,7 +87,8 @@ public class BookmarkViewEventServiceImpl implements BookmarkViewEventService {
      * 그 날짜의 집계를 1 올리고 갱신 결과를 돌려준다.
      *
      * 갱신 행이 0이면 그 날짜 첫 조회다. 이때 두 요청이 동시에 INSERT 를 시도하면
-     * UNIQUE 제약에 걸리므로, 진 쪽은 UPDATE 로 한 번 더 간다.
+     * 진 쪽은 UNIQUE 제약에 걸려 실패한다. 같은 트랜잭션에서 다시 시도해도
+     * 이미 rollback-only 가 찍혀 커밋되지 않으므로, 로그만 남기고 그대로 실패시킨다.
      */
     private Long increaseDailyStat(Long userId, String provider, LocalDate statDate) {
         int updated = bookmarkDailyStatWriterJpaRepository.increaseViewCount(userId, statDate, provider);
@@ -99,10 +100,15 @@ public class BookmarkViewEventServiceImpl implements BookmarkViewEventService {
                 bookmarkDailyStatWriterJpaRepository.saveAndFlush(stat);
                 return stat.getViewCount();
             } catch (DataIntegrityViolationException e) {
-                log.info("일별 집계 첫 행 생성이 경합했다. UPDATE 로 재시도한다. userId={} statDate={} provider={}",
-                    userId, statDate, provider);
-                bookmarkDailyStatWriterJpaRepository.increaseViewCount(userId, statDate, provider);
+                log.warn("일별 집계 첫 행 생성 실패 userId={} statDate={} provider={}",
+                    userId, statDate, provider, e);
+                throw e;
             }
+        }
+        if (updated > 1) {
+            // UNIQUE 키가 실제 스키마에 없거나, provider 가 NULL 인 행이 겹치면 여기로 온다.
+            log.warn("일별 집계 행이 {}개다. 리포트 합계가 중복으로 세어진다. userId={} statDate={} provider={}",
+                updated, userId, statDate, provider);
         }
 
         return bookmarkDailyStatReaderRepository

@@ -1,6 +1,5 @@
 package com.tech.n.ai.api.bookmark.service;
 
-import com.tech.n.ai.api.bookmark.dto.request.BookmarkDailyReportRequest;
 import com.tech.n.ai.api.bookmark.dto.response.BookmarkDailyReportResponse;
 import com.tech.n.ai.domain.aurora.entity.bookmark.BookmarkDailyStatEntity;
 import com.tech.n.ai.domain.aurora.repository.reader.bookmark.BookmarkDailyStatReaderRepository;
@@ -55,7 +54,7 @@ class BookmarkReportServiceTest {
                 ));
 
             BookmarkDailyReportResponse response = bookmarkReportService.getDailyReport(
-                TEST_USER_ID, new BookmarkDailyReportRequest("2026-08-01", "2026-08-03", PROVIDER));
+                TEST_USER_ID, from, to, PROVIDER);
 
             assertThat(response.days()).hasSize(3);
             assertThat(response.days().get(0).date()).isEqualTo("2026-08-01");
@@ -76,7 +75,7 @@ class BookmarkReportServiceTest {
                 .thenReturn(List.of(createStat(from, PROVIDER, 2L)));
 
             bookmarkReportService.getDailyReport(
-                TEST_USER_ID, new BookmarkDailyReportRequest("2026-05-23", "2026-08-20", PROVIDER));
+                TEST_USER_ID, from, to, PROVIDER);
 
             verify(bookmarkDailyStatReaderRepository, times(1))
                 .findRange(eq(TEST_USER_ID), eq(from), eq(to), eq(PROVIDER));
@@ -92,7 +91,7 @@ class BookmarkReportServiceTest {
                 .thenReturn(List.of());
 
             BookmarkDailyReportResponse response = bookmarkReportService.getDailyReport(
-                TEST_USER_ID, new BookmarkDailyReportRequest("2026-08-01", "2026-08-05", PROVIDER));
+                TEST_USER_ID, from, to, PROVIDER);
 
             assertThat(response.days()).isEmpty();
             assertThat(response.totalViews()).isZero();

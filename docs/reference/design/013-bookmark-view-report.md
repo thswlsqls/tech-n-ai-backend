@@ -112,6 +112,10 @@ CREATE TABLE bookmark_daily_stats (
 
 `(user_id, stat_date, provider)`에 UNIQUE 제약을 둔다. 같은 조합의 행이 둘 생기면 리포트 합계가 두 번 세어진다.
 
+단, `provider`가 NULL인 행은 이 키로 막히지 않는다. MySQL의 UNIQUE 인덱스는 NULL을 서로 다른 값으로 보기 때문이다.
+지금은 `provider`가 빈 북마크를 만드는 경로가 없어서 그대로 둔다. 실제 테이블을 만들 때 이 점을 알고 정한다.
+행이 둘 이상 갱신되면 서비스가 경고 로그를 남긴다.
+
 > 스키마는 저장소 밖에서 관리한다(`ddl-auto: none`). 위 DDL은 반영해야 할 내용을 적어 둔 것이다.
 
 ---
@@ -174,7 +178,7 @@ GET /api/v1/bookmark/reports/daily?from=2026-08-01&to=2026-08-30&provider=github
 | 정상 | 200 |
 | 날짜 형식이 `yyyy-MM-dd`가 아님 | 400 |
 | `from`이 `to`보다 늦음 | 400 |
-| 구간이 90일을 넘음 | 400 |
+| 구간이 90일을 넘음 (`from`과 `to`를 모두 포함해 센다) | 400 |
 
 ---
 

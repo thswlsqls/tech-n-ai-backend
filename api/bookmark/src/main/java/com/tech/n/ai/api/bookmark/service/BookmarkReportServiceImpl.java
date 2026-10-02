@@ -1,6 +1,5 @@
 package com.tech.n.ai.api.bookmark.service;
 
-import com.tech.n.ai.api.bookmark.dto.request.BookmarkDailyReportRequest;
 import com.tech.n.ai.api.bookmark.dto.response.BookmarkDailyReportResponse;
 import com.tech.n.ai.domain.aurora.entity.bookmark.BookmarkDailyStatEntity;
 import com.tech.n.ai.domain.aurora.repository.reader.bookmark.BookmarkDailyStatReaderRepository;
@@ -24,12 +23,9 @@ public class BookmarkReportServiceImpl implements BookmarkReportService {
     private final BookmarkDailyStatReaderRepository bookmarkDailyStatReaderRepository;
 
     @Override
-    public BookmarkDailyReportResponse getDailyReport(Long userId, BookmarkDailyReportRequest request) {
-        LocalDate from = LocalDate.parse(request.from());
-        LocalDate to = LocalDate.parse(request.to());
-
+    public BookmarkDailyReportResponse getDailyReport(Long userId, LocalDate from, LocalDate to, String provider) {
         List<BookmarkDailyStatEntity> stats =
-            bookmarkDailyStatReaderRepository.findRange(userId, from, to, request.provider());
+            bookmarkDailyStatReaderRepository.findRange(userId, from, to, provider);
 
         List<BookmarkDailyReportResponse.DailyView> days = stats.stream()
             .map(stat -> new BookmarkDailyReportResponse.DailyView(
@@ -40,6 +36,6 @@ public class BookmarkReportServiceImpl implements BookmarkReportService {
             .mapToLong(BookmarkDailyStatEntity::getViewCount)
             .sum();
 
-        return new BookmarkDailyReportResponse(request.from(), request.to(), totalViews, days);
+        return new BookmarkDailyReportResponse(from.toString(), to.toString(), totalViews, days);
     }
 }
