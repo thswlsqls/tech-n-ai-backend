@@ -22,21 +22,26 @@
 | `00-criteria.md` | 세 스테이지 공통 — 불변식 · 무효 조건 I-1~I-8 · 등급 · 출처 등급 · 유형별 조정표 · 코멘트 규격 · 게시 전 윤문 |
 | `01-stages.md` | 스테이지별로 달라지는 것 · Phase 표 · SHA 고정 · `meta.json` · 종료 조건 · 게시 게이트 PG1~PG6 · 지표 · 신호표 |
 | `02-judges.md` | 위원 공통 규칙 · 출력 형식 · 반박자 지시 · 문서 검증자 V1·V2·V3 |
+| `03-risk.md` | 자동 머지 리스크 점수 — 점수표 · 등급별 처리 · 보정 기록 |
 | `profiles/backend.md` · `frontend.md` | 리뷰 축 정의문과 위원 4인의 볼 것 / 보지 않을 것 / 등급 예시 / 측정 기준선 |
 | `_memory/learnings.md` | PR 을 넘어 누적되는 학습 |
 | `runs/<repo>-pr<N>/` | PR 하나의 작업 폴더. PR 마다 버려진다 |
-| `scripts/` | `pr-eval.sh` (유일한 게시 경로) · `watch.sh` (Stage 1 자동 트리거) · `install-entrypoints.sh` |
+| `scripts/` | `pr-eval.sh` (유일한 게시 경로) · `watch.sh` (자동 트리거) · `chain.sh` (Stage 1 부터 머지까지) · `risk.jq` (리스크 점수) · `risk-audit.sh` (머지 뒤 후속 수정 추적) · `install-entrypoints.sh` |
 | `settings.json` · `mcp.json` | 헤드리스 세션 도구 allow/deny · MCP 를 context7 하나로 묶는 설정 |
 
 ## 2. 세 스테이지
 
 | Stage | 질문 | 트리거 |
 |---|---|---|
-| 1 review | 이 PR 에 무슨 결함이 있나 | **자동** — 봇을 리뷰어로 지정하면 watcher 가 세션을 띄운다 |
-| 2 followup | 리뷰가 시킨 것을 했나 | 사람이 `/pr-eval stage2 <저장소> <PR번호>` |
-| 3 measured | 실측하면 리뷰가 버티나, 놓친 게 있나 | 사람이 `/pr-eval stage3 <저장소> <PR번호>` |
+| 1 review | 이 PR 에 무슨 결함이 있나 | 체인이 부른다. 단독으로는 `/pr-eval stage1 <저장소> <PR번호>` |
+| 2 followup | 리뷰가 시킨 것을 했나 | 체인이 부른다. 단독으로는 `/pr-eval stage2 …` |
+| 3 measured | 실측하면 리뷰가 버티나, 놓친 게 있나 | 체인이 부른다. 단독으로는 `/pr-eval stage3 …` |
 
-**자동으로 도는 것은 Stage 1 뿐이다.** 재실행도 사람이 부른다 — 리뷰어를 다시 지정해도 안 돈다. **Stage N 은 `meta.json` 에 Stage N−1 완료 기록이 있어야 돈다**(`lock` 이 막는다, 종료 코드 3).
+**기본 동작은 머지까지다.** 봇을 리뷰어로 지정하면 watcher 가 `scripts/chain.sh <저장소> <PR번호>` 를 띄우고, 체인이
+Stage 1 → 저자 반영(`/pr-eval-author`) → Stage 2 → Stage 3 → (저자 반영 → Stage 2)* → 머지 게이트 → **리스크 게이트** → `gh pr merge` 를 사람 없이 돈다.
+머지는 봇이 아니라 체인이 사용자 gh 계정으로 한다. 리스크 점수(`03-risk.md`)가 `low` 가 아니면 머지하지 않고 `chain.state=needs-human` 으로 멈춘다 —
+점수표는 봇이 PR 코멘트로 남긴다. 체인은 `meta.json` 을 보고 멈춘 자리부터 이어 가므로 손으로 다시 불러도 된다.
+리뷰어를 다시 지정해도 Stage 1 을 다시 돌지 않는다. **Stage N 은 `meta.json` 에 Stage N−1 완료 기록이 있어야 돈다**(`lock` 이 막는다, 종료 코드 3).
 
 ## 2-1. 리뷰 축과 위원 4인 — 축 배정
 
@@ -71,7 +76,8 @@
 | `reply` | `<repo> <pr> <comment_id> <body.md>` | 스레드 reply | 필요 |
 | `patch` | `<repo> <pr> <comment_id> <body.md>` | 봇 자기 코멘트 본문 정정 | 필요 |
 | `patch-review` | `<repo> <pr> <review_id> <body.md>` | 게시한 리뷰 **요약** 본문 정정. **닫힌 PR 에서는 404 다**(실측) — 열린 PR 에서만 쓴다 | 필요 |
-| `comment` | `<repo> <pr> <body.md>` | PR 에 일반 코멘트 1건 (대형 PR 보류 알림용) | 필요 |
+| `comment` | `<repo> <pr> <body.md>` | PR 에 일반 코멘트 1건 (대형 PR 보류 알림 · 리스크 점수표) | 필요 |
+| `risk` | `<repo> <pr>` | 현재 head 의 자동 머지 리스크 점수(`03-risk.md`). `meta.risk` 와 `outputs/risk.md` 에 남긴다. **`low` 가 아니면 종료 3** | 불필요 |
 
 **종료 코드** — 0 성공 · 1 사용법·인자 오류 · 2 환경(봇 토큰 파일 또는 `meta.json` 없음) · 3 게이트 위반(PG1 실패, PG5 필수 항목 누락, 대형 PR 컷, **스테이지 순서 위반**) · 4 GitHub API 실패 · 5 락 점유 중.
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # chain.sh — PR 하나를 Stage 1 → 저자 반영 → Stage 2 → Stage 3 → (저자 반영 → Stage 2)* → 머지까지 사람 없이 돌린다.
+# 머지는 머지 게이트와 리스크 게이트(03-risk.md, low 만 통과)를 둘 다 넘어야 한다. 아니면 needs-human 으로 멈춘다.
 # 어디까지 했는지는 meta.json 과 outputs/author/round-NN.json 으로 판단하므로, 중간에 죽어도 다시 부르면 이어서 간다.
 # 사람에게 물을 자리는 세션 쪽에서 권장안으로 정한다(--auto). 머지 여부만은 세션이 아니라 여기서 판정한다.
 set -euo pipefail
@@ -90,7 +91,14 @@ merge_gate() {
   local a head pr_json reasons=()
   a="$(last_author)"
   head="$(head_sha)"
-  pr_json="$(gh pr view "$PR" --repo "$OWNER/$REPO" --json state,isDraft,mergeable)"
+  GATE_SHA="$head"   # 리스크 게이트와 머지가 이 커밋에 묶인다
+  # mergeable 은 GitHub 가 계산을 마칠 때까지 UNKNOWN 이다. 오래된 PR 일수록 첫 조회에서 자주 나온다
+  local i
+  for i in 1 2 3 4 5 6; do
+    pr_json="$(gh pr view "$PR" --repo "$OWNER/$REPO" --json state,isDraft,mergeable)"
+    [ "$(jq -r '.mergeable' <<<"$pr_json")" != "UNKNOWN" ] && break
+    sleep 10
+  done
 
   [ "$(jq -r '.state' <<<"$pr_json")" = "OPEN" ] || reasons+=("PR 이 열려 있지 않다")
   [ "$(jq -r '.isDraft' <<<"$pr_json")" = "false" ] || reasons+=("draft 다")
@@ -111,13 +119,31 @@ merge_gate() {
   fi
 }
 
+# 리스크 게이트 (03-risk.md) — 다른 게이트를 다 통과한 PR 만 점수를 매긴다. 점수표는 레벨과 상관없이 PR 에 남긴다.
+risk_gate() {
+  local rc=0
+  "$PR_EVAL" risk "$REPO" "$PR" >/dev/null || rc=$?
+  [ "$rc" = 0 ] || [ "$rc" = 3 ] || { chain_state "blocked" "리스크 판정 실패(종료 $rc)"; exit 4; }
+  # 머지 게이트를 본 뒤 push 가 들어왔으면 점수는 게이트가 보지 않은 커밋의 것이다
+  [ "$(jq -r '.risk.sha' "$M")" = "$GATE_SHA" ] \
+    || { chain_state "blocked" "머지 게이트(${GATE_SHA:0:7}) 뒤에 head 가 바뀌었다 — 체인을 다시 부른다"; exit 3; }
+  if [ "$(jq -r '.risk.commented_sha // empty' "$M")" != "$(jq -r '.risk.sha' "$M")" ]; then
+    "$PR_EVAL" comment "$REPO" "$PR" "$RUN/outputs/risk.md" >/dev/null \
+      && meta_set '.risk.commented_sha = .risk.sha' \
+      || log "리스크 코멘트 게시 실패 — 판정은 meta.json 에 남았다"
+  fi
+  if [ "$rc" = 3 ]; then
+    chain_state "needs-human" "리스크 $(jq -r '.risk.level' "$M") $(jq -r '.risk.score' "$M")점 — 사람이 승인해야 머지한다"
+    exit 3
+  fi
+}
+
 do_merge() {
-  local head; head="$(head_sha)"
-  # --match-head-commit: 게이트를 본 뒤 누가 push 했으면 머지하지 않는다
-  gh pr merge "$PR" --repo "$OWNER/$REPO" --merge --match-head-commit "$head" \
+  # --match-head-commit: 게이트가 본 커밋을 넘긴다. head 를 새로 읽으면 그 사이 push 된 커밋이 그대로 머지된다
+  gh pr merge "$PR" --repo "$OWNER/$REPO" --merge --match-head-commit "$GATE_SHA" \
     || { chain_state "blocked" "gh pr merge 실패"; exit 4; }
-  meta_set '.chain.merged_sha = $s' --arg s "$head"
-  chain_state "merged" "head=$head"
+  meta_set '.chain.merged_sha = $s' --arg s "$GATE_SHA"
+  chain_state "merged" "head=$GATE_SHA"
 }
 
 # ---------- 본체 ----------
@@ -164,4 +190,5 @@ done
 
 chain_state "merge-gate"
 merge_gate
+risk_gate
 do_merge

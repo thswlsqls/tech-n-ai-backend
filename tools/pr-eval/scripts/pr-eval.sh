@@ -31,6 +31,7 @@ usage: pr-eval.sh <subcommand> <repo> <pr> [args]
     meta       <repo> <pr>                   meta.json 을 출력한다
     precheck   <repo> <pr>                   대형 PR 컷(파일 50 / 줄 3000) 을 판정한다
     ranges     <repo> <pr> <sha>            inline 앵커를 달 수 있는 줄 범위를 낸다 (위원 프롬프트용)\n    gate1      <repo> <pr> <sha> <comments.json>   PG1 — 앵커가 diff 안인지 검사한다
+    risk       <repo> <pr>                   자동 머지 리스크 점수 (03-risk.md). low 가 아니면 3
 
   상태
     init       <repo> <pr> [--reset-eval]    runs/<repo>-pr<N>/ 와 meta.json 을 만든다
@@ -191,6 +192,45 @@ cmd_gate1() {
     return "$E_GATE"
   fi
   echo "PG1 통과 — 앵커 $total 건 전부 diff 안이다 (기준 SHA $sha)"
+}
+
+# 자동 머지 리스크 점수 (03-risk.md). 현재 head 의 PR diff 로 매기고 meta.risk 와 outputs/risk.md 에 남긴다.
+# low 면 0, 그 밖이면 3 — 사람이 승인해야 머지된다는 뜻이다.
+cmd_risk() {
+  local repo="$1" pr="$2" d m sha
+  need_meta "$repo" "$pr"
+  d="$(run_dir "$repo" "$pr")"; m="$(meta_path "$repo" "$pr")"
+  sha="$(cmd_sha "$repo" "$pr")"
+  mktmp; local tmp="$TMP"
+  api --paginate "repos/$OWNER/$repo/pulls/$pr/files" | jq -s 'add // []' > "$tmp/files.json"
+  # jq 문법 오류는 종료 3 이라 게이트 위반(E_GATE)과 섞인다. 판정 실패로 따로 끝낸다
+  jq --arg sha "$sha" --arg at "$(now_iso)" -f "$HARNESS_DIR/scripts/risk.jq" "$tmp/files.json" > "$tmp/risk.json" \
+    || die "$E_API" "risk.jq 계산 실패"
+
+  # 같은 head·같은 점수로 이미 코멘트를 달았으면 그 기록을 이어 받는다 (chain.sh 가 중복 게시를 막는 데 쓴다).
+  # 규칙이 바뀌어 점수가 달라지면 이어 받지 않는다 — PR 에 남은 점수표가 낡은 채로 남지 않게
+  meta_update "$repo" "$pr" '.risk = ($r[0] + {commented_sha: (if .risk.sha == $r[0].sha and .risk.score == $r[0].score and .risk.level == $r[0].level
+                                                               then .risk.commented_sha else null end)})' \
+    --slurpfile r "$tmp/risk.json"
+
+  jq -r '
+    def action: {low: "다른 머지 게이트를 모두 통과하면 자동으로 머지합니다.",
+                 medium: "자동 머지하지 않습니다. 사람 1명이 확인한 뒤 직접 머지합니다.",
+                 high: "자동 머지하지 않습니다. 걸린 항목을 아는 사람이 리뷰한 뒤 머지합니다.",
+                 critical: "자동 머지하지 않습니다. 사람이 PR 을 쪼갤지부터 판단합니다."}[.level];
+    def files: if length == 0 then "" elif length <= 2 then " — " + (map("`\(.)`") | join(", "))
+               else " — `\(.[0])` 외 \(length - 1)건" end;
+    "**자동 머지 리스크 \(.score) / 100 — `\(.level)`** · 기준 커밋 `\(.sha[0:7])`\n",
+    (if .override then "**\(.override)**입니다. 자동 머지하지 않습니다. 비밀값을 빼고, 이미 올라간 값은 교체한 뒤 사람이 다시 봅니다.\n" else "\(action)\n" end),
+    "| 항목 | 점수 | 걸린 신호 |", "|---|---|---|",
+    (.categories[] | "| \(.title) | \(.points) / \(.max) | \([.signals[] | select(.points > 0) | "\(.name) \(.points)\(.hits | files)"] | join("<br>") | if . == "" then "-" else . end) |"),
+    "| **합계** | **\(.score)** / 100 | |\n",
+    "low 0–14 자동 머지 · medium 15–39 사람 1명 승인 · high 40–69 해당 분야 리뷰 · critical 70+ 또는 평문 비밀값. low 가 아니면 체인은 머지하지 않고 사람에게 넘깁니다.",
+    "파일 경로와 변경 줄 수만 보고 기계로 매긴 점수입니다. 코드 품질 판정이 아니라, 잘못됐을 때 얼마나 아픈 변경인지를 잽니다. 규칙은 `tools/pr-eval/03-risk.md` 에 있습니다."
+  ' "$tmp/risk.json" > "$d/outputs/risk.md"
+  cat "$d/outputs/risk.md"
+
+  [ "$(jq -r '.level' "$tmp/risk.json")" = "low" ] || return "$E_GATE"
 }
 
 # ---------- 상태 ----------
@@ -421,6 +461,7 @@ case "$sub" in
   precheck)    [ $# -eq 2 ] || usage; cmd_precheck "$@" ;;
   ranges)      [ $# -eq 3 ] || usage; cmd_ranges "$@" ;;
   gate1)       [ $# -eq 4 ] || usage; cmd_gate1 "$@" ;;
+  risk)        [ $# -eq 2 ] || usage; cmd_risk "$@" ;;
   init)        [ $# -ge 2 ] && [ $# -le 3 ] || usage; cmd_init "$@" ;;
   lock)        [ $# -eq 3 ] || usage; cmd_lock "$@" ;;
   unlock)      [ $# -eq 2 ] || usage; cmd_unlock "$@" ;;
