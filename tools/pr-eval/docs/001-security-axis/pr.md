@@ -72,6 +72,10 @@ configuration.setAllowedOrigins(allowedOrigins);
 기본값은 로컬에서 띄우는 프런트엔드 둘(`app` 3000, `admin` 3001)이다.
 **서비스별 `application.yml` 은 안 고쳤다.** 기본값이 있어서 설정을 안 넣어도 로컬은 그대로 돌고,
 환경별 도메인은 필요한 곳에서 `security.cors.allowed-origins` 로 덮으면 된다.
+beta·prod 는 `devops/terraform/envs/{beta,prod}/services.tf` 의 `common_env` 에
+`SECURITY_CORS_ALLOWED_ORIGINS` 를 넣어, gateway 의 `application-{beta,prod}.yml` 과 같은 오리진을 쓰게 했다.
+`@Value` 로 `List<String>` 을 받으므로 값은 콤마로 이은 한 줄 문자열이다. dev 는 gateway 가 `http://localhost:*` 를
+허용해 기본값과 겹치므로 넣지 않았다.
 코드에 남아 있던 TODO 는 지웠다 — 이제 좁히는 수단이 코드 밖에 있다.
 
 `setAllowCredentials(false)` 는 그대로 뒀다. 지금 인증은 `Authorization` 헤더로 하고 쿠키를 안 쓴다.
@@ -122,7 +126,7 @@ Phase 0 부터 게시까지 도는 라운드에서 돈 적은 없다. 이 PR 이
 그리고 고치는 대상이, §8-2 에서 `R-I` 위원이 **찾아 놓고 무효 조건 I-8("이 PR 이 만든 것인가")에 걸려
 접어 둔 바로 그 둘**이다. 축은 제대로 동작했는데 접힌 결함은 main 에 남아 있었다.
 
-이 PR 의 `main…head` 에 다섯 신호를 돌린 결과다.
+이 PR 의 `main…head` 에 다섯 신호를 돌린 결과다. `3152201` 에서 센 값이다 — `d86dbf6` 에서는 신호1 이 `10` 이고 판정은 같다.
 
 | 신호1 | 신호2 | 신호3 | 신호4 | 신호5 | 판정 |
 |---|---|---|---|---|---|
@@ -137,7 +141,7 @@ Phase 0 부터 게시까지 도는 라운드에서 돈 적은 없다. 이 PR 이
 
 | 무엇 | 결과 |
 |---|---|
-| `./gradlew :common-security:compileJava` | 통과 |
+| `./gradlew :common-security:test` | 새로 넣은 `SecurityConfigCorsTest` 2건 통과 |
 | `./gradlew :api-emerging-tech:compileJava` | 통과 |
 | `./gradlew :api-auth:test --rerun` | 181건 중 **178건 통과 · 3건 skipped**, 실패 0 · 오류 0. skipped 3건은 이 PR 이전부터 있던 `@Disabled` 다 |
 | 저장소 전체에 남은 값 재검색 | `git grep` 으로 `Password123!` · `Admin123!` · 개인 이메일 두 개를 다시 훑었다. 남은 것은 아래 「남는 것」에 적은 셋뿐이다 |
@@ -147,8 +151,9 @@ Phase 0 부터 게시까지 도는 라운드에서 돈 적은 없다. 이 PR 이
 **테스트 건수를 고쳐 적었다.** 이 PR 의 앞선 초안은 "181건 전부 통과" 라고 썼는데, 실제로는 3건이
 skipped 다. eval-bot 리뷰가 짚어 준 것을 재실행으로 확인했다.
 
-**`common/security` 에는 테스트 소스셋이 없다.** 그래서 CORS 변경은 컴파일과, 이 모듈을 쓰는
-`api-auth` 의 테스트로만 확인했다. 오리진 목록이 실제로 응답 헤더에 어떻게 실리는지는 확인하지 않았다.
+**`common/security` 에 테스트를 하나 더했다.** `SecurityConfigCorsTest` 가 설정이 없을 때 기본값 두 개가,
+콤마로 이은 값을 줬을 때 그 목록이 `CorsConfiguration` 에 그대로 들어가는지 확인한다.
+오리진 목록이 실제로 응답 헤더에 어떻게 실리는지는 서비스를 띄워 확인하지 않았다.
 `api-emerging-tech` 쪽도 컴파일까지만 확인했다.
 
 ## 남는 것
@@ -158,8 +163,8 @@ skipped 다. eval-bot 리뷰가 짚어 준 것을 재실행으로 확인했다.
 - **`docker/init/auth/02-init-data.sql` 은 안 고쳤다.** 로컬 docker 컨테이너에만 들어가는 시드 데이터다.
   비밀번호는 BCrypt 해시로 들어가 있고 평문은 주석(`Admin1234!`)뿐이지만, 개인 이메일이 계정 식별자로 박혀 있다.
   이 값을 바꾸면 로컬에서 로그인하는 계정 자체가 바뀌어 `.http` 흐름이 같이 흔들리므로 따로 판단할 문제로 뒀다.
-- **CORS 설정 키를 채우는 곳은 아직 없다.** 네 서비스에 비-local 프로필 파일 자체가 없어서 이 키만의 문제는
-  아니다. beta·prod 를 처음 띄우는 시점에 `security.cors.allowed-origins` 를 넣어야 한다.
+- **beta·prod 오리진 값은 gateway 설정의 자리표시자(`example.com`)를 그대로 따랐다.** 실제 도메인이 정해지면
+  gateway 의 `application-{beta,prod}.yml` 과 `services.tf` 두 곳을 같이 바꿔야 한다. `terraform plan` 은 돌리지 않았다.
 - **frontend 프로파일의 보안 축은 손대지 않았다.** `docs/001-security-axis.md` §9 가 미뤄 둔 그대로다.
 
-Closes #N
+Closes #35
