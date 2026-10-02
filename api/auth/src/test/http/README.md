@@ -9,8 +9,9 @@
 ```
 http/
 ├── README.md                           # 이 파일
-├── http-client.env.json                # 환경별 공개 변수 (baseUrl, testEmail 등)
-├── http-client.private.env.json        # 환경별 비공개 변수 (토큰 등) - Git 제외
+├── http-client.env.json                # 환경별 공개 변수 (baseUrl, testUsername 등)
+├── http-client.private.env.json.template  # 비공개 변수 견본 — 복사해서 아래 파일을 만든다
+├── http-client.private.env.json        # 환경별 비공개 변수 (이메일·비밀번호·토큰) - Git 제외
 ├── 01-signup.http                      # 회원가입 API 테스트
 ├── 02-login.http                       # 로그인 API 테스트
 ├── 03-logout.http                      # 로그아웃 API 테스트
