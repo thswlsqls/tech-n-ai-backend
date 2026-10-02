@@ -372,11 +372,8 @@
     "successCount": 8,
     "newCount": 6,
     "duplicateCount": 2,
-    "failureCount": 2,
-    "failureMessages": [
-      "index 3: Invalid provider value",
-      "index 7: URL is required"
-    ]
+    "failureCount": 0,
+    "failureMessages": []
   }
 }
 ```
