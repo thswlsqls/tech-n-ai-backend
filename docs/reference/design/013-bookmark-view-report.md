@@ -147,6 +147,7 @@ POST /api/v1/bookmark/{id}/views
 | 정상 | 200 |
 | 본인 북마크가 아님 | 403 |
 | 없는 북마크 · 삭제된 북마크 | 404 |
+| 같은 날의 첫 조회 두 건이 동시에 들어와 늦은 쪽이 UNIQUE 키에 막힘 | 400 (`VALIDATION_ERROR`). 서비스가 다시 던진 `DataIntegrityViolationException` 을 전역 핸들러가 받는다. 다시 요청하면 200 이다 |
 
 ### 4.2 일별 리포트
 
