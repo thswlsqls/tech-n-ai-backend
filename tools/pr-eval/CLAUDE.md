@@ -144,7 +144,13 @@ chmod 600 ~/.config/pr-eval/bot.env
 ### 5-3. 진입점 설치
 
 `.claude/` 는 gitignore 되므로 clone 한 머신마다 `tools/pr-eval/scripts/install-entrypoints.sh` 를 한 번 돌린다. `.claude/commands/pr-eval.md` 와 `.claude/agents/pr-eval-judge.md` 를 재생성한다.
-두 settings 파일과 명령 문서는 스크립트를 이 머신의 절대 경로(`/Users/m1/workspace/tech-n-ai/tech-n-ai-backend/...`)로 부른다. 다른 머신에서는 그 경로를 고쳐야 세션이 스크립트를 부를 수 있다.
+두 settings 파일과 명령 문서는 스크립트를 이 머신의 절대 경로(`/Users/m1/workspace/tech-n-ai/tech-n-ai-backend/...`)로 부른다. 다른 위치에 clone 했으면 아래처럼 하니스 안의 경로를 한 번에 바꾸고 이 스크립트를 다시 돌린다. 경로가 안 맞으면 `chain.sh` 와 이 스크립트가 종료 2 로 멈춘다.
+
+```bash
+NEW_WS="$(cd "$(git rev-parse --show-toplevel)/.." && pwd)"   # backend·frontend 저장소와 워크트리 폴더가 있는 곳
+grep -rlF /Users/m1/workspace/tech-n-ai/ tools/pr-eval --exclude-dir=runs --exclude-dir=docs \
+  | xargs sed -i '' "s|/Users/m1/workspace/tech-n-ai/|$NEW_WS/|g"
+```
 
 ### 5-4. watcher 상시 실행 (선택)
 
