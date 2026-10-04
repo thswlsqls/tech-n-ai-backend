@@ -273,6 +273,7 @@ stage_sha       = Stage 2/3 시작 시점 head
              "comments": [{"id": 999, "code": "P-01", "path": "…", "line": 25,
                            "axis": "R-A · R-B", "grade": "경미"}],
              "replies": {"C-02": 1001}},   // 스레드 reply 는 여기 남긴다
+  "chain": {"sessions": [{"step": "stage1", "try": 1, "at": "…", "duration_ms": 0, "cost_usd": 0, "num_turns": 0, "is_error": false}]},   // chain.sh 가 세션마다 덧붙인다
 
   "status": "대기|진행|완료|보류(대형PR)|보류(실패)"   // 보류면 watcher 가 건너뛴다
 }

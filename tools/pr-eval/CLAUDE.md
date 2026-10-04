@@ -41,6 +41,8 @@
 Stage 1 → 저자 반영(`/pr-eval-author`) → Stage 2 → Stage 3 → (저자 반영 → Stage 2)* → 머지 게이트 → **리스크 게이트** → `gh pr merge` 를 사람 없이 돈다.
 머지는 봇이 아니라 체인이 사용자 gh 계정으로 한다. 리스크 점수(`03-risk.md`)가 `low` 가 아니면 머지하지 않고 `chain.state=needs-human` 으로 멈춘다 —
 점수표는 봇이 PR 코멘트로 남긴다. 체인은 `meta.json` 을 보고 멈춘 자리부터 이어 가므로 손으로 다시 불러도 된다.
+체인이 띄운 헤드리스 세션마다 걸린 시간·비용·턴 수가 `meta.json` 의 `chain.sessions[]` 에 한 줄씩 쌓인다(`claude -p --output-format json` 의 `duration_ms`·`total_cost_usd`·`num_turns`·`is_error`).
+watcher 는 저장소 소유자가 연 PR(`authorAssociation=OWNER`)만 체인에 넣는다 — 남의 PR 본문·diff 가 사용자 계정으로 push·머지하는 세션에 들어가지 않게 한다.
 리뷰어를 다시 지정해도 Stage 1 을 다시 돌지 않는다. **Stage N 은 `meta.json` 에 Stage N−1 완료 기록이 있어야 돈다**(`lock` 이 막는다, 종료 코드 3).
 
 ## 2-1. 리뷰 축과 위원 4인 — 축 배정

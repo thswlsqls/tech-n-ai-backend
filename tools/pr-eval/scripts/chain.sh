@@ -38,19 +38,26 @@ author_count() { find "$AUTHOR_DIR" -name 'round-*.json' | wc -l | tr -d ' '; }
 last_author() { find "$AUTHOR_DIR" -name 'round-*.json' | sort | tail -1; }
 
 # 헤드리스 세션 하나를 띄운다. 도구 권한·MCP 를 이 머신 설정과 떼어 놓는 이유는 watch.sh 주석과 같다.
-run_session() {  # run_session <settings.json> <프롬프트>
-  local settings="$1" prompt="$2" add_dirs=() d
+run_session() {  # run_session <settings.json> <프롬프트> <단계 이름> <시도 번호>
+  local settings="$1" prompt="$2" name="$3" try="$4" add_dirs=() d out
   for d in "$WS_ROOT/tech-n-ai-backend-worktrees" "$WS_ROOT/tech-n-ai-frontend" \
            "$WS_ROOT/tech-n-ai-frontend-worktrees"; do
     [ -d "$d" ] && add_dirs+=("$d")
   done
-  ( cd "$REPO_ROOT" && claude -p --permission-mode acceptEdits \
+  out="$( cd "$REPO_ROOT" && claude -p --output-format json --permission-mode acceptEdits \
       --settings "$settings" \
       --mcp-config tools/pr-eval/mcp.json --strict-mcp-config \
       --disallowedTools AskUserQuestion \
       --append-system-prompt "체인 모드다. 사람은 응답하지 않는다. 사람에게 묻거나 확인을 기다리지 말고, 규칙 문서가 권하는 쪽(권장안)으로 정해 진행한다. 정한 것은 tools/pr-eval/runs/$REPO-pr$PR/decisions.md 에 '시각 · 단계 · 상황 · 고른 쪽 · 이유' 한 줄로 덧붙인다." \
       ${add_dirs[0]+--add-dir "${add_dirs[@]}"} \
-      -- "$prompt" ) < /dev/null || log "세션이 0 이 아닌 코드로 끝났다 — 기록으로 성공 여부를 판단한다"
+      -- "$prompt" < /dev/null )" || log "세션이 0 이 아닌 코드로 끝났다 — 기록으로 성공 여부를 판단한다"
+  # 결과 텍스트는 예전처럼 로그로 흘린다. JSON 이 아니면 받은 그대로 찍는다
+  jq -r '.result // empty' <<<"$out" 2>/dev/null || printf '%s\n' "$out"
+  # 단계별 시간·비용을 남긴다 — 작은 PR 에서 단계를 줄여도 되는지 판단할 근거
+  { jq -e . <<<"$out" >/dev/null 2>&1 && meta_set '.chain.sessions = ((.chain.sessions // []) + [{step:$s, try:$t,
+      at:$at, duration_ms:$r.duration_ms, cost_usd:$r.total_cost_usd, num_turns:$r.num_turns, is_error:$r.is_error}])' \
+      --arg s "$name" --argjson t "$try" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --argjson r "$out"; } \
+    || log "세션 결과를 JSON 으로 못 읽어 meta.json 에 시간·비용을 남기지 못했다"
 }
 
 # 단계 하나를 돌리고, 기대한 기록이 남았는지로 성공을 판정한다. 두 번 다 실패하면 체인을 멈춘다.
@@ -58,7 +65,7 @@ step() {  # step <이름> <완료 판정 함수> <settings> <프롬프트>
   local name="$1" check="$2" settings="$3" prompt="$4" t
   for (( t=1; t<=MAX_STEP_TRIES; t++ )); do
     chain_state "$name" "시도 $t"
-    run_session "$settings" "$prompt"
+    run_session "$settings" "$prompt" "$name" "$t"
     "$check" && return 0
     log "$name 이 기록을 남기지 못했다 (시도 $t)"
   done

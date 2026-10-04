@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # pr-eval.sh — PR eval harness 의 유일한 GitHub 게시 경로.
 # 세션은 봇 토큰을 갖지 않는다. 이 스크립트가 자기 안에서 읽는다.
-# 계약(서브커맨드·종료 코드)은 tools/pr-eval/README.md §3 에 있다.
+# 계약(서브커맨드·종료 코드)은 tools/pr-eval/CLAUDE.md §3 에 있다.
 set -euo pipefail
 
 OWNER="${PR_EVAL_OWNER:-thswlsqls}"
@@ -30,7 +30,8 @@ usage: pr-eval.sh <subcommand> <repo> <pr> [args]
     sha        <repo> <pr>                   현재 head SHA 를 출력한다
     meta       <repo> <pr>                   meta.json 을 출력한다
     precheck   <repo> <pr>                   대형 PR 컷(파일 50 / 줄 3000) 을 판정한다
-    ranges     <repo> <pr> <sha>            inline 앵커를 달 수 있는 줄 범위를 낸다 (위원 프롬프트용)\n    gate1      <repo> <pr> <sha> <comments.json>   PG1 — 앵커가 diff 안인지 검사한다
+    ranges     <repo> <pr> <sha>            inline 앵커를 달 수 있는 줄 범위를 낸다 (위원 프롬프트용)
+    gate1      <repo> <pr> <sha> <comments.json>   PG1 — 앵커가 diff 안인지 검사한다
     risk       <repo> <pr>                   자동 머지 리스크 점수 (03-risk.md). low 가 아니면 3
 
   상태
@@ -75,7 +76,7 @@ meta_update() {
 }
 
 load_bot_token() {
-  [ -f "$BOT_ENV" ] || die "$E_ENV" "봇 토큰 파일이 없다: $BOT_ENV (README §2 참고)"
+  [ -f "$BOT_ENV" ] || die "$E_ENV" "봇 토큰 파일이 없다: $BOT_ENV (CLAUDE.md §5-2 참고)"
   # shellcheck disable=SC1090
   set +u; . "$BOT_ENV"; set -u
   local tok="${PR_EVAL_BOT_TOKEN:-${GH_TOKEN:-}}"

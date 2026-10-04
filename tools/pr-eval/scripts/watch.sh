@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# watch.sh — 봇에게 리뷰 요청이 걸린 PR 을 찾아 Stage 1 세션을 띄운다.
-# 자동으로 도는 것은 Stage 1 뿐이다. Stage 2·3 은 사람이 /pr-eval 을 부를 때만 돈다.
+# watch.sh — 봇에게 리뷰 요청이 걸린 PR 을 찾아 체인(scripts/chain.sh)을 띄운다.
+# 체인이 Stage 1 부터 머지까지 사람 없이 돈다. 단계별로 따로 돌릴 때는 사람이 /pr-eval 을 부른다.
 # launchd StartInterval 60 으로 상시 실행한다. --once 는 디버깅 경로다.
 set -euo pipefail
 
@@ -36,21 +36,24 @@ run_once() {
   local prs n
   # watcher 가 GitHub 에 던지는 질의는 이것 하나뿐이다. PR 코멘트를 폴링하지 않는다.
   prs="$(gh search prs --owner "$OWNER" --review-requested="$BOT" --state=open \
-          --json number,repository,isDraft 2>/dev/null || echo '[]')"
+          --json number,repository,isDraft,authorAssociation 2>/dev/null || echo '[]')"
   n="$(jq 'length' <<<"$prs")"
   [ "$n" -gt 0 ] || { log "리뷰 요청 없음"; return 0; }
 
   local i
   for (( i=0; i<n; i++ )); do
-    local pr repo draft m
+    local pr repo draft assoc m
     pr="$(jq -r ".[$i].number" <<<"$prs")"
     repo="$(jq -r ".[$i].repository.name" <<<"$prs")"
     draft="$(jq -r ".[$i].isDraft" <<<"$prs")"
+    assoc="$(jq -r ".[$i].authorAssociation" <<<"$prs")"
 
     # 1) 프로파일을 모르는 저장소 — 질의가 --owner 단위라 밖의 PR 도 걸려 온다.
     known_profile "$repo" || { log "skip $repo#$pr — 프로파일 없음"; continue; }
     # 2) draft
     [ "$draft" = "false" ] || { log "skip $repo#$pr — draft"; continue; }
+    # 2-1) 저장소 소유자가 연 PR 만 — 저장소가 public 이라, 남의 PR 이면 본문·diff 가 사용자 계정으로 push·머지하는 세션에 그대로 들어간다
+    [ "$assoc" = "OWNER" ] || { log "skip $repo#$pr — 작성자가 소유자가 아니다($assoc)"; continue; }
 
     m="$HARNESS_DIR/runs/$repo-pr$pr/meta.json"
     if [ -f "$m" ]; then
