@@ -160,9 +160,15 @@ chmod 600 ~/.config/pr-eval/bot.env
 <string>/Users/m1/workspace/tech-n-ai/tech-n-ai-backend</string>
 ```
 
+**지금 쓰는 plist 는 머지를 막아 둔다.** `EnvironmentVariables.PATH` 맨 앞에 `~/.config/pr-eval/no-merge-bin` 이 있고,
+그 안의 `gh` 래퍼가 `gh pr merge` 와 `gh api .../pulls/<N>/merge` 만 `exit 1` 로 거절한다(나머지 명령은 `/opt/homebrew/bin/gh` 로 넘긴다).
+그래서 launchd 로 돈 체인은 머지 게이트를 지나도 `chain.state=blocked`("gh pr merge 실패")로 끝나고, 로그에 `[no-merge] gh pr merge 차단` 이 찍힌다.
+자동 머지를 다시 켜려면 PATH 에서 이 경로를 빼고 `launchctl bootout` 뒤 다시 `bootstrap` 한다.
+래퍼가 없는 PATH 로 직접 띄운 `watch.sh`·`chain.sh` 는 이 차단을 받지 않는다.
+
 머신이 꺼져 있으면 안 돈다. 켜면 폴링이라 밀린 것부터 처리한다. **한 번에 한 건씩 순서대로 처리한다** — PR A 가 도는 동안 PR B 에 리뷰어를 걸어도 A 가 끝나야 뜬다.
 
-**수동 호출에는 `--settings` 가 안 걸린다.** 헤드리스 세션은 호출줄에서 도구 권한을 강제하지만 사람이 여는 대화형 세션은 평소 설정으로 돈다. 같은 보증을 걸려면 수동 호출도 `claude --settings tools/pr-eval/settings.json` 으로 띄운다.
+**수동 호출에는 `--settings` 가 안 걸린다.** 헤드리스 세션은 호출줄에서 도구 권한을 강제하지만 사람이 여는 대화형 세션은 평소 설정으로 돈다. 같은 보증을 걸려면 수동 호출도 `claude --settings tools/pr-eval/settings.json --setting-sources project --permission-mode dontAsk` 로 띄운다.
 
 ## 6. 실측으로 확인된 것 — 다시 실험하지 않는다
 
