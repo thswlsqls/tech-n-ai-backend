@@ -127,6 +127,7 @@ docs/monitoring/.venv/
 !/docs/reference/design/005-chatbot-hybrid-search-score-fusion.md
 !/docs/reference/design/006-chatbot-session-title-generation.md
 !/docs/reference/design/008-api-gateway-improvement.md
+!/docs/reference/design/013-bookmark-view-report.md
 !/docs/reference/guide/003-mysql-docker-local-setup.md
 ### AI coding tool local config ###
 /.claude/
