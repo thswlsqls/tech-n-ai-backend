@@ -6,6 +6,9 @@
 set -euo pipefail
 
 OWNER="${PR_EVAL_OWNER:-thswlsqls}"
+# 봇 로그인은 watch.sh 와 같은 방식으로 bot.env 에서 값만 꺼낸다. 머지 게이트가 봇 리뷰를 찾을 때 쓴다
+BOT_ENV="${PR_EVAL_BOT_ENV:-$HOME/.config/pr-eval/bot.env}"
+BOT="${PR_EVAL_BOT:-$(sed -n 's/^BOT_LOGIN=//p' "$BOT_ENV" 2>/dev/null | tr -d "\"'" | head -1 || true)}"
 HARNESS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO_ROOT="$(cd "$HARNESS_DIR/../.." && pwd)"
 WS_ROOT="$(cd "$REPO_ROOT/.." && pwd)"
@@ -18,6 +21,7 @@ die() { log "$1"; exit "${2:-1}"; }
 
 [ $# -eq 2 ] || { echo "usage: chain.sh <repo> <pr>" >&2; exit 1; }
 REPO="$1"; PR="$2"
+[ -n "$BOT" ] || { echo "봇 로그인을 못 찾았다: $BOT_ENV 의 BOT_LOGIN 또는 PR_EVAL_BOT 을 설정하라" >&2; exit 2; }
 RUN="$HARNESS_DIR/runs/$REPO-pr$PR"
 M="$RUN/meta.json"
 AUTHOR_DIR="$RUN/outputs/author"
@@ -44,11 +48,14 @@ run_session() {  # run_session <settings.json> <프롬프트> <단계 이름> <�
            "$WS_ROOT/tech-n-ai-frontend-worktrees"; do
     [ -d "$d" ] && add_dirs+=("$d")
   done
-  out="$( cd "$REPO_ROOT" && claude -p --output-format json --permission-mode acceptEdits \
-      --settings "$settings" \
+  # --setting-sources project: .claude/settings.local.json 의 allow·훅과 ~/.claude/settings.json 을 읽지 않는다.
+  # user 만 남기면 .claude/commands·agents 도 안 읽혀 /pr-eval 이 없어진다(실측). --settings 는 이 값과 상관없이 읽힌다
+  # dontAsk: allow 에 없는 것은 묻지 않고 거부한다. acceptEdits 는 작업 폴더 안 편집과 mkdir·rm·mv 등을 allow 와 상관없이 승인했다(실측)
+  out="$( cd "$REPO_ROOT" && claude -p --output-format json --permission-mode dontAsk \
+      --setting-sources project --settings "$settings" \
       --mcp-config tools/pr-eval/mcp.json --strict-mcp-config \
       --disallowedTools AskUserQuestion \
-      --append-system-prompt "체인 모드다. 사람은 응답하지 않는다. 사람에게 묻거나 확인을 기다리지 말고, 규칙 문서가 권하는 쪽(권장안)으로 정해 진행한다. 정한 것은 tools/pr-eval/runs/$REPO-pr$PR/decisions.md 에 '시각 · 단계 · 상황 · 고른 쪽 · 이유' 한 줄로 덧붙인다." \
+      --append-system-prompt "체인 모드다. 사람은 응답하지 않는다. 사람에게 묻거나 확인을 기다리지 말고, 규칙 문서가 권하는 쪽(권장안)으로 정해 진행한다. 정한 것은 tools/pr-eval/runs/$REPO-pr$PR/decisions.md 에 '시각 · 단계 · 상황 · 고른 쪽 · 이유' 한 줄로 Edit·Write 도구로 덧붙인다(mv·cp 는 권한에서 거부되므로 '> tmp && mv' 방식은 쓰지 않는다)." \
       ${add_dirs[0]+--add-dir "${add_dirs[@]}"} \
       -- "$prompt" < /dev/null )" || log "세션이 0 이 아닌 코드로 끝났다 — 기록으로 성공 여부를 판단한다"
   # 결과 텍스트는 예전처럼 로그로 흘린다. JSON 이 아니면 받은 그대로 찍는다
@@ -124,6 +131,11 @@ merge_gate() {
      && ! { [ "$(jq -r '.pushed' "$a")" = "false" ] && [ "$head" = "$(jq -r '.to_sha' "$a")" ]; }; then
     reasons+=("head $head 를 아무 단계도 판정하지 않았다")
   fi
+  # 위 기록은 세션이 쓴 파일이라 고쳐 쓸 수 있다. 봇이 이 head 에 리뷰나 reply 를 실제로 남겼는지 GitHub 에서 본다
+  local bot_reviews
+  bot_reviews="$(gh api --paginate "repos/$OWNER/$REPO/pulls/$PR/reviews" \
+    | jq -s --arg b "$BOT" --arg s "$head" '[add // [] | .[] | select(.user.login == $b and .commit_id == $s)] | length')" || bot_reviews=""
+  [ "${bot_reviews:-0}" -gt 0 ] || reasons+=("봇($BOT)이 head $head 에 남긴 리뷰를 GitHub 에서 찾지 못했다")
 
   if [ ${#reasons[@]} -gt 0 ]; then
     chain_state "blocked" "머지 게이트: $(IFS='; '; echo "${reasons[*]}")"
@@ -168,6 +180,10 @@ do_merge() {
 }
 
 # ---------- 본체 ----------
+# watch.sh 와 같은 확인을 여기서도 한다 — 사람이 chain.sh 를 직접 불러도 남이 연 PR 은 세션에 들어가지 않는다
+assoc="$(gh api "repos/$OWNER/$REPO/pulls/$PR" --jq '.author_association')" || die "PR 작성자를 확인하지 못했다" 4
+[ "$assoc" = "OWNER" ] || die "작성자가 저장소 소유자가 아니다($assoc) — 체인을 돌리지 않는다" 3
+
 [ -f "$M" ] || "$PR_EVAL" init "$REPO" "$PR" >/dev/null
 mkdir -p "$AUTHOR_DIR"
 
@@ -185,6 +201,20 @@ if [ -n "$other" ] && [ "$other" != "$$" ] && kill -0 "$other" 2>/dev/null; then
 fi
 meta_set '.chain = ((.chain // {}) + {pid:$p})' --argjson p "$$"
 trap 'meta_set ".chain.pid = null" 2>/dev/null || true' EXIT
+
+# 대형 PR 컷은 세션에 맡기지 않고 여기서 본다. 알림 코멘트는 한 번만 단다 — 다시 불러도 위의 보류 확인에서 먼저 멈춘다
+pre_rc=0
+pre_out="$("$PR_EVAL" precheck "$REPO" "$PR")" || pre_rc=$?
+case "$pre_rc" in
+  0) ;;
+  3) "$PR_EVAL" status "$REPO" "$PR" "보류(대형PR)" >/dev/null
+     mkdir -p "$RUN/outputs"
+     printf '변경이 커서 자동 리뷰를 하지 않습니다(%s, 기준: 파일 50개 또는 3,000줄 초과). PR 을 나누거나 사람이 리뷰해 주세요.\n' \
+       "$(head -1 <<<"$pre_out" | sed 's/ (cut.*//')" > "$RUN/outputs/large-pr.md"
+     "$PR_EVAL" comment "$REPO" "$PR" "$RUN/outputs/large-pr.md" >/dev/null || log "대형 PR 알림 코멘트 게시 실패"
+     chain_state "blocked" "대형 PR 컷에 걸렸다"; exit 3 ;;
+  *) chain_state "blocked" "대형 PR 판정 실패(종료 $pre_rc)"; exit 4 ;;
+esac
 
 stage1_done || run_stage1
 [ "$(jq -r '.status' "$M")" = "보류(대형PR)" ] && { chain_state "blocked" "대형 PR 로 Stage 1 이 보류됐다"; exit 3; }

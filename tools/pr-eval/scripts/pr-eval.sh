@@ -35,6 +35,7 @@ usage: pr-eval.sh <subcommand> <repo> <pr> [args]
     risk       <repo> <pr>                   자동 머지 리스크 점수 (03-risk.md). low 가 아니면 3
     pg5        <summary.md> <comments.json> [stage1|stage2|stage3]   PG5 기계 검사 (post-review 가 게시 직전에 도는 것과 같다)
     pg6        <outputs/stage 디렉터리>      PG6 — 윤문 전 사본(pre-polish/)과 대조한다
+    snapshot   <outputs/stage 디렉터리>      윤문 전 사본을 pre-polish/ 에 뜬다 (runs/ 아래만)
 
   상태
     init       <repo> <pr> [--reset-eval]    runs/<repo>-pr<N>/ 와 meta.json 을 만든다
@@ -79,9 +80,11 @@ meta_update() {
 
 load_bot_token() {
   [ -f "$BOT_ENV" ] || die "$E_ENV" "봇 토큰 파일이 없다: $BOT_ENV (CLAUDE.md §5-2 참고)"
-  # shellcheck disable=SC1090
-  set +u; . "$BOT_ENV"; set -u
-  local tok="${PR_EVAL_BOT_TOKEN:-${GH_TOKEN:-}}"
+  # source 하지 않고 watch.sh 처럼 값만 꺼낸다 — 파일에 셸 코드가 들어가도 실행되지 않는다.
+  # 환경 변수도 보지 않는다. 밖에서 받은 GH_TOKEN 은 사용자 토큰이라 봇 대신 사용자 이름으로 게시된다
+  local tok
+  tok="$(sed -n 's/^PR_EVAL_BOT_TOKEN=//p' "$BOT_ENV" | tr -d "\"'" | head -1)"
+  [ -n "$tok" ] || tok="$(sed -n 's/^GH_TOKEN=//p' "$BOT_ENV" | tr -d "\"'" | head -1)"
   [ -n "$tok" ] || die "$E_ENV" "$BOT_ENV 에 PR_EVAL_BOT_TOKEN 또는 GH_TOKEN 이 없다"
   export GH_TOKEN="$tok"
   unset GITHUB_TOKEN || true
@@ -402,7 +405,34 @@ cmd_pg6() {
   echo "PG6 통과 — $dir (JSON 필드·첫 줄, 마크다운 앵커·수치)"
 }
 
+# 윤문 전 사본을 뜬다. 세션에 cp 를 열지 않으려고 둔다 — 복사 대상은 runs/ 아래 산출물 폴더 하나뿐이다.
+cmd_snapshot() {
+  local dir="${1%/}" runs real f copied=()
+  [ -d "$dir" ] || dir="$HARNESS_DIR/$dir"
+  [ -d "$dir" ] || die "$E_USAGE" "산출물 폴더가 없다: $1"
+  runs="$(cd "$RUNS_DIR" && pwd -P)"
+  real="$(cd "$dir" && pwd -P)"
+  case "$real/" in "$runs"/*/*) ;; *) die "$E_USAGE" "runs/ 아래 산출물 폴더만 받는다: $1" ;; esac
+  mkdir -p "$real/pre-polish"
+  for f in comments.json summary.md replies patches; do
+    [ -e "$real/$f" ] || continue
+    cp -R "$real/$f" "$real/pre-polish/"
+    copied+=("$f")
+  done
+  echo "사본 — $real/pre-polish (${copied[*]:-없음})"
+}
+
 # ---------- 게시 ----------
+
+# 게시 본문은 runs/ 아래 일반 파일만 받는다. 세션이 이 스크립트를 부를 수 있으므로,
+# 다른 경로를 넘기면 Read deny 를 거치지 않고 그 파일이 공개 코멘트로 올라간다
+need_run_file() {
+  local f="$1" runs dir
+  [ -f "$f" ] && [ ! -L "$f" ] || die "$E_USAGE" "본문 파일이 없거나 링크다: $f"
+  runs="$(cd "$RUNS_DIR" && pwd -P)"
+  dir="$(cd "$(dirname "$f")" && pwd -P)"
+  case "$dir/" in "$runs"/*) ;; *) die "$E_USAGE" "본문 파일은 runs/ 아래에 둔다: $f" ;; esac
+}
 
 cmd_post_review() {
   local repo="$1" pr="$2" sha="$3" sfile="$4" cfile="$5" stage="${6:-stage1}"
@@ -549,15 +579,16 @@ case "$sub" in
   risk)        [ $# -eq 2 ] || usage; cmd_risk "$@" ;;
   pg5)         [ $# -ge 2 ] && [ $# -le 3 ] || usage; cmd_pg5 "$@" ;;
   pg6)         [ $# -eq 1 ] || usage; cmd_pg6 "$@" ;;
+  snapshot)    [ $# -eq 1 ] || usage; cmd_snapshot "$@" ;;
   init)        [ $# -ge 2 ] && [ $# -le 3 ] || usage; cmd_init "$@" ;;
   lock)        [ $# -eq 3 ] || usage; cmd_lock "$@" ;;
   unlock)      [ $# -eq 2 ] || usage; cmd_unlock "$@" ;;
   status)      [ $# -eq 3 ] || usage; cmd_status "$@" ;;
   attempt)     [ $# -eq 3 ] || usage; cmd_attempt "$@" ;;
-  post-review) [ $# -ge 5 ] || usage; cmd_post_review "$@" ;;
-  reply)       [ $# -eq 4 ] || usage; cmd_reply "$@" ;;
-  patch)       [ $# -eq 4 ] || usage; cmd_patch "$@" ;;
-  patch-review) [ $# -eq 4 ] || usage; cmd_patch_review "$@" ;;
-  comment)     [ $# -eq 3 ] || usage; cmd_comment "$@" ;;
+  post-review) [ $# -ge 5 ] || usage; need_run_file "$4"; need_run_file "$5"; cmd_post_review "$@" ;;
+  reply)       [ $# -eq 4 ] || usage; need_run_file "$4"; cmd_reply "$@" ;;
+  patch)       [ $# -eq 4 ] || usage; need_run_file "$4"; cmd_patch "$@" ;;
+  patch-review) [ $# -eq 4 ] || usage; need_run_file "$4"; cmd_patch_review "$@" ;;
+  comment)     [ $# -eq 3 ] || usage; need_run_file "$3"; cmd_comment "$@" ;;
   *) usage ;;
 esac
