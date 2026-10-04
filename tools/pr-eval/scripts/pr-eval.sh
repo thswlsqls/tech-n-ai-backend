@@ -424,6 +424,16 @@ cmd_snapshot() {
 
 # ---------- 게시 ----------
 
+# 게시 본문은 runs/ 아래 일반 파일만 받는다. 세션이 이 스크립트를 부를 수 있으므로,
+# 다른 경로를 넘기면 Read deny 를 거치지 않고 그 파일이 공개 코멘트로 올라간다
+need_run_file() {
+  local f="$1" runs dir
+  [ -f "$f" ] && [ ! -L "$f" ] || die "$E_USAGE" "본문 파일이 없거나 링크다: $f"
+  runs="$(cd "$RUNS_DIR" && pwd -P)"
+  dir="$(cd "$(dirname "$f")" && pwd -P)"
+  case "$dir/" in "$runs"/*) ;; *) die "$E_USAGE" "본문 파일은 runs/ 아래에 둔다: $f" ;; esac
+}
+
 cmd_post_review() {
   local repo="$1" pr="$2" sha="$3" sfile="$4" cfile="$5" stage="${6:-stage1}"
   case "$stage" in
@@ -575,10 +585,10 @@ case "$sub" in
   unlock)      [ $# -eq 2 ] || usage; cmd_unlock "$@" ;;
   status)      [ $# -eq 3 ] || usage; cmd_status "$@" ;;
   attempt)     [ $# -eq 3 ] || usage; cmd_attempt "$@" ;;
-  post-review) [ $# -ge 5 ] || usage; cmd_post_review "$@" ;;
-  reply)       [ $# -eq 4 ] || usage; cmd_reply "$@" ;;
-  patch)       [ $# -eq 4 ] || usage; cmd_patch "$@" ;;
-  patch-review) [ $# -eq 4 ] || usage; cmd_patch_review "$@" ;;
-  comment)     [ $# -eq 3 ] || usage; cmd_comment "$@" ;;
+  post-review) [ $# -ge 5 ] || usage; need_run_file "$4"; need_run_file "$5"; cmd_post_review "$@" ;;
+  reply)       [ $# -eq 4 ] || usage; need_run_file "$4"; cmd_reply "$@" ;;
+  patch)       [ $# -eq 4 ] || usage; need_run_file "$4"; cmd_patch "$@" ;;
+  patch-review) [ $# -eq 4 ] || usage; need_run_file "$4"; cmd_patch_review "$@" ;;
+  comment)     [ $# -eq 3 ] || usage; need_run_file "$3"; cmd_comment "$@" ;;
   *) usage ;;
 esac
