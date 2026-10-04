@@ -6,6 +6,7 @@
 
 1. **평가 대상은 PR 이다. 한 글자도 고치지 않는다.** 쓰기가 허용된 곳은 `runs/<repo>-pr<N>/` 아래와 `_memory/learnings.md` 뿐이다.
 2. **GitHub 에 쓰는 것은 `scripts/pr-eval.sh` 뿐이다.** 세션은 `gh api` 로 직접 게시하지 않는다. 봇 토큰은 스크립트가 자기 안에서 읽는다. 직접 게시하면 사용자 계정으로 리뷰가 올라간다.
+   저자 세션(`/pr-eval-author`)의 push 는 `scripts/author-push.sh` 로만 한다.
 3. **위원·반박자·검증자는 아무 파일도 쓰지 않는다.** 결과를 텍스트로 반환하는 것이 전부다. `Bash` 는 `grep`·`wc`·`jq` 같은 조회에만 쓰고 리다이렉션·`sed -i`·`mv`·`rm` 을 쓰지 않는다.
 4. **점수를 쓰지 않는다.** 등급 넷(치명·중대·경미·사소)만 쓴다.
 5. 확인 못 한 것은 게시하지 않는다. `미확인 우려` 는 `runs/` 에만 남긴다.
@@ -28,8 +29,8 @@
 | `_memory/learnings.md` | PR 을 넘어 누적되는 학습 |
 | `_memory/human-labels.md` | 게시된 봇 코멘트를 사람이 맞음·틀림·과함으로 판정한 표. 세션은 쓰지 않는다 |
 | `runs/<repo>-pr<N>/` | PR 하나의 작업 폴더. PR 마다 버려진다 |
-| `scripts/` | `pr-eval.sh` (유일한 게시 경로) · `watch.sh` (자동 트리거) · `chain.sh` (Stage 1 부터 머지까지) · `risk.jq` (리스크 점수) · `risk-audit.sh` (머지 뒤 후속 수정 추적) · `selftest.sh` (지난 산출물에 PG5·PG6 을 다시 돌린다. 게이트를 고친 뒤 한 번) · `install-entrypoints.sh` |
-| `settings.json` · `mcp.json` | 헤드리스 세션 도구 allow/deny · MCP 를 context7 하나로 묶는 설정 |
+| `scripts/` | `pr-eval.sh` (유일한 게시 경로) · `watch.sh` (자동 트리거) · `chain.sh` (Stage 1 부터 머지까지) · `risk.jq` (리스크 점수) · `risk-audit.sh` (머지 뒤 후속 수정 추적) · `selftest.sh` (지난 산출물에 PG5·PG6 을 다시 돌린다. 게이트를 고친 뒤 한 번) · `install-entrypoints.sh` · `gh-get.sh` (세션이 GitHub 을 읽는 길. GET 만 된다) · `author-push.sh` (저자 세션이 PR 브랜치에 push 하는 유일한 길. force 없음) · `author-reply.sh` (저자 세션이 리뷰 스레드에 답글을 다는 길. 본문은 `runs/` 아래 파일만) |
+| `settings.json` · `author-settings.json` · `mcp.json` | 평가 세션과 저자 세션의 도구 allow/deny · MCP 를 context7 하나로 묶는 설정 |
 
 ## 2. 세 스테이지
 
@@ -41,10 +42,10 @@
 
 **기본 동작은 머지까지다.** 봇을 리뷰어로 지정하면 watcher 가 `scripts/chain.sh <저장소> <PR번호>` 를 띄우고, 체인이
 Stage 1 → 저자 반영(`/pr-eval-author`) → Stage 2 → Stage 3 → (저자 반영 → Stage 2)* → 머지 게이트 → **리스크 게이트** → `gh pr merge` 를 사람 없이 돈다.
-머지는 봇이 아니라 체인이 사용자 gh 계정으로 한다. 리스크 점수(`03-risk.md`)가 `low` 가 아니거나, Stage 3 이 리뷰가 놓친 치명·중대(`P`)를 찾았으면 머지하지 않고 `chain.state=needs-human` 으로 멈춘다 —
+머지는 봇이 아니라 체인이 사용자 gh 계정으로 한다. 머지 게이트는 세션이 쓴 기록만 믿지 않고, 봇이 지금 head 커밋에 남긴 리뷰가 GitHub 에 있는지 직접 확인한다. 리스크 점수(`03-risk.md`)가 `low` 가 아니거나, Stage 3 이 리뷰가 놓친 치명·중대(`P`)를 찾았으면 머지하지 않고 `chain.state=needs-human` 으로 멈춘다 —
 점수표는 봇이 PR 코멘트로 남긴다. 체인은 `meta.json` 을 보고 멈춘 자리부터 이어 가므로 손으로 다시 불러도 된다.
 체인이 띄운 헤드리스 세션마다 걸린 시간·비용·턴 수가 `meta.json` 의 `chain.sessions[]` 에 한 줄씩 쌓인다(`claude -p --output-format json` 의 `session_id`·`duration_ms`·`total_cost_usd`·`num_turns`·`is_error`).
-watcher 는 저장소 소유자가 연 PR(`authorAssociation=OWNER`)만 체인에 넣는다 — 남의 PR 본문·diff 가 사용자 계정으로 push·머지하는 세션에 들어가지 않게 한다.
+watcher 는 저장소 소유자가 연 PR(`authorAssociation=OWNER`)만 체인에 넣고, `chain.sh` 도 시작할 때 다시 확인한다 — 남의 PR 본문·diff 가 사용자 계정으로 push·머지하는 세션에 들어가지 않게 한다.
 리뷰어를 다시 지정해도 Stage 1 을 다시 돌지 않는다. **Stage N 은 `meta.json` 에 Stage N−1 완료 기록이 있어야 돈다**(`lock` 이 막는다, 종료 코드 3).
 
 ## 2-1. 리뷰 축과 위원 4인 — 축 배정
@@ -143,6 +144,7 @@ chmod 600 ~/.config/pr-eval/bot.env
 ### 5-3. 진입점 설치
 
 `.claude/` 는 gitignore 되므로 clone 한 머신마다 `tools/pr-eval/scripts/install-entrypoints.sh` 를 한 번 돌린다. `.claude/commands/pr-eval.md` 와 `.claude/agents/pr-eval-judge.md` 를 재생성한다.
+두 settings 파일과 명령 문서는 스크립트를 이 머신의 절대 경로(`/Users/m1/workspace/tech-n-ai/tech-n-ai-backend/...`)로 부른다. 다른 머신에서는 그 경로를 고쳐야 세션이 스크립트를 부를 수 있다.
 
 ### 5-4. watcher 상시 실행 (선택)
 
@@ -194,8 +196,8 @@ chmod 600 ~/.config/pr-eval/bot.env
 
 | 무엇 | 결과 | 그래서 |
 |---|---|---|
-| `--settings` 가 `.claude/settings.local.json` 을 대체하는가 | **permissions 는 대체한다.** 빈 allow 로 띄우면 `ls` 도 거부된다 | **allow 목록이 자족적이어야 한다.** 이 머신에서 되는 것이 다른 머신에서 되는 근거가 아니다 |
-| 훅은 대체되지 않는다 | `settings.local.json` 의 `matcher:"Bash"` → `rtk hook claude` 가 헤드리스에서도 돈다. `hooks:{}` 를 넣어도 안 없어진다 | 세션이 `rtk ls` 로 재작성된 명령을 쓰면 allow 에 없어 거부된다. 치명적이진 않다(`Read`·`Glob` 로 우회한다) |
+| `--settings` 가 `.claude/settings.local.json` 을 대체하는가 | **대체하지 않는다. 합쳐진다.** local 의 allow 가 헤드리스 세션에도 걸렸다(2026-10-04 재실측) | `chain.sh` 는 `--setting-sources project` 로 local 설정과 그 훅을 읽지 않게 한다. `user` 나 빈 값을 주면 `.claude/commands`·`agents` 도 안 읽혀 체인이 멈춘다 |
+| 훅을 끌 수 있는가 | `hooks:{}` 로는 안 꺼진다. 두 settings 에 `disableAllHooks: true` 를 넣자 실측에서 `rtk` 훅 기록이 남지 않았다 | 헤드리스 세션의 명령이 `rtk …` 로 바뀌지 않는다 |
 | deny 가 실제로 막는가 | **막는다.** `Bash(git config:*)` 를 deny 에 두면 `.git/config` 에 값이 남지 않는다 | 안전장치가 문서 약속이 아니라 실제로 동작한다 |
 | MCP | `--settings` 로는 안 걸러진다. playwright·filesystem·memory 까지 전부 떴다 | `--mcp-config tools/pr-eval/mcp.json --strict-mcp-config` 로 context7 하나만 남긴다 |
 

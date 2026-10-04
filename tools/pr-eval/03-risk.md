@@ -19,16 +19,18 @@
 
 | 항목 | 상한 | 신호 (점수) | 왜 |
 |---|---|---|---|
-| **보안** | 30 | 인증·인가 코드 (15) — `common/security/` 아래, 또는 이름에 `Security`·`Auth`·`Jwt`·`OAuth`·`Cors`·`Password`·`Permission`·`Role`·`Bcrypt`·`Principal`·`Credential`·`Refresh/Access/SecureToken`·`ApiKey` 가 든 운영 코드, Gateway 의 `filter/`, 프론트의 `middleware`·`proxy`·`lib/auth*`·`cookie-config`·`/api/bff/auth/`<br>자격증명·비밀값 (30) — `.env`·`.pem`·`.key` 파일, 설정 파일(`.yml`·`.json`·`.properties` 등)에 새로 들어간 `password: 값`·`secret-key: 값` 류<br>자동 머지 게이트·하니스 (15) — `tools/pr-eval/` 아래 전부(규칙 문서 포함)<br>의존성 (10) — `*.gradle`·`package.json`·lock 파일<br>인프라 권한 (15) — IAM 을 바꾼 `.tf` | 사고가 나면 데이터가 새거나 계정이 뚫린다. 가장 무겁게 잡는다 |
+| **보안** | 30 | 인증·인가 코드 (15) — `common/security/` 아래, 또는 이름에 `Security`·`Auth`·`Jwt`·`OAuth`·`Cors`·`Password`·`Permission`·`Role`·`Bcrypt`·`Principal`·`Credential`·`Refresh/Access/SecureToken`·`ApiKey` 가 든 운영 코드, Gateway 의 `filter/`, 프론트의 `middleware`·`proxy`·`lib/auth*`·`cookie-config`·`/api/bff/auth/`<br>자격증명·비밀값 (30) — `.env`·`.pem`·`.key` 파일, 설정 파일(`.yml`·`.json`·`.properties` 등)에 새로 들어간 `password: 값`·`secret-key: 값` 류<br>자동 머지 게이트·하니스 (15) — `tools/pr-eval/` 아래 전부(규칙 문서 포함)<br>에이전트 지시·CI·빌드 스크립트 (15) — `CLAUDE.md`·`AGENTS.md`(어느 폴더든), `.claude/` 아래 전부, `.github/workflows/`·`Jenkinsfile*`, `*.gradle`·`gradle.properties`·`gradle/wrapper/`·`gradlew`<br>의존성 (10) — `*.gradle`·`package.json`·lock 파일<br>인프라 권한 (15) — IAM 을 바꾼 `.tf` | 사고가 나면 데이터가 새거나 계정이 뚫린다. 가장 무겁게 잡는다 |
 | **호환성 깨짐** | 25 | API 계약 (15) — 컨트롤러·요청/응답 DTO<br>DB 스키마 (15) — `*Entity`·`entity/`·`document/`<br>설정·환경 변수 (10) — `application*.yml`·`docker-compose`·`Jenkinsfile*`·워크플로<br>이벤트 계약 (10) — `common/kafka/`·`*Event` | 다른 서비스나 배포 환경이 이 PR 의 가정을 모른 채 깨진다 |
 | **되돌리기 어려운 변경** | 15 | DB 마이그레이션 (15) — `.sql`·`migration/`<br>인프라 (15) — `.tf`·`.tfvars` | 머지를 되돌려도 이미 적용된 스키마·인프라는 안 돌아온다 |
 | **테스트** | 15 | 테스트를 붙일 수 있는 운영 코드(`.java`·`.ts` 등. `.tf`·`.sql`·`.sh` 는 뺀다)가 바뀌었는데 테스트 파일 변경이 없다 (15) | 같은 것이 다시 깨져도 잡을 장치가 없다 |
 | **범위** | 15 | 테스트·문서·lock 파일을 뺀 변경 줄 수 — 100 이하 0 · 300 이하 5 · 800 이하 10 · 그 이상 15 | 큰 PR 은 리뷰가 끝까지 같은 밀도로 못 본다. 작은 PR 을 쓰게 만든다 |
 
 항목마다 신호 점수를 더하되 상한을 넘지 않는다. 다섯 항목 상한의 합이 100 이다.
-문서(`*.md`·이미지·`.drawio`·`docs/`·`contents/`)는 어느 항목에도 세지 않는다. 예외가 둘 있다. 비밀값은 문서 경로에 있어도 센다. `tools/pr-eval/` 의 규칙 문서는 세션이 그대로 따르는 실행 규칙이라 하니스 신호로 센다.
+문서(`*.md`·이미지·`.drawio`·`docs/`·`contents/`)는 어느 항목에도 세지 않는다. 예외가 셋 있다. 비밀값은 문서 경로에 있어도 센다. `tools/pr-eval/` 의 규칙 문서는 세션이 그대로 따르는 실행 규칙이라 하니스 신호로 센다. `CLAUDE.md`·`AGENTS.md`·`.claude/` 아래 문서도 같은 이유로 에이전트 지시 신호로 센다.
 
 하니스 신호는 게이트가 자기 자신을 느슨하게 만드는 PR 을 막으려고 둔다. 저자 세션은 PR 브랜치에 push 할 수 있어서, 이 신호가 없으면 `risk.jq` 를 고친 작은 PR 이 0점 `low` 로 자동 머지된다. 15점이라 이 신호 하나만으로도 `low` 를 벗어난다.
+
+에이전트 지시·CI·빌드 스크립트 신호도 같은 이유로 15점이다. `CLAUDE.md`·`.claude/` 가 바뀌면 그 뒤에 뜨는 모든 세션의 지시와 권한이 바뀌고, CI 설정과 Gradle 빌드 파일은 빌드할 때 그대로 실행된다. 예전에는 CI 설정·Gradle 이 10점이라 이것만 바꾼 PR 이 `low` 로 자동 머지될 수 있었고, `CLAUDE.md` 는 문서로 쳐 0점이었다. `*.gradle`·워크플로·`Jenkinsfile*` 은 의존성·설정 신호에도 함께 걸려 25점이 된다.
 
 ## 등급과 처리
 
@@ -69,7 +71,7 @@
 | #30 | 토큰 계측 + 테스트 | 0 | low | - |
 | #34 | 신기술 일괄 저장 리팩토링 + 테스트 | 5 | low | 범위 270줄 |
 | #33 | 북마크 리포트 API · 엔티티 2개 | 35 | medium | API 계약 · DB 스키마 · 범위 654줄 |
-| #38 | api-auth Mongo 설정 | 35 | medium | 의존성 · 설정 · 테스트 없음 |
+| #38 | api-auth Mongo 설정 | 50 | high | 에이전트 지시·CI·빌드(`build.gradle`) · 의존성 · 설정 · 테스트 없음 |
 | #43 | ECS blue/green (Terraform) | 50 | high | 의존성 · IAM · 인프라 · 범위 494줄(lock 파일 224줄 제외) |
 | #36 | 평문 자격증명 제거 · CORS | 45 | high | 인증 코드(`SecurityConfig`) · 하니스(`pr-eval.sh`) · 인프라(`services.tf`) |
 
@@ -102,6 +104,7 @@ PR 별 등급·점수·체인 자동 머지 여부·후속 PR 과, 등급별 "�
 |---|---|---|
 | 2026-10-02 | 최근 머지 20건. `low` 12건 중 1건(#17 → #20)에 후속 fix 가 붙었다. #20 은 #17 이 넣은 `disableConcurrentBuilds()` 를 되돌렸다. `medium`·`high` 8건은 후속 0 | #17 의 `Jenkinsfile-cicd` 를 패턴(`Jenkinsfile$`)이 못 잡았다 → `Jenkinsfile[^/]*$` 로 고쳤다. 고친 뒤에도 설정 신호 10점이라 `low` 다. 표본 1건이라 가중치는 그대로 두고 후보로만 적는다 — **CI·배포 설정 변경** |
 | 2026-10-02 | 규칙 점검(기준별 반박 평가). 기록이 아니라 저장소 파일과 맞춰 본 결함 | 비밀값에 `secret-key` 추가(JWT 서명 키 이름), `.http` 는 비밀값 검사에서 뺌(테스트 요청 본문 30여 줄이 걸려 #36 이 실재하지 않는 비밀값으로 critical 이 됐다), 하니스 신호 추가, Gateway `filter/`·`ApiKey`·프론트 인증 파일 추가, `*Document` 접미어는 뺌(`WebSearchDocument` 오탐), `.sh` 는 테스트 신호에서 뺌, lock 파일은 범위에서 뺌. #36 은 45 high, #43 은 범위 494줄로 바뀌고 나머지 행은 그대로다 |
+| 2026-10-04 | 보안 점검. `CLAUDE.md` 는 0점, CI 설정·Gradle 은 10점이라 이것만 바꾼 PR 이 `low` 로 자동 머지될 수 있었다 | 에이전트 지시·CI·빌드 스크립트 신호(15)를 더했다. #38 은 35 medium 에서 50 high 로, #17 은 10 low 에서 25 medium 으로 바뀌고 나머지 행은 그대로다. 첫 행의 "CI·배포 설정 변경" 후보도 이것으로 처리했다 |
 
 ## 이 점수가 못 보는 것
 
