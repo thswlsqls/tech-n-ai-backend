@@ -144,7 +144,13 @@ chmod 600 ~/.config/pr-eval/bot.env
 ### 5-3. 진입점 설치
 
 `.claude/` 는 gitignore 되므로 clone 한 머신마다 `tools/pr-eval/scripts/install-entrypoints.sh` 를 한 번 돌린다. `.claude/commands/pr-eval.md` 와 `.claude/agents/pr-eval-judge.md` 를 재생성한다.
-두 settings 파일과 명령 문서는 스크립트를 이 머신의 절대 경로(`/Users/m1/workspace/tech-n-ai/tech-n-ai-backend/...`)로 부른다. 다른 머신에서는 그 경로를 고쳐야 세션이 스크립트를 부를 수 있다.
+두 settings 파일과 명령 문서는 스크립트를 이 머신의 절대 경로(`/Users/m1/workspace/tech-n-ai/tech-n-ai-backend/...`)로 부른다. 다른 위치에 clone 했으면 아래처럼 하니스 안의 경로를 한 번에 바꾸고 이 스크립트를 다시 돌린다. 경로가 안 맞으면 `chain.sh` 와 이 스크립트가 종료 2 로 멈춘다.
+
+```bash
+NEW_WS="$(cd "$(git rev-parse --show-toplevel)/.." && pwd)"   # backend·frontend 저장소와 워크트리 폴더가 있는 곳
+grep -rlF /Users/m1/workspace/tech-n-ai/ tools/pr-eval --exclude-dir=runs --exclude-dir=docs \
+  | xargs sed -i '' "s|/Users/m1/workspace/tech-n-ai/|$NEW_WS/|g"
+```
 
 ### 5-4. watcher 상시 실행 (선택)
 
@@ -160,9 +166,15 @@ chmod 600 ~/.config/pr-eval/bot.env
 <string>/Users/m1/workspace/tech-n-ai/tech-n-ai-backend</string>
 ```
 
+**지금 쓰는 plist 는 머지를 막아 둔다.** `EnvironmentVariables.PATH` 맨 앞에 `~/.config/pr-eval/no-merge-bin` 이 있고,
+그 안의 `gh` 래퍼가 `gh pr merge` 와 `gh api .../pulls/<N>/merge` 만 `exit 1` 로 거절한다(나머지 명령은 `/opt/homebrew/bin/gh` 로 넘긴다).
+그래서 launchd 로 돈 체인은 머지 게이트를 지나도 `chain.state=blocked`("gh pr merge 실패")로 끝나고, 로그에 `[no-merge] gh pr merge 차단` 이 찍힌다.
+자동 머지를 다시 켜려면 PATH 에서 이 경로를 빼고 `launchctl bootout` 뒤 다시 `bootstrap` 한다.
+래퍼가 없는 PATH 로 직접 띄운 `watch.sh`·`chain.sh` 는 이 차단을 받지 않는다.
+
 머신이 꺼져 있으면 안 돈다. 켜면 폴링이라 밀린 것부터 처리한다. **한 번에 한 건씩 순서대로 처리한다** — PR A 가 도는 동안 PR B 에 리뷰어를 걸어도 A 가 끝나야 뜬다.
 
-**수동 호출에는 `--settings` 가 안 걸린다.** 헤드리스 세션은 호출줄에서 도구 권한을 강제하지만 사람이 여는 대화형 세션은 평소 설정으로 돈다. 같은 보증을 걸려면 수동 호출도 `claude --settings tools/pr-eval/settings.json` 으로 띄운다.
+**수동 호출에는 `--settings` 가 안 걸린다.** 헤드리스 세션은 호출줄에서 도구 권한을 강제하지만 사람이 여는 대화형 세션은 평소 설정으로 돈다. 같은 보증을 걸려면 수동 호출도 `claude --settings tools/pr-eval/settings.json --setting-sources project --permission-mode dontAsk` 로 띄운다.
 
 ## 6. 실측으로 확인된 것 — 다시 실험하지 않는다
 

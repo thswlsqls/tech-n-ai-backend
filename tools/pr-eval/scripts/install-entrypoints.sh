@@ -6,6 +6,12 @@ set -euo pipefail
 
 HARNESS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO_ROOT="$(cd "$HARNESS_DIR/../.." && pwd)"
+# 세션 권한과 명령 문서는 스크립트를 이 저장소의 절대 경로로만 부른다(상대 경로는 PR 워크트리 사본을 가리킨다).
+# 다른 위치에 clone 했는데 경로를 안 바꾸면 세션 호출이 모두 권한에서 거부되므로 여기서 먼저 멈춘다
+for f in "$HARNESS_DIR/settings.json" "$HARNESS_DIR/author-settings.json" "$HARNESS_DIR/scripts/install-entrypoints.sh"; do
+  grep -qF "$REPO_ROOT/tools/pr-eval/scripts/" "$f" \
+    || { echo "$f 의 스크립트 절대 경로가 이 저장소($REPO_ROOT)와 다르다 — tools/pr-eval/CLAUDE.md §5-3 대로 바꾼다" >&2; exit 2; }
+done
 CMD="$REPO_ROOT/.claude/commands/pr-eval.md"
 AGENT="$REPO_ROOT/.claude/agents/pr-eval-judge.md"
 
