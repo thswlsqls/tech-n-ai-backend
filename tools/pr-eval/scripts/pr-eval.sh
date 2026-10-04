@@ -392,6 +392,9 @@ cmd_pg6() {
     [ -f "$cur" ] || cur="$(find "$dir" -name "$(basename "$rel")" -not -path "$pre/*" | head -1)"
     [ -n "$cur" ] && [ -f "$cur" ] && md_cur+=("$cur")
   done < <(cd "$pre" && find . -name '*.md' | sed 's|^\./||' | sort)
+  # 사본이 비어 있으면 대조할 것이 없어 통과처럼 보인다 — 사본 만들기가 권한에 막힌 경우다
+  [ -f "$pre/comments.json" ] || [ "${#md_pre[@]}" -gt 0 ] \
+    || die "$E_GATE" "PG6 위반 — 사본 폴더가 비어 있다. 사본을 다시 뜬 뒤 돌린다: $pre"
   if [ "${#md_pre[@]}" -gt 0 ]; then
     tok() { [ $# -eq 0 ] || grep -ohE '[A-Za-z0-9_./-]+\.[a-z]+:[0-9]+|[0-9]+(\.[0-9]+)?' "$@" | sort -u; }
     missing="$(comm -23 <(tok "${md_pre[@]}") <(tok ${md_cur[@]+"${md_cur[@]}"}))"
