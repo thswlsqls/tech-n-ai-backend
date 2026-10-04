@@ -122,6 +122,8 @@ git diff --name-only $B...$S | grep -cE '^(api/agent|api/chatbot|client/(scraper
 
 **R-A 설계 ↔ 구현 정합성**
 - PR 본문·연결 이슈·`docs/reference/design/`이 선언한 것을 코드가 지키는가. 안 지키면 어느 쪽이 틀렸는가.
+- **다른 모듈이 기대는 메서드(`common-*`·`datasource-*`)의 동작이나 시그니처가 바뀌었으면, diff 밖 호출부가 바뀐 것에 기대는가.**
+  `grep -rn` 으로 호출부를 찾아 근거(C)로 단다. 앵커는 diff 안의 바뀐 줄에 둔다.
 - **CQRS 방향 위반** — 쓰기가 MongoDB로 가거나, 읽기 경로가 Aurora 쓰기 리포지토리를 부르는가.
 - **모듈 의존 방향 위반** — `common-core`가 무언가에 의존하게 됐는가. `datasource`가 `api`를 부르는가.
   `api-gateway`는 WebFlux/Netty라 Servlet·Tomcat·Security 스타터를 빌드에서 제외한다 — 그걸 되살리는 의존이 붙었는가.

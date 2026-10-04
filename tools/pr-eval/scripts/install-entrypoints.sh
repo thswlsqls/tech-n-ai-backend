@@ -235,6 +235,7 @@ cd ../tech-n-ai-backend-worktrees/pr-author-$2 && git checkout -B <headRefName> 
 
 메인 작업 트리는 건드리지 않는다. 고친 뒤 영향 모듈 테스트를 돌린다(`./gradlew :<모듈>:test`).
 **실패하면 push 하지 않는다.** 고쳐서 통과시키지 못하면 `tests.result` 를 `fail` 로 적고 끝낸다.
+**테스트를 지우거나 `@Disabled` 로 끄거나 단언·기대값을 바꿔 통과시키지 않는다.** 리뷰가 그 테스트를 고치라고 한 경우만 예외다.
 
 반영한 것이 있으면 한 커밋으로 묶어 `git push origin <headRefName>` 한다.
 PR 본문의 서술이 바뀐 코드와 어긋나게 됐으면 `gh pr edit $2 --body-file <파일>` 로 그 문장만 고친다.
