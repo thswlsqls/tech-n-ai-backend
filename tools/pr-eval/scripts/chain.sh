@@ -93,19 +93,24 @@ run_author() {  # 기록 파일이 하나 늘었으면 성공
 
 author_pushed() { [ "$(jq -r '.pushed' "$(last_author)")" = "true" ]; }
 
+# mergeable 은 GitHub 가 계산을 마칠 때까지 UNKNOWN 이다. 오래된 PR 일수록 첫 조회에서 자주 나온다
+pr_state() {
+  local i out
+  for i in 1 2 3 4 5 6; do
+    out="$(gh pr view "$PR" --repo "$OWNER/$REPO" --json state,isDraft,mergeable)" || return 1
+    [ "$(jq -r '.mergeable' <<<"$out")" != "UNKNOWN" ] && break
+    sleep 10
+  done
+  printf '%s\n' "$out"
+}
+
 # ---------- 머지 게이트 — 세션의 자기보고가 아니라 기록과 GitHub 상태로 본다 ----------
 merge_gate() {
   local a head pr_json reasons=()
   a="$(last_author)"
   head="$(head_sha)"
   GATE_SHA="$head"   # 리스크 게이트와 머지가 이 커밋에 묶인다
-  # mergeable 은 GitHub 가 계산을 마칠 때까지 UNKNOWN 이다. 오래된 PR 일수록 첫 조회에서 자주 나온다
-  local i
-  for i in 1 2 3 4 5 6; do
-    pr_json="$(gh pr view "$PR" --repo "$OWNER/$REPO" --json state,isDraft,mergeable)"
-    [ "$(jq -r '.mergeable' <<<"$pr_json")" != "UNKNOWN" ] && break
-    sleep 10
-  done
+  pr_json="$(pr_state)"
 
   [ "$(jq -r '.state' <<<"$pr_json")" = "OPEN" ] || reasons+=("PR 이 열려 있지 않다")
   [ "$(jq -r '.isDraft' <<<"$pr_json")" = "false" ] || reasons+=("draft 다")
@@ -174,6 +179,11 @@ trap 'meta_set ".chain.pid = null" 2>/dev/null || true' EXIT
 
 stage1_done || run_stage1
 [ "$(jq -r '.status' "$M")" = "보류(대형PR)" ] && { chain_state "blocked" "대형 PR 로 Stage 1 이 보류됐다"; exit 3; }
+
+# 저자 반영 전에 main 과 충돌하는지 본다. 충돌을 풀면 head 가 바뀌어 그 뒤 단계를 다시 돌아야 한다.
+# Stage 1 앞에서 멈추면 watch.sh 가 리뷰가 없는 PR 로 보고 매분 다시 띄워 보류(실패) 로 만든다
+[ "$(pr_state | jq -r '.mergeable')" != "CONFLICTING" ] \
+  || { chain_state "blocked" "main 과 충돌한다 — 사람이 충돌을 푼 뒤 체인을 다시 부른다"; exit 3; }
 
 [ "$(author_count)" -ge 1 ] || run_author
 [ "$(stage2_count)" -ge 1 ] || run_stage2

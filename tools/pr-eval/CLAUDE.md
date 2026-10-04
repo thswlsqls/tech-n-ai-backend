@@ -13,6 +13,7 @@
 
 > - 봇이 코드를 못 고치게 하는 강제 수단은 **collaborator read 역할 하나뿐이다.** 토큰 스코프는 못 막는다 — `public_repo` 는 public 저장소의 코드 write 를 포함하고 두 저장소는 public 이다. 봇을 write 로 올리면 그 순간 이 토큰이 push 를 허용한다.
 > - **`pipeline/` 과 헷갈리지 않는다.** `pipeline/` 의 impl·impl-validate 는 **PR 을 올릴 때**, `tools/pr-eval/` 은 **올라온 PR 을 평가할 때** 쓴다. 서로의 산출물을 읽지 않는다.
+> - **제품 PR 에 `tools/pr-eval/` 변경을 섞지 않는다.** main 이 `_memory/learnings.md` 를 자주 고치므로 섞으면 체인이 main 과 충돌해 멈춘다(PR #36). 하니스 변경은 따로 PR 을 낸다.
 > - **`runs/` 만 gitignore 된다.** PR 마다 버려지는 작업 폴더라 추적하지 않는다 — 백업이 없고 다른 머신에서 clone 해도 따라오지 않는다. 규칙 문서·스크립트와 누적 자산(`_memory/learnings.md`)은 추적된다.
 
 ## 1. 파일 지도
