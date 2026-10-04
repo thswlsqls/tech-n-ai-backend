@@ -33,6 +33,8 @@ usage: pr-eval.sh <subcommand> <repo> <pr> [args]
     ranges     <repo> <pr> <sha>            inline 앵커를 달 수 있는 줄 범위를 낸다 (위원 프롬프트용)
     gate1      <repo> <pr> <sha> <comments.json>   PG1 — 앵커가 diff 안인지 검사한다
     risk       <repo> <pr>                   자동 머지 리스크 점수 (03-risk.md). low 가 아니면 3
+    pg5        <summary.md> <comments.json> [stage1|stage2|stage3]   PG5 기계 검사 (post-review 가 게시 직전에 도는 것과 같다)
+    pg6        <outputs/stage 디렉터리>      PG6 — 윤문 전 사본(pre-polish/)과 대조한다
 
   상태
     init       <repo> <pr> [--reset-eval]    runs/<repo>-pr<N>/ 와 meta.json 을 만든다
@@ -337,6 +339,69 @@ cmd_attempt() {
   jq -r '.attempts' "$(meta_path "$1" "$2")"
 }
 
+# PG5 일부(기계로 셀 수 있는 것). post-review 가 게시 직전에 부르고, selftest.sh 가 지난 산출물에 다시 돌린다.
+cmd_pg5() {
+  local sfile="$1" cfile="$2" stage="${3:-stage1}"
+  [ -f "$sfile" ] || die "$E_USAGE" "요약 파일이 없다: $sfile"
+  [ -f "$cfile" ] || die "$E_USAGE" "코멘트 파일이 없다: $cfile"
+  if [ "$stage" = "stage1" ]; then
+    grep -q 'praise' "$sfile" || jq -e '[.[] | select(.body | test("praise"))] | length > 0' "$cfile" >/dev/null \
+      || die "$E_GATE" "PG5 위반 — praise 코멘트가 없다"
+  fi
+  jq -e '[.[] | select((.code|not) or (.axis|not) or (.body|not))] | length == 0' "$cfile" >/dev/null \
+    || die "$E_GATE" "PG5 위반 — code/axis/body 가 빠진 코멘트가 있다"
+  # 축은 코드만이 아니라 이름까지 본문에 있어야 한다 — 저자가 프로파일을 열지 않고 읽을 수 있어야 한다.
+  local noname; noname="$(jq -r '[.[] | select((.body | test("R-[A-I] \\(")) | not) | .code] | join(", ")' "$cfile")"
+  [ -z "$noname" ] || die "$E_GATE" "PG5 위반 — 축 이름이 없다(\`R-x (이름)\` 형식이어야 한다): $noname"
+  # 요약에는 축 범례표를 한 번 싣는다 — blocking 순서표 칸에는 코드만 들어가기 때문이다.
+  if [ "$stage" = "stage1" ]; then
+    grep -qE '`R-[A-I]`' "$sfile" || die "$E_GATE" "PG5 위반 — 요약에 축 범례표가 없다 (00-criteria.md §6)"
+  fi
+  echo "PG5 통과 — $cfile"
+}
+
+# PG6 — 윤문이 뜻을 깎지 않았나 (01-stages.md §7). <dir> 은 pre-polish/ 를 품은 outputs/<stage>[/round-NN] 이다.
+# 세션이 문서의 두 줄을 직접 돌리면 권한에 막혀 눈 대조로 우회했다(L0-42·L0-51). 한 줄 호출로 옮긴다.
+# 영향(②)과 방향(④)이 남았는지는 셀 수 없으므로 여기서 보지 않는다.
+cmd_pg6() {
+  local dir="${1%/}" pre bad=0
+  pre="$dir/pre-polish"
+  [ -d "$pre" ] || die "$E_USAGE" "사본 폴더가 없다: $pre"
+
+  # JSON — 건수·필드·본문 첫 줄이 사본과 같은가
+  if [ -f "$pre/comments.json" ] || [ -f "$dir/comments.json" ]; then
+    [ -f "$pre/comments.json" ] && [ -f "$dir/comments.json" ] \
+      || die "$E_GATE" "PG6 위반 — comments.json 이 사본과 현재 중 한쪽에만 있다"
+    if ! jq -e -s 'map(map({code, path, line, side:(.side//"RIGHT"), axis, grade,
+                           head:(.body | split("\n")[0])})) | .[0] == .[1]' \
+         "$pre/comments.json" "$dir/comments.json" >/dev/null; then
+      echo "PG6 위반 — comments.json 의 건수·필드·첫 줄이 사본과 다르다"; bad=1
+    fi
+  fi
+
+  # 마크다운 — 사본에만 있는 앵커·수치 토큰이 있는가 (summary.md · replies/ · patches/)
+  # 사본은 원본과 같은 상대 경로가 원칙이지만, cp -R 가 권한에 막히면 세션이 replies/ 없이 평평하게 복사한다.
+  # 같은 경로가 없으면 같은 파일 이름으로 찾는다.
+  local rel cur md_pre=() md_cur=() missing
+  while IFS= read -r rel; do
+    md_pre+=("$pre/$rel")
+    cur="$dir/$rel"
+    [ -f "$cur" ] || cur="$(find "$dir" -name "$(basename "$rel")" -not -path "$pre/*" | head -1)"
+    [ -n "$cur" ] && [ -f "$cur" ] && md_cur+=("$cur")
+  done < <(cd "$pre" && find . -name '*.md' | sed 's|^\./||' | sort)
+  if [ "${#md_pre[@]}" -gt 0 ]; then
+    tok() { [ $# -eq 0 ] || grep -ohE '[A-Za-z0-9_./-]+\.[a-z]+:[0-9]+|[0-9]+(\.[0-9]+)?' "$@" | sort -u; }
+    missing="$(comm -23 <(tok "${md_pre[@]}") <(tok ${md_cur[@]+"${md_cur[@]}"}))"
+    if [ -n "$missing" ]; then
+      echo "PG6 위반 — 사본에만 있는 토큰(근거의 파일:줄이나 수치가 빠졌는지 하나씩 확인한다):"
+      sed 's/^/  /' <<<"$missing"; bad=1
+    fi
+  fi
+
+  [ "$bad" = 0 ] || return "$E_GATE"
+  echo "PG6 통과 — $dir (JSON 필드·첫 줄, 마크다운 앵커·수치)"
+}
+
 # ---------- 게시 ----------
 
 cmd_post_review() {
@@ -352,20 +417,7 @@ cmd_post_review() {
   # 게시 직전에 PG1 을 한 번 더 돌린다 — 세션이 건너뛰어도 여기서 막힌다.
   cmd_gate1 "$repo" "$pr" "$sha" "$cfile" || return "$E_GATE"
 
-  # PG5 일부(기계로 셀 수 있는 것)
-  if [ "$stage" = "stage1" ]; then
-    grep -q 'praise' "$sfile" || jq -e '[.[] | select(.body | test("praise"))] | length > 0' "$cfile" >/dev/null \
-      || die "$E_GATE" "PG5 위반 — praise 코멘트가 없다"
-  fi
-  jq -e '[.[] | select((.code|not) or (.axis|not) or (.body|not))] | length == 0' "$cfile" >/dev/null \
-    || die "$E_GATE" "PG5 위반 — code/axis/body 가 빠진 코멘트가 있다"
-  # 축은 코드만이 아니라 이름까지 본문에 있어야 한다 — 저자가 프로파일을 열지 않고 읽을 수 있어야 한다.
-  local noname; noname="$(jq -r '[.[] | select((.body | test("R-[A-I] \\(")) | not) | .code] | join(", ")' "$cfile")"
-  [ -z "$noname" ] || die "$E_GATE" "PG5 위반 — 축 이름이 없다(\`R-x (이름)\` 형식이어야 한다): $noname"
-  # 요약에는 축 범례표를 한 번 싣는다 — blocking 순서표 칸에는 코드만 들어가기 때문이다.
-  if [ "$stage" = "stage1" ]; then
-    grep -qE '`R-[A-I]`' "$sfile" || die "$E_GATE" "PG5 위반 — 요약에 축 범례표가 없다 (00-criteria.md §6)"
-  fi
+  cmd_pg5 "$sfile" "$cfile" "$stage"
 
   load_bot_token
   mktmp; local tmp="$TMP"
@@ -403,11 +455,16 @@ cmd_post_review() {
       meta_update "$repo" "$pr" '.stage1 += [{review_id:$rid, posted_at:$at, eval_sha:$sha, comments:$c}] | .attempts=0 | .status="완료"' \
         --argjson rid "$review_id" --arg at "$(now_iso)" --arg sha "$sha" --argjson c "$merged" ;;
     stage2)
-      meta_update "$repo" "$pr" '.stage2 = ((.stage2 // []) | if length == 0 then [{}] else . end)
+      # 마지막 원소가 다른 커밋을 판정한 회차면 새 원소를 붙인다 — 합치면 앞 회차 게시 기록이 덮인다(L0-25)
+      meta_update "$repo" "$pr" '.stage2 = ((.stage2 // []) | if length == 0 or ((.[-1].stage_sha // $sha) != $sha) then . + [{}] else . end)
                                  | .stage2[-1] += {review_id:$rid, posted_at:$at, stage_sha:$sha, new_comments:$c}' \
         --argjson rid "$review_id" --arg at "$(now_iso)" --arg sha "$sha" --argjson c "$merged" ;;
     stage3)
-      meta_update "$repo" "$pr" '.stage3 = ((.stage3 // {}) + {review_id:$rid, posted_at:$at, stage_sha:$sha, comments:$c})' \
+      # 다른 커밋으로 다시 돌면 앞 회차를 stage3_history 로 옮긴다 — 합치면 앞 회차 review_id·stage_sha 가 덮인다(L0-43)
+      meta_update "$repo" "$pr" '((.stage3 != null) and ((.stage3.stage_sha // $sha) != $sha)) as $new
+                                 | (if $new then .stage3_history = ((.stage3_history // []) + [.stage3]) | .stage3 = null else . end)
+                                 | .stage3 = ((.stage3 // {}) + {review_id:$rid, posted_at:$at, stage_sha:$sha, comments:$c})
+                                 | .stage3.replies = ((.stage3.replies // {}) + (.stage3_replies // {})) | del(.stage3_replies)' \
         --argjson rid "$review_id" --arg at "$(now_iso)" --arg sha "$sha" --argjson c "$merged" ;;
   esac
 
@@ -416,12 +473,39 @@ cmd_post_review() {
 }
 
 cmd_reply() {
-  local repo="$1" pr="$2" cid="$3" bfile="$4"
+  local repo="$1" pr="$2" cid="$3" bfile="$4" rid
   [ -f "$bfile" ] || die "$E_USAGE" "본문 파일이 없다: $bfile"
+  need_meta "$repo" "$pr"
   load_bot_token
-  jq -n --rawfile b "$bfile" '{body:$b}' \
-    | gh api "repos/$OWNER/$repo/pulls/$pr/comments/$cid/replies" --input - --jq '.id' \
+  rid="$(jq -n --rawfile b "$bfile" '{body:$b}' \
+    | gh api "repos/$OWNER/$repo/pulls/$pr/comments/$cid/replies" --input - --jq '.id')" \
     || die "$E_API" "reply 실패 (comment_id=$cid)"
+  echo "$rid"
+
+  # 게시는 이미 끝났으므로 기록이 실패해도 0 으로 끝낸다 — 실패 코드를 보고 다시 올리면 reply 가 두 번 달린다.
+  record_reply "$repo" "$pr" "$cid" "$rid" \
+    || echo "주의 — reply 는 게시됐지만(id $rid) meta.json 기록에 실패했다. 다시 올리지 말고 손으로 적는다" >&2
+}
+
+# reply id 를 지금 락의 스테이지 기록에 남긴다. 안 남기면 다음 스테이지가 스레드를 못 찾고
+# 재개 세션이 같은 reply 를 두 번 올린다(L0-23). 키는 부모 코멘트의 code, 못 찾으면 comment_id 다.
+# Stage 3 은 이번 락에서 post-review 가 이미 게시한 회차가 있으면 거기에, 없으면 .stage3_replies 에 모아 두고
+# post-review 가 합친다 — reply 가 .stage3 를 만들면 chain.sh 의 stage3_done 이 게시 전에 참이 되고,
+# 앞 회차 객체에 붙으면 다시 돌 때 history 로 같이 밀려난다.
+record_reply() {
+  local repo="$1" pr="$2" cid="$3" rid="$4" m stage code
+  m="$(meta_path "$repo" "$pr")"
+  stage="$(jq -r '.lock.stage // empty' "$m")" || return 1
+  code="$(jq -r --argjson id "$cid" 'first(([.stage1[]?.comments[]?] + [.stage2[]?.new_comments[]?] + [.stage3.comments[]?])[]
+                                           | select(.id == $id) | .code) // empty' "$m")" || return 1
+  case "$stage" in
+    2) meta_update "$repo" "$pr" '.stage2 = ((.stage2 // []) | if length == 0 then [{}] else . end) | .stage2[-1].replies[$k] = $rid' \
+         --arg k "${code:-$cid}" --argjson rid "$rid" ;;
+    3) meta_update "$repo" "$pr" 'if .stage3 != null and (.stage3.posted_at // "") >= (.lock.started_at // "~")
+                                  then .stage3.replies[$k] = $rid else .stage3_replies[$k] = $rid end' \
+         --arg k "${code:-$cid}" --argjson rid "$rid" ;;
+    *) echo "주의 — 락에 스테이지 2·3 이 없어 reply id($rid) 를 meta.json 에 남기지 않았다" >&2 ;;
+  esac
 }
 
 cmd_patch() {
@@ -463,6 +547,8 @@ case "$sub" in
   ranges)      [ $# -eq 3 ] || usage; cmd_ranges "$@" ;;
   gate1)       [ $# -eq 4 ] || usage; cmd_gate1 "$@" ;;
   risk)        [ $# -eq 2 ] || usage; cmd_risk "$@" ;;
+  pg5)         [ $# -ge 2 ] && [ $# -le 3 ] || usage; cmd_pg5 "$@" ;;
+  pg6)         [ $# -eq 1 ] || usage; cmd_pg6 "$@" ;;
   init)        [ $# -ge 2 ] && [ $# -le 3 ] || usage; cmd_init "$@" ;;
   lock)        [ $# -eq 3 ] || usage; cmd_lock "$@" ;;
   unlock)      [ $# -eq 2 ] || usage; cmd_unlock "$@" ;;

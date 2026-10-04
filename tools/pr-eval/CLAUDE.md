@@ -28,7 +28,7 @@
 | `_memory/learnings.md` | PR 을 넘어 누적되는 학습 |
 | `_memory/human-labels.md` | 게시된 봇 코멘트를 사람이 맞음·틀림·과함으로 판정한 표. 세션은 쓰지 않는다 |
 | `runs/<repo>-pr<N>/` | PR 하나의 작업 폴더. PR 마다 버려진다 |
-| `scripts/` | `pr-eval.sh` (유일한 게시 경로) · `watch.sh` (자동 트리거) · `chain.sh` (Stage 1 부터 머지까지) · `risk.jq` (리스크 점수) · `risk-audit.sh` (머지 뒤 후속 수정 추적) · `install-entrypoints.sh` |
+| `scripts/` | `pr-eval.sh` (유일한 게시 경로) · `watch.sh` (자동 트리거) · `chain.sh` (Stage 1 부터 머지까지) · `risk.jq` (리스크 점수) · `risk-audit.sh` (머지 뒤 후속 수정 추적) · `selftest.sh` (지난 산출물에 PG5·PG6 을 다시 돌린다. 게이트를 고친 뒤 한 번) · `install-entrypoints.sh` |
 | `settings.json` · `mcp.json` | 헤드리스 세션 도구 allow/deny · MCP 를 context7 하나로 묶는 설정 |
 
 ## 2. 세 스테이지
@@ -82,8 +82,10 @@ watcher 는 저장소 소유자가 연 PR(`authorAssociation=OWNER`)만 체인�
 | `patch-review` | `<repo> <pr> <review_id> <body.md>` | 게시한 리뷰 **요약** 본문 정정. **닫힌 PR 에서는 404 다**(실측) — 열린 PR 에서만 쓴다 | 필요 |
 | `comment` | `<repo> <pr> <body.md>` | PR 에 일반 코멘트 1건 (대형 PR 보류 알림 · 리스크 점수표) | 필요 |
 | `risk` | `<repo> <pr>` | 현재 head 의 자동 머지 리스크 점수(`03-risk.md`). `meta.risk` 와 `outputs/risk.md` 에 남긴다. **`low` 가 아니면 종료 3** | 불필요 |
+| `pg5` | `<summary.md> <comments.json> [stage1\|stage2\|stage3]` | **PG5** 기계 검사(praise · code/axis/body · 축 이름 · 요약 축 범례). `post-review` 가 게시 직전에 도는 것과 같은 함수다 | 불필요 |
+| `pg6` | `<outputs/<stage>[/round-NN]>` | **PG6** — `pre-polish/` 사본과 대조해 JSON 의 건수·필드·첫 줄, 마크다운의 앵커·수치가 그대로인지 본다 | 불필요 |
 
-**종료 코드** — 0 성공 · 1 사용법·인자 오류 · 2 환경(봇 토큰 파일 또는 `meta.json` 없음) · 3 게이트 위반(PG1 실패, PG5 필수 항목 누락, 대형 PR 컷, **스테이지 순서 위반**) · 4 GitHub API 실패 · 5 락 점유 중.
+**종료 코드** — 0 성공 · 1 사용법·인자 오류 · 2 환경(봇 토큰 파일 또는 `meta.json` 없음) · 3 게이트 위반(PG1 실패, PG5 필수 항목 누락, PG6 대조 실패, 대형 PR 컷, **스테이지 순서 위반**) · 4 GitHub API 실패 · 5 락 점유 중.
 
 ## 4. 산출물 규격
 

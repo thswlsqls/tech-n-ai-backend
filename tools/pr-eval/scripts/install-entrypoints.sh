@@ -31,7 +31,7 @@ description: PR eval harness 를 돌린다. 인자 — <stage> <저장소명> <P
 ### 0. 규칙을 읽는다 (순서대로, 전부)
 
 `tools/pr-eval/00-criteria.md` → `01-stages.md` → `02-judges.md` → `profiles/<프로파일>.md`
-→ `_memory/learnings.md` 전부 → `runs/<repo>-pr<N>/frozen.md` 전부.
+→ `_memory/learnings.md` 의 첫 표 전부(맨 아래 "규칙에 이미 박은 것" 절은 읽지 않는다) → `runs/<repo>-pr<N>/frozen.md` 전부.
 직전 라운드가 있으면 `runs/<repo>-pr<N>/rounds/` 의 마지막 기록도 읽는다.
 
 ### 1. 락과 상태를 확인한다
@@ -115,19 +115,14 @@ cp -R comments.json summary.md replies patches pre-polish/ 2>/dev/null || true
 - Stage 2·3 은 **판정 단어를 바꾸지 않는다** — `반영`·`부분`·`미반영`·`역행`, `P`·`Q`·`N` 은 척도다
 - **코멘트·reply 를 합치거나 지우거나 새로 만들지 않는다.** 건수는 그대로다 — 문장만 손댄다
 
-고친 뒤 PG6 으로 대조한다. JSON 과 마크다운을 따로 본다.
+고친 뒤 PG6 으로 대조한다. 명령을 직접 조립하지 말고 스크립트를 한 줄로 부른다 — 직접 조립한 `comm`·`jq` 복합 명령은 세션 권한에서 거부된다.
 
 ```bash
-jq -s 'map(map({code, path, line, side:(.side//"RIGHT"), axis, grade,
-                head:(.body | split("\n")[0])})) | .[0] == .[1]' \
-   pre-polish/comments.json comments.json
-
-tok() { grep -ohE '[A-Za-z0-9_./-]+\.[a-z]+:[0-9]+|[0-9]+(\.[0-9]+)?' "$@" | sort -u; }
-comm -23 <(tok pre-polish/summary.md pre-polish/replies/*.md pre-polish/patches/*.md) \
-         <(tok summary.md replies/*.md patches/*.md)
+tools/pr-eval/scripts/pr-eval.sh pg6 runs/<repo>-pr<N>/outputs/$1     # 회차 폴더면 …/$1/round-NN
 ```
 
-`false` 가 나오거나 토큰이 출력되면 그 건을 사본에서 되돌리고 다시 줄인다.
+종료 3 이면 그 건을 사본에서 되돌리고 다시 줄인다. 출력된 토큰이 문장을 합치며 같은 앵커를 한 번으로 줄인 것뿐이면 통과로 본다.
+영향(②)과 방향(④)이 남았는지는 스크립트가 못 본다 — 한 건씩 다시 읽는다.
 이어서 문장에 기대는 게이트를 다시 본다 — Stage 1 은 PG2·PG5, Stage 2·3 은 PG3 과 산출물 간 교차 대조.
 before → after 분량과 되돌린 건수를 기록에 적는다.
 
@@ -160,8 +155,8 @@ tools/pr-eval/scripts/pr-eval.sh unlock $2 $3
 ```
 라운드 NN 종료
  ├ S1~S3 충족           → 4-5 윤문 → 게시하고 세션 종료
- ├ 미충족 & NN < 2       → prompts/round-(NN+1).md 를 쓰고 같은 세션에서 이어간다
- └ 미충족 & NN = 2       → 미충족 항목을 요약에 적고 → 4-5 윤문 → 게시
+ ├ 미충족 & NN < 5       → prompts/round-(NN+1).md 를 쓰고 같은 세션에서 이어간다
+ └ 미충족 & NN = 5       → 미충족 항목을 요약에 적고 → 4-5 윤문 → 게시
 ```
 
 **어느 쪽으로 끝나든 게시 직전에 4-5 를 거친다.**
@@ -182,8 +177,12 @@ tools/pr-eval/scripts/pr-eval.sh unlock $2 $3
 | 그 밖에 판단이 갈리는 자리 | 사람에게 묻는다 | 규칙 문서가 권하는 쪽. 권하는 쪽이 없으면 **게시하지 않는 쪽** |
 
 **Stage 2 를 두 번째 이상 부를 때** — `meta.json` 의 `stage2` 에 판정 기록이 이미 있으면 새 회차다.
-`post-review` 는 `stage2` 의 마지막 원소에 합치므로, 게시하기 전에 `{round, stage_sha, last_judged_sha}` 를
-새 원소로 먼저 붙인다. 판정은 그 원소의 `verdicts` 에 적는다 — 체인은 `verdicts` 가 있는 원소 수로 완료를 센다.
+`reply` 는 reply id 를 `stage2` 의 마지막 원소에 적으므로, 첫 `reply`·`post-review` 를 부르기 전에 `{round, stage_sha, last_judged_sha}` 를
+새 원소로 먼저 붙인다. `post-review` 는 마지막 원소의 `stage_sha` 가 같으면 거기에 합치고 다르면 새 원소를 붙인다. 판정은 그 원소의 `verdicts` 에 적는다 — 체인은 `verdicts` 가 있는 원소 수로 완료를 센다.
+
+**Stage 3 의 reply id** 는 이번 락에서 `post-review … stage3` 를 이미 했으면 `stage3.replies` 에 바로, 아직이면 `stage3_replies` 에 모였다가 `post-review` 가 합친다. 순서는 어느 쪽이든 된다.
+이번 락에서 `post-review` 를 부르지 않고 끝낼 때(재개 세션, `.stage3` 를 손으로 쓴 경우)는 `stage3_replies` 를 `stage3.replies` 로 옮기고 지운다.
+남겨 두면 다음 회차 `post-review` 가 지난 회차 reply 를 새 회차에 합친다.
 CMDEOF
 
 AUTHOR_CMD="$REPO_ROOT/.claude/commands/pr-eval-author.md"

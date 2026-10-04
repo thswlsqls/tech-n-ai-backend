@@ -74,7 +74,9 @@
       "Bash(rtk git fetch:*)",
       "Bash(rtk git show:*)",
       "Bash(rtk git worktree:*)",
-      "Bash(rtk git checkout:*)"
+      "Bash(rtk git checkout:*)",
+      "Bash(rtk gh pr edit:*)",
+      "Bash(rtk gh pr comment:*)"
     ],
     "deny": [
       "Bash(git push --force:*)",
