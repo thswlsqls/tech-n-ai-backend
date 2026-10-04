@@ -215,6 +215,9 @@ outputs/<stage>/pre-polish/            위 전부의 윤문 전 사본. 같은 �
 | 경미·사소만 | 불필요 |
 | 0건 | 불필요 (강) |
 
+체인 모드에서는 Stage 1 을 다시 돌리지 않고 `P` 를 저자 반영으로 넘긴다. 대신 `P` 에 치명·중대가 하나라도 있으면
+머지 게이트가 `needs-human` 으로 멈춘다 — 리뷰가 놓친 결함이 나온 PR 은 저자가 고쳤더라도 사람이 보고 머지한다.
+
 ### 5-1. 실측 — 인프라 제약
 
 `docker-compose.yml`에 Redis도 MongoDB도 없다(kafka · mysql 4종 · 관측 스택뿐).
@@ -273,7 +276,7 @@ stage_sha       = Stage 2/3 시작 시점 head
              "comments": [{"id": 999, "code": "P-01", "path": "…", "line": 25,
                            "axis": "R-A · R-B", "grade": "경미"}],
              "replies": {"C-02": 1001}},   // 스레드 reply 는 여기 남긴다
-  "chain": {"sessions": [{"step": "stage1", "try": 1, "at": "…", "duration_ms": 0, "cost_usd": 0, "num_turns": 0, "is_error": false}]},   // chain.sh 가 세션마다 덧붙인다
+  "chain": {"sessions": [{"step": "stage1", "try": 1, "at": "…", "session_id": "…", "duration_ms": 0, "cost_usd": 0, "num_turns": 0, "is_error": false}]},   // chain.sh 가 세션마다 덧붙인다
 
   "status": "대기|진행|완료|보류(대형PR)|보류(실패)"   // 보류면 watcher 가 건너뛴다
 }
@@ -387,6 +390,7 @@ A/B 비교는 쓰지 않는다 — 그 자리는 §6 "문단 쓰기 전 두 줄 
 | V3(저자 반박) 성공이 2라운드 연속 늘었다 **또는 2회 연속 5건 이상이다** | 근거 없이 세게 쓰고 있다. 무효 조건 I-8을 위원 프롬프트 앞으로. 그리고 `00-criteria.md` §7 의 판 전체 대조를 게시 전에 돌린다 — 성공이 높게 **유지**되는 국면은 "늘어남" 만으로는 안 잡힌다 |
 | 위원이 평가 대상을 고치려 했다 / 파일을 썼다 | 불변식이 안 먹혔다. 에이전트 정의와 프롬프트 맨 앞 블록을 강화한다 |
 | PG1이 앵커를 반복해서 되돌린다 | 위원이 diff 밖을 보고 있다. Phase 0에서 변경 파일 목록을 본문으로 싣는다 |
+| `_memory/learnings.md` 에 같은 유형이 두 번째로 적혔다 | 처방을 learnings 에만 두지 않는다. 그 자리에서 `00`·`01`·`02` 나 커맨드(`install-entrypoints.sh`)의 해당 절에 옮기고 learnings 항목에 `[YYYY-MM-DD 고쳤다]` 를 붙인다 — learnings 에 적고 읽히기만 해서는 같은 실패가 되풀이됐다(L0-39 → L0-41 → L0-51). 규칙 문서의 해당 절에 있어야 점검 대상이 된다 |
 
 고칠 게 없으면 **"이번 라운드에는 하니스 결함 없음"** 이라고 기록에 적는다. 안 적으면 점검을 안 한 것으로 본다.
 

@@ -55,7 +55,7 @@ run_session() {  # run_session <settings.json> <프롬프트> <단계 이름> <�
   jq -r '.result // empty' <<<"$out" 2>/dev/null || printf '%s\n' "$out"
   # 단계별 시간·비용을 남긴다 — 작은 PR 에서 단계를 줄여도 되는지 판단할 근거
   { jq -e . <<<"$out" >/dev/null 2>&1 && meta_set '.chain.sessions = ((.chain.sessions // []) + [{step:$s, try:$t,
-      at:$at, duration_ms:$r.duration_ms, cost_usd:$r.total_cost_usd, num_turns:$r.num_turns, is_error:$r.is_error}])' \
+      at:$at, session_id:$r.session_id, duration_ms:$r.duration_ms, cost_usd:$r.total_cost_usd, num_turns:$r.num_turns, is_error:$r.is_error}])' \
       --arg s "$name" --argjson t "$try" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --argjson r "$out"; } \
     || log "세션 결과를 JSON 으로 못 읽어 meta.json 에 시간·비용을 남기지 못했다"
 }
@@ -127,6 +127,15 @@ merge_gate() {
 
   if [ ${#reasons[@]} -gt 0 ]; then
     chain_state "blocked" "머지 게이트: $(IFS='; '; echo "${reasons[*]}")"
+    exit 3
+  fi
+
+  # Stage 3 이 리뷰가 놓친 치명·중대(P)를 찾았으면 Stage 1 재실행 여부는 사람이 정한다 (01-stages.md §5).
+  # 세션이 적는 verdict 문구가 아니라 pr-eval.sh 가 기록한 P 코멘트 등급으로 본다. 등급이 빠진 P 도 멈춘다
+  local missed
+  missed="$(jq -r '[.stage3.comments[]? | select(.grade != "경미" and .grade != "사소") | "\(.code)(\(.grade))"] | join(", ")' "$M")"
+  if [ -n "$missed" ]; then
+    chain_state "needs-human" "Stage 3 이 리뷰가 놓친 결함을 찾았다: $missed — Stage 1 재실행 여부를 사람이 정한다"
     exit 3
   fi
 }

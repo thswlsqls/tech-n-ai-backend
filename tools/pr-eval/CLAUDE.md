@@ -26,6 +26,7 @@
 | `03-risk.md` | 자동 머지 리스크 점수 — 점수표 · 등급별 처리 · 보정 기록 |
 | `profiles/backend.md` · `frontend.md` | 리뷰 축 정의문과 위원 4인의 볼 것 / 보지 않을 것 / 등급 예시 / 측정 기준선 |
 | `_memory/learnings.md` | PR 을 넘어 누적되는 학습 |
+| `_memory/human-labels.md` | 게시된 봇 코멘트를 사람이 맞음·틀림·과함으로 판정한 표. 세션은 쓰지 않는다 |
 | `runs/<repo>-pr<N>/` | PR 하나의 작업 폴더. PR 마다 버려진다 |
 | `scripts/` | `pr-eval.sh` (유일한 게시 경로) · `watch.sh` (자동 트리거) · `chain.sh` (Stage 1 부터 머지까지) · `risk.jq` (리스크 점수) · `risk-audit.sh` (머지 뒤 후속 수정 추적) · `install-entrypoints.sh` |
 | `settings.json` · `mcp.json` | 헤드리스 세션 도구 allow/deny · MCP 를 context7 하나로 묶는 설정 |
@@ -40,9 +41,9 @@
 
 **기본 동작은 머지까지다.** 봇을 리뷰어로 지정하면 watcher 가 `scripts/chain.sh <저장소> <PR번호>` 를 띄우고, 체인이
 Stage 1 → 저자 반영(`/pr-eval-author`) → Stage 2 → Stage 3 → (저자 반영 → Stage 2)* → 머지 게이트 → **리스크 게이트** → `gh pr merge` 를 사람 없이 돈다.
-머지는 봇이 아니라 체인이 사용자 gh 계정으로 한다. 리스크 점수(`03-risk.md`)가 `low` 가 아니면 머지하지 않고 `chain.state=needs-human` 으로 멈춘다 —
+머지는 봇이 아니라 체인이 사용자 gh 계정으로 한다. 리스크 점수(`03-risk.md`)가 `low` 가 아니거나, Stage 3 이 리뷰가 놓친 치명·중대(`P`)를 찾았으면 머지하지 않고 `chain.state=needs-human` 으로 멈춘다 —
 점수표는 봇이 PR 코멘트로 남긴다. 체인은 `meta.json` 을 보고 멈춘 자리부터 이어 가므로 손으로 다시 불러도 된다.
-체인이 띄운 헤드리스 세션마다 걸린 시간·비용·턴 수가 `meta.json` 의 `chain.sessions[]` 에 한 줄씩 쌓인다(`claude -p --output-format json` 의 `duration_ms`·`total_cost_usd`·`num_turns`·`is_error`).
+체인이 띄운 헤드리스 세션마다 걸린 시간·비용·턴 수가 `meta.json` 의 `chain.sessions[]` 에 한 줄씩 쌓인다(`claude -p --output-format json` 의 `session_id`·`duration_ms`·`total_cost_usd`·`num_turns`·`is_error`).
 watcher 는 저장소 소유자가 연 PR(`authorAssociation=OWNER`)만 체인에 넣는다 — 남의 PR 본문·diff 가 사용자 계정으로 push·머지하는 세션에 들어가지 않게 한다.
 리뷰어를 다시 지정해도 Stage 1 을 다시 돌지 않는다. **Stage N 은 `meta.json` 에 Stage N−1 완료 기록이 있어야 돈다**(`lock` 이 막는다, 종료 코드 3).
 

@@ -154,9 +154,10 @@ PR #34 에서는 Stage 1 이 코멘트 6건(그중 잘한 점 1건)을 남겼고
 flowchart LR
   C["Stage 1 → 저자 반영 → Stage 2 → Stage 3<br/>→ (저자 반영 → Stage 2)*"] --> MG{"머지 게이트<br/>blocking 0 · 역행 0 · 테스트 통과<br/>head 를 누군가 판정했나"}
   MG -- 아니다 --> B[blocked]
+  MG -- "Stage 3 P 에 치명·중대" --> H
   MG -- 그렇다 --> RG{"리스크 게이트<br/>0~100 점"}
   RG -- "low (0–14)" --> M[gh pr merge]
-  RG -- "medium 이상" --> H["needs-human<br/>점수표를 PR 에 남기고 멈춘다"]
+  RG -- "medium 이상 · 점수표를 PR 에 남긴다" --> H["needs-human<br/>사람이 보고 머지한다"]
 ```
 
 리뷰가 blocking 을 다 풀었어도 인증 코드나 인프라를 건드린 PR 은 사람이 봐야 한다. 리스크 게이트는 **어디를 얼마나 바꿨는지**를
