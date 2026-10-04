@@ -16,7 +16,7 @@ cat > "$CMD" <<'CMDEOF'
 description: PR eval harness 를 돌린다. 인자 — <stage> <저장소명> <PR번호> [--round N] [--approve]
 ---
 
-`/pr-eval $1 $2 $3` — stage 는 `stage1`·`stage2`·`stage3` 중 하나, `$2` 는 저장소명(= 프로파일 키), `$3` 은 PR 번호.
+`/pr-eval $0 $1 $2` — stage 는 `stage1`·`stage2`·`stage3` 중 하나, `$1` 은 저장소명(= 프로파일 키), `$2` 는 PR 번호.
 
 ## 맨 앞에서 지킬 것
 
@@ -37,13 +37,13 @@ description: PR eval harness 를 돌린다. 인자 — <stage> <저장소명> <P
 ### 1. 락과 상태를 확인한다
 
 ```bash
-tools/pr-eval/scripts/pr-eval.sh init  $2 $3
-tools/pr-eval/scripts/pr-eval.sh lock  $2 $3 <1|2|3>
+tools/pr-eval/scripts/pr-eval.sh init  $1 $2
+tools/pr-eval/scripts/pr-eval.sh lock  $1 $2 <1|2|3>
 ```
 
 `init` 은 **어느 스테이지에서 불러도 안전하다.** Stage 1 이 이미 게시했으면 `base_sha`·`eval_sha` 를 보존한다 —
 Stage 2·3 시점의 head 는 저자의 반영 커밋이라, 덮으면 Stage 1 이 무엇을 판정했는지가 사라진다.
-Stage 1 을 새 head 로 다시 돌릴 때만 `init $2 $3 --reset-eval` 를 쓴다.
+Stage 1 을 새 head 로 다시 돌릴 때만 `init $1 $2 --reset-eval` 를 쓴다.
 
 - `lock` 이 5 로 끝나면 다른 세션이 돌고 있다. **멈추고 사람에게 보고한다.**
 - `lock` 이 3 으로 끝나면 직전 스테이지 완료 기록이 없다는 뜻이다(스크립트가 막는다).
@@ -54,7 +54,7 @@ Stage 1 을 새 head 로 다시 돌릴 때만 `init $2 $3 --reset-eval` 를 쓴�
 ### 2. 기준 SHA 를 고정한다
 
 ```bash
-tools/pr-eval/scripts/pr-eval.sh sha $2 $3
+tools/pr-eval/scripts/pr-eval.sh sha $1 $2
 ```
 
 **라운드를 시작할 때마다 직접 확인한다.** Stage 1 라운드 도중 head 가 움직였으면
@@ -63,7 +63,7 @@ tools/pr-eval/scripts/pr-eval.sh sha $2 $3
 그리고 **앵커를 달 수 있는 줄 범위를 받아 위원 프롬프트에 싣는다.**
 
 ```bash
-tools/pr-eval/scripts/pr-eval.sh ranges $2 $3 <기준SHA>
+tools/pr-eval/scripts/pr-eval.sh ranges $1 $2 <기준SHA>
 ```
 
 **앵커가 하나라도 이 범위 밖이면 GitHub 이 리뷰를 통째로 422 로 되돌린다**(실측).
@@ -118,7 +118,7 @@ cp -R comments.json summary.md replies patches pre-polish/ 2>/dev/null || true
 고친 뒤 PG6 으로 대조한다. 명령을 직접 조립하지 말고 스크립트를 한 줄로 부른다 — 직접 조립한 `comm`·`jq` 복합 명령은 세션 권한에서 거부된다.
 
 ```bash
-tools/pr-eval/scripts/pr-eval.sh pg6 runs/<repo>-pr<N>/outputs/$1     # 회차 폴더면 …/$1/round-NN
+tools/pr-eval/scripts/pr-eval.sh pg6 runs/<repo>-pr<N>/outputs/$0     # 회차 폴더면 …/$0/round-NN
 ```
 
 종료 3 이면 그 건을 사본에서 되돌리고 다시 줄인다. 출력된 토큰이 문장을 합치며 같은 앵커를 한 번으로 줄인 것뿐이면 통과로 본다.
@@ -129,9 +129,9 @@ before → after 분량과 되돌린 건수를 기록에 적는다.
 ### 5. 게이트를 통과시키고 게시한다
 
 ```bash
-tools/pr-eval/scripts/pr-eval.sh gate1 $2 $3 <기준SHA> runs/<repo>-pr<N>/outputs/$1/comments.json
-tools/pr-eval/scripts/pr-eval.sh post-review $2 $3 <기준SHA> \
-    runs/<repo>-pr<N>/outputs/$1/summary.md runs/<repo>-pr<N>/outputs/$1/comments.json $1
+tools/pr-eval/scripts/pr-eval.sh gate1 $1 $2 <기준SHA> runs/<repo>-pr<N>/outputs/$0/comments.json
+tools/pr-eval/scripts/pr-eval.sh post-review $1 $2 <기준SHA> \
+    runs/<repo>-pr<N>/outputs/$0/summary.md runs/<repo>-pr<N>/outputs/$0/comments.json $0
 ```
 
 `post-review` 의 마지막 인자는 `stage1`·`stage2`·`stage3` 중 이번 스테이지다. 척도 밖 값은 스크립트가 거부한다.
@@ -147,7 +147,7 @@ Stage 2·3 의 스레드 reply·정정은 `reply`·`patch` 서브커맨드를 �
 Phase 5 신호표를 한 줄씩 대조하고, 고칠 게 없으면 **"이번 라운드에는 하니스 결함 없음"** 이라고 적는다.
 
 ```bash
-tools/pr-eval/scripts/pr-eval.sh unlock $2 $3
+tools/pr-eval/scripts/pr-eval.sh unlock $1 $2
 ```
 
 ## Stage 1 라운드 루프
@@ -191,7 +191,7 @@ cat > "$AUTHOR_CMD" <<'AUTHOREOF'
 description: 체인 모드의 저자 역할. 봇 리뷰를 PR 브랜치에 반영하고 스레드에 답한다. 인자 — <저장소명> <PR번호>
 ---
 
-`/pr-eval-author $1 $2` — PR 작성자 입장에서 `tech-n-ai-eval-bot` 의 리뷰를 반영한다. `scripts/chain.sh` 가 부른다.
+`/pr-eval-author $0 $1` — PR 작성자 입장에서 `tech-n-ai-eval-bot` 의 리뷰를 반영한다. `scripts/chain.sh` 가 부른다.
 
 ## 맨 앞에서 지킬 것
 
@@ -206,12 +206,12 @@ description: 체인 모드의 저자 역할. 봇 리뷰를 PR 브랜치에 반�
 ### 0. 무엇에 답할지 모은다
 
 ```bash
-gh pr view $2 --json headRefName,headRefOid,body
-gh api repos/thswlsqls/$1/pulls/$2/comments --paginate
-gh api repos/thswlsqls/$1/pulls/$2/reviews --paginate
+gh pr view $1 --json headRefName,headRefOid,body
+gh api repos/thswlsqls/$0/pulls/$1/comments --paginate
+gh api repos/thswlsqls/$0/pulls/$1/reviews --paginate
 ```
 
-`tools/pr-eval/runs/$1-pr$2/outputs/stage*/summary.md` 와 `outputs/author/` 의 지난 회차 기록도 읽는다.
+`tools/pr-eval/runs/$0-pr$1/outputs/stage*/summary.md` 와 `outputs/author/` 의 지난 회차 기록도 읽는다.
 
 **답할 항목** = 봇의 스레드 가운데 **마지막 말이 봇이고, 할 일을 남긴 것**.
 `praise` 와 `판정: 반영` 만 적고 새 요청이 없는 reply 는 답할 항목이 아니다.
@@ -228,8 +228,8 @@ gh api repos/thswlsqls/$1/pulls/$2/reviews --paginate
 
 ```bash
 git fetch origin <headRefName>
-git worktree add ../tech-n-ai-backend-worktrees/pr-author-$2 origin/<headRefName>   # 없을 때만
-cd ../tech-n-ai-backend-worktrees/pr-author-$2 && git checkout -B <headRefName> origin/<headRefName>
+git worktree add ../tech-n-ai-backend-worktrees/pr-author-$1 origin/<headRefName>   # 없을 때만
+cd ../tech-n-ai-backend-worktrees/pr-author-$1 && git checkout -B <headRefName> origin/<headRefName>
 ```
 
 메인 작업 트리는 건드리지 않는다. 고친 뒤 영향 모듈 테스트를 돌린다(`./gradlew :<모듈>:test`).
@@ -237,7 +237,7 @@ cd ../tech-n-ai-backend-worktrees/pr-author-$2 && git checkout -B <headRefName> 
 **테스트를 지우거나 `@Disabled` 로 끄거나 단언·기대값을 바꿔 통과시키지 않는다.** 리뷰가 그 테스트를 고치라고 한 경우만 예외다.
 
 반영한 것이 있으면 한 커밋으로 묶어 `git push origin <headRefName>` 한다.
-PR 본문의 서술이 바뀐 코드와 어긋나게 됐으면 `gh pr edit $2 --body-file <파일>` 로 그 문장만 고친다.
+PR 본문의 서술이 바뀐 코드와 어긋나게 됐으면 `gh pr edit $1 --body-file <파일>` 로 그 문장만 고친다.
 
 ### 3. 스레드에 답한다
 
@@ -245,14 +245,14 @@ push 한 뒤, 항목마다 그 스레드에 한 건씩 답한다. 첫 줄은 `�
 무엇을 어디서 바꿨는지 `파일:줄` 로 적는다.
 
 ```bash
-gh api repos/thswlsqls/$1/pulls/$2/comments/<comment_id>/replies -F body=@<본문파일>
+gh api repos/thswlsqls/$0/pulls/$1/comments/<comment_id>/replies -F body=@<본문파일>
 ```
 
-요약에만 있던 항목은 `gh pr comment $2 --body-file <파일>` 로 한 건에 모아 답한다.
+요약에만 있던 항목은 `gh pr comment $1 --body-file <파일>` 로 한 건에 모아 답한다.
 
 ### 4. 회차 기록을 남긴다 — 체인은 이 파일로만 판단한다
 
-`tools/pr-eval/runs/$1-pr$2/outputs/author/round-NN.json` (NN 은 기존 파일 수 + 1, 두 자리):
+`tools/pr-eval/runs/$0-pr$1/outputs/author/round-NN.json` (NN 은 기존 파일 수 + 1, 두 자리):
 
 ```json
 { "round": 1, "from_sha": "<시작 head>", "to_sha": "<끝난 뒤 head>", "pushed": true,
