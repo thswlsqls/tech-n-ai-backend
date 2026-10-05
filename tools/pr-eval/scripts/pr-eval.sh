@@ -154,6 +154,20 @@ cmd_ranges() {
   emit_ranges "$repo" "$sha" "$tmp" "$pr"
   echo "# inline 앵커 허용 범위 (기준 SHA $sha) — 파일 / 시작줄 / 끝줄(포함)"
   awk -F'\t' '{printf "%s\t%d-%d\n", $1, $2, $2+$3-1}' "$tmp/ranges.tsv"
+  # 범위만 주면 위원이 hunk 시작줄부터 세다 틀린다. 같은 patch 에 줄 번호를 붙여 보여 준다.
+  echo "# 줄 번호를 붙인 diff — '+'·' ' 줄은 새 파일 번호(앵커 가능), '(N) -' 줄은 삭제된 옛 파일 번호(앵커 불가)"
+  jq -r '.files[] | select(.patch != null) | "F\t\(.filename)", (.patch | split("\n")[] | "P\t\(.)")' \
+    "$tmp/compare.json" | awk '
+    /^F\t/ { print "## " substr($0, 3); next }
+    { l = substr($0, 3); c = substr(l, 1, 1) }
+    c == "@" { match(l, /-[0-9]+/); o = substr(l, RSTART + 1, RLENGTH - 1) + 0
+               match(l, /\+[0-9]+(,[0-9]+)?/); h = substr(l, RSTART + 1, RLENGTH - 1)
+               n = h + 0; k = (h ~ /,/) ? substr(h, index(h, ",") + 1) + 0 : 1
+               printf "  %d-%d  %s\n", n, n + k - 1, l; next }
+    c == "+" { printf "%7d + %s\n", n++, substr(l, 2); next }
+    c == "-" { printf "%7s - %s\n", "(" o++ ")", substr(l, 2); next }
+    c == " " { printf "%7d   %s\n", n++, substr(l, 2); o++; next }
+    l != "" { print "          " l }'
   local n; n="$(jq -r '[.files[] | select(.patch == null)] | length' "$tmp/compare.json")"
   [ "$n" = "0" ] || { echo "# patch 가 없어 앵커를 달 수 없는 파일 $n 건:"; \
     jq -r '.files[] | select(.patch == null) | "#   " + .filename' "$tmp/compare.json"; }
