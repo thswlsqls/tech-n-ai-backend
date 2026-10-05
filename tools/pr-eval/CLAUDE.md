@@ -70,7 +70,7 @@ watcher 는 저장소 소유자가 연 PR(`authorAssociation=OWNER`)만 체인�
 | `sha` | `<repo> <pr>` | 현재 head SHA 를 출력 | 불필요 |
 | `meta` | `<repo> <pr>` | `meta.json` 출력 | 불필요 |
 | `precheck` | `<repo> <pr>` | 대형 PR 컷 판정 (파일 50 / 줄 3000) | 불필요 |
-| `ranges` | `<repo> <pr> <sha>` | inline 앵커를 달 수 있는 줄 범위를 낸다. **위원 프롬프트에 실어 diff 밖 앵커를 애초에 막는다** | 불필요 |
+| `ranges` | `<repo> <pr> <sha>` | inline 앵커를 달 수 있는 줄 범위와, 줄 번호를 붙인 diff 본문(삭제 줄은 옛 파일 번호라 앵커 불가)을 낸다. **위원 프롬프트에 실어 diff 밖 앵커를 애초에 막는다** | 불필요 |
 | `gate1` | `<repo> <pr> <sha> <comments.json>` | **PG1** — 앵커가 그 SHA 의 diff 안인지 줄 단위로 검사 | 불필요 |
 | `init` | `<repo> <pr> [--reset-eval]` | `runs/<repo>-pr<N>/` 와 `meta.json` 생성·갱신. **기존 기록을 덮어쓰지 않는다.** Stage 1 이 이미 게시했으면 `base_sha`·`eval_sha` 도 보존한다 — Stage 1 을 새 head 로 다시 돌릴 때만 `--reset-eval` | 불필요 |
 | `lock` | `<repo> <pr> <stage>` | 락 획득. pid 가 죽었거나 3시간이 지난 락은 지우고 가져온다 | 불필요 |
