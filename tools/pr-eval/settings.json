@@ -6,7 +6,6 @@
       "Grep",
       "Glob",
       "Edit(/runs/**)",
-      "Edit(/_memory/learnings.md)",
       "Task",
       "Agent",
       "Bash(/Users/m1/workspace/tech-n-ai/tech-n-ai-backend/tools/pr-eval/scripts/pr-eval.sh sha:*)",
@@ -72,7 +71,7 @@
       "Edit(/*.json)",
       "Edit(/*.md)",
       "Edit(/profiles/**)",
-      "Edit(/_memory/human-labels.md)"
+      "Edit(/_memory/**)"
     ]
   }
 }

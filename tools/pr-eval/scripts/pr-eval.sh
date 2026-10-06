@@ -587,6 +587,11 @@ cmd_comment() {
 
 [ $# -ge 1 ] || usage
 sub="$1"; shift
+# PR 번호는 runs/ 아래 경로가 된다. 숫자가 아니면 init 이 runs/ 밖에 폴더와 frozen.md 를 만들 수 있다
+case "$sub" in
+  pg5|pg6|snapshot) ;;
+  *) [[ "${2:-}" =~ ^[1-9][0-9]*$ ]] || die "$E_USAGE" "PR 번호는 양의 정수여야 한다: ${2:-}" ;;
+esac
 case "$sub" in
   sha)         [ $# -eq 2 ] || usage; cmd_sha "$@" ;;
   meta)        [ $# -eq 2 ] || usage; cmd_meta "$@" ;;
