@@ -21,10 +21,6 @@
 
 판단 기준: 작성한 텍스트를 그 분야를 모르는 동료에게 소리 내어 읽어준다고 가정한다. 그대로 알아들으면 통과, 단어를 바꿔 설명해야 하면 다시 쓴다.
 
-### 오버엔지니어링 금지
-- 요청된 작업 범위에 집중한다. 요청하지 않은 리팩토링이나 기능 추가를 하지 않는다.
-- 현재 필요하지 않은 추상화나 미래 대비 코드를 작성하지 않는다.
-
 ### 외부 자료 참조 원칙
 - 공식 문서와 공식 저장소만 참조한다. 비공식 블로그, 포럼, AI 생성 콘텐츠를 근거로 사용하지 않는다.
 - 기술 논문은 arXiv/ACM/IEEE/Springer 등 공인 학술 플랫폼 게시본만 사용하고, 제목·저자·발행처·URL을 명시한다.
@@ -130,41 +126,28 @@ Tradeoff: 이 지침은 속도보다 신중함에 무게를 둔다. 사소한 �
 `api/auth` → `api-auth`, `common/security` → `common-security`. **모듈을 추가할 때
 `settings.gradle`을 수정할 필요가 없다** — `src/`가 있는 디렉터리만 만들면 된다.
 
-```
-api/          REST API 서버: agent, auth, bookmark, chatbot, emerging-tech, gateway
-batch/        배치 잡 (batch/source)
-client/       외부 연동: feign, mail, rss, scraper, slack
-common/       공유 라이브러리: conversation, core, exception, kafka, security
-datasource/   데이터 접근: aurora (command), mongodb (query)
-```
-
-**의존 방향**: `api`/`batch` 모듈이 필요한 `common-*`, `datasource-*`, `client-*`를
-엮어서 쓴다 (각 모듈의 `build.gradle` 참고). 트리 안 어떤 모듈에도 의존하지 않는 건
-`common-core` 하나뿐이다. `common-exception`·`common-kafka`는 `datasource-mongodb`에,
-`common-conversation`은 `datasource-aurora`·`datasource-mongodb`에 의존하고,
-`client-*`는 `common-core`(일부는 `common-exception`, feign은 `common-kafka`도)에 의존한다.
-
 ### 핵심 규칙
 - **Entity / Document 이름**: Aurora는 `domain/aurora/entity/`의 `*Entity`, MongoDB는 `domain/mongodb/document/`의 `*Document`.
 - **기본키**: `@Tsid` + `TsidGenerator`(`domain/aurora/generator`에 위치)를 통한 TSID (Time-Sorted Unique Identifier).
 - **이력 추적**: `BaseWriterRepository`가 `HistoryService`를 호출해 저장하는 `*HistoryEntity` (User/Admin/Bookmark 3종).
-- **Gradle DSL**: Groovy (Kotlin DSL 아님). 공유 의존성 설정은 루트 `build.gradle`에, JPA/QueryDSL 추가분은 `jpa.gradle`에, REST Docs는 `docs.gradle`에 두고 모듈마다 `apply from:`으로 적용한다.
+- **Gradle DSL**: Groovy (Kotlin DSL 아님). 공유 의존성 설정은 루트 `build.gradle`에, JPA/QueryDSL 추가분은 `jpa.gradle`에, REST Docs는 `docs.gradle`에 두고 모듈마다 `apply from:`으로 적용한다. `jpa.gradle`에 있는 의존성(HikariCP, QueryDSL, AWS MySQL JDBC)을 datasource 모듈에서 다시 선언하지 않는다.
+- **Aurora 스키마는 외부에서 관리한다**: Flyway 의존성은 있지만 마이그레이션 파일은 아직 없고 `ddl-auto: none`이다.
+- **Kafka 이벤트 소비**는 Redis 기반 멱등성 처리(7일 TTL)를 거친다.
+- **TSID 기본키**(64비트 Long)는 JS `Number.MAX_SAFE_INTEGER`를 넘으므로 전역 Jackson 직렬화기가 `Long`을 `String`으로 내보낸다. API 경계를 넘을 때 ID는 문자열로 유지한다.
+- **전역 제외**: 루트 `build.gradle`이 `spring-boot-data-rest`/`hateoas`를 모든 모듈에서 제외한다.
+- **서비스 간 호출**: 외부 트래픽은 `api-gateway`를 통해서만 들어오고, 서비스 사이 내부 호출은 `X-Internal-Api-Key` 헤더가 필요하다. `api-emerging-tech`는 MySQL 없이 MongoDB만 쓴다.
+- **배치**: `batch-source`에는 내부 스케줄러가 없다. GitHub Release·RSS·웹 스크래핑 잡을 `--job.name`으로 골라 실행하고, 수집 결과는 `api-emerging-tech` 내부 API를 거쳐 MongoDB에 저장한다.
+- **설계 기준 문서**: `README.md`(아키텍처 다이어그램, ERD, API 엔드포인트 목록, `docs/stepN/` 설계 문서).
 
 ### API Gateway
 `api-gateway`가 중앙 진입점이다: JWT 검증, CORS, 백엔드 서비스로의 라우팅을 맡는다.
+WebFlux/Netty 기반이라 빌드에서 Servlet/Tomcat/Security 스타터를 모두 제외한다는 점에 유의한다.
 JWT 처리는 `common-security`(`JwtTokenProvider`)에서 온다.
 
 ### RAG 챗봇 (`api-chatbot`)
 langchain4j 1.10.0을 사용하며, 검색에는 MongoDB Atlas Vector Search를, 기본 LLM
 제공자로는 OpenAI를, 재순위(re-ranking)에는 Cohere를 쓴다.
 Cohere 재순위와 Google 웹 검색은 기본 비활성이고 API 키를 설정하면 켜진다.
-
-## 기술 스택
-- Java 21, Spring Boot 4.0.2 (`spring-boot-starter-classic`), Spring Cloud 2025.1.0
-- Aurora MySQL (command) + MongoDB Atlas (query), Apache Kafka, Redis
-- JPA/Hibernate 7.2 + QueryDSL 5.1 (writer), MyBatis 4.0.1 (reader)
-- langchain4j 1.10.0 (OpenAI + Cohere), Spring REST Docs + Asciidoctor
-- 관측(observability): OpenTelemetry, Micrometer (Prometheus / Dynatrace); `monitoring/`과 `docker-compose.yml` 참고
 
 ## 설정
 - 프로필: `local`, `dev`, `beta`, `prod`. 테스트와 `bootRun`은 기본적으로 `local`을 쓴다.
@@ -174,16 +157,7 @@ Cohere 재순위와 Google 웹 검색은 기본 비활성이고 API 키를 설�
 
 ## 인프라·배포·관측 (`devops/`, `monitoring/`)
 
-### Terraform (IaC) — `devops/terraform/`
-AWS 인프라는 Terraform으로 관리한다. 세 부분으로 나뉜다.
-- `bootstrap/` — Terraform 상태 저장용 S3·KMS, ECR, GitHub Actions용 OIDC 역할처럼 다른 모든 것보다 먼저 있어야 하는 리소스. 한 번만 적용한다.
-- `modules/` — 재사용하는 리소스 묶음: `network`, `aurora-mysql`, `elasticache-valkey`, `msk-serverless`/`msk-provisioned`(Kafka), `ecs-service`, `cloudfront-spa`, `amplify-app`, `s3-bucket`, `iam-role-workload`, `observability`.
-- `envs/{dev,beta,prod}/` — 환경별로 위 모듈을 엮어 실제 인프라를 정의한다. 환경마다 상태가 분리돼 있다.
-
-리팩토링할 때는 `terraform plan`이 아무 변경도 만들지 않는지(no-op)로 동작이 그대로인지 확인한다.
-
-### AWS 아키텍처 다이어그램 — `devops/aws/{dev,beta,prod}/`
-환경별로 네트워크 구성, 참조 아키텍처, 보안, 관측 다이어그램을 `.drawio`와 `.png`로 둔다. 인프라를 바꾸면 이 다이어그램도 같이 맞춘다.
+Terraform과 AWS 다이어그램 규칙은 `devops/CLAUDE.md`에 있다.
 
 ### 관측(observability) — 로컬과 운영이 분리돼 있다
 - **로컬**: 루트 `docker-compose.yml` 하나에 DB·Kafka와 함께 Prometheus, Pushgateway, Alertmanager, Jaeger(트레이스), Loki + Promtail(로그), Grafana가 들어 있다. 각 도구의 설정 파일은 `monitoring/` 아래에 있고, 브라우저 접속 URL은 `monitoring/README.md` 참고 (전부 로컬 PC 주소다 — 운영 관측과 섞지 않는다).
@@ -191,11 +165,3 @@ AWS 인프라는 Terraform으로 관리한다. 세 부분으로 나뉜다.
 
 ## tmux 개발 환경
 `./scripts/tmux/tmux-backend.sh`가 3창 세션(project, module, test)을 띄운다. 사용법은 `scripts/tmux/` 아래 md 문서 참고.
-<!-- rtk-instructions v2 -->
-# RTK (Rust Token Killer)
-
-**모든 셸 명령 앞에 `rtk`를 붙인다.** 체인에서도 각 명령마다 붙인다 (`rtk git add . && rtk git commit -m "msg"`).
-전용 필터가 있는 명령(빌드·테스트·git·gh·docker·kubectl·curl 등)은 출력을 60~90% 압축하고,
-필터가 없으면 그대로 통과시키므로 항상 안전하다.
-`rtk gain`으로 절감 통계를 보고, 원본 출력이 필요하면 `rtk proxy <cmd>`를 쓴다.
-<!-- /rtk-instructions -->
