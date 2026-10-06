@@ -21,6 +21,7 @@ die() { log "$1"; exit "${2:-1}"; }
 
 [ $# -eq 2 ] || { echo "usage: chain.sh <repo> <pr>" >&2; exit 1; }
 REPO="$1"; PR="$2"
+[[ "$PR" =~ ^[1-9][0-9]*$ ]] || { echo "PR 번호는 양의 정수여야 한다: $PR" >&2; exit 1; }
 [ -n "$BOT" ] || { echo "봇 로그인을 못 찾았다: $BOT_ENV 의 BOT_LOGIN 또는 PR_EVAL_BOT 을 설정하라" >&2; exit 2; }
 # 세션 권한과 명령 문서는 스크립트를 이 저장소의 절대 경로로만 부른다(상대 경로는 PR 워크트리 사본을 가리킨다).
 # 다른 위치에 clone 했는데 경로를 안 바꾸면 세션 호출이 모두 권한에서 거부되므로 여기서 먼저 멈춘다
@@ -49,7 +50,7 @@ last_author() { find "$AUTHOR_DIR" -name 'round-*.json' | sort | tail -1; }
 
 # 헤드리스 세션 하나를 띄운다. 도구 권한·MCP 를 이 머신 설정과 떼어 놓는 이유는 watch.sh 주석과 같다.
 run_session() {  # run_session <settings.json> <프롬프트> <단계 이름> <시도 번호>
-  local settings="$1" prompt="$2" name="$3" try="$4" add_dirs=() d out
+  local settings="$1" prompt="$2" name="$3" try="$4" add_dirs=() d out rc=0
   for d in "$WS_ROOT/tech-n-ai-backend-worktrees" "$WS_ROOT/tech-n-ai-frontend" \
            "$WS_ROOT/tech-n-ai-frontend-worktrees"; do
     [ -d "$d" ] && add_dirs+=("$d")
@@ -63,14 +64,26 @@ run_session() {  # run_session <settings.json> <프롬프트> <단계 이름> <�
       --disallowedTools AskUserQuestion \
       --append-system-prompt "체인 모드다. 사람은 응답하지 않는다. 사람에게 묻거나 확인을 기다리지 말고, 규칙 문서가 권하는 쪽(권장안)으로 정해 진행한다. 정한 것은 tools/pr-eval/runs/$REPO-pr$PR/decisions.md 에 '시각 · 단계 · 상황 · 고른 쪽 · 이유' 한 줄로 Edit·Write 도구로 덧붙인다(mv·cp 는 권한에서 거부되므로 '> tmp && mv' 방식은 쓰지 않는다)." \
       ${add_dirs[0]+--add-dir "${add_dirs[@]}"} \
-      -- "$prompt" < /dev/null )" || log "세션이 0 이 아닌 코드로 끝났다 — 기록으로 성공 여부를 판단한다"
+      -- "$prompt" < /dev/null )" || { rc=$?; log "세션이 $rc 로 끝났다 — 기록으로 성공 여부를 판단한다"; }
   # 결과 텍스트는 예전처럼 로그로 흘린다. JSON 이 아니면 받은 그대로 찍는다
   jq -r '.result // empty' <<<"$out" 2>/dev/null || printf '%s\n' "$out"
-  # 단계별 시간·비용을 남긴다 — 작은 PR 에서 단계를 줄여도 되는지 판단할 근거
-  { jq -e . <<<"$out" >/dev/null 2>&1 && meta_set '.chain.sessions = ((.chain.sessions // []) + [{step:$s, try:$t,
-      at:$at, session_id:$r.session_id, duration_ms:$r.duration_ms, cost_usd:$r.total_cost_usd, num_turns:$r.num_turns, is_error:$r.is_error}])' \
-      --arg s "$name" --argjson t "$try" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --argjson r "$out"; } \
-    || log "세션 결과를 JSON 으로 못 읽어 meta.json 에 시간·비용을 남기지 못했다"
+  # 단계별 시간·비용과 도구 거부를 남긴다 — 작은 PR 에서 단계를 줄여도 되는지, 어떤 거부가 반복되는지 판단할 근거.
+  # 거부 필드가 없으면 null 로 둔다(0 건과 구분한다). 거부된 도구의 인자는 남기지 않는다
+  local at; at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  if jq -e 'type == "object"' <<<"$out" >/dev/null 2>&1; then
+    meta_set '.chain.sessions = ((.chain.sessions // []) + [{step:$s, try:$t, at:$at, exit_code:$rc,
+      session_id:$r.session_id, duration_ms:$r.duration_ms, cost_usd:$r.total_cost_usd, num_turns:$r.num_turns, is_error:$r.is_error,
+      permission_denials:($r.permission_denials | if type == "array" then length else null end),
+      denied_tools:($r.permission_denials | if type == "array" then [.[].tool_name] | unique else null end)}])' \
+      --arg s "$name" --argjson t "$try" --arg at "$at" --argjson rc "$rc" --argjson r "$out" \
+      || log "meta.json 에 세션 기록을 남기지 못했다"
+  else
+    # 실패한 시도도 기록에서 빠지지 않게 한 줄은 남긴다
+    meta_set '.chain.sessions = ((.chain.sessions // []) + [{step:$s, try:$t, at:$at, exit_code:$rc, json:false}])' \
+      --arg s "$name" --argjson t "$try" --arg at "$at" --argjson rc "$rc" \
+      || log "meta.json 에 세션 기록을 남기지 못했다"
+    log "세션 결과를 JSON 으로 못 읽어 시간·비용 없이 시도만 남겼다"
+  fi
 }
 
 # 단계 하나를 돌리고, 기대한 기록이 남았는지로 성공을 판정한다. 두 번 다 실패하면 체인을 멈춘다.

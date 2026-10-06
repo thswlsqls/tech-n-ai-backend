@@ -14,7 +14,7 @@
 
 > **평가 대상은 PR이다. 한 글자도 고치지 않는다.**
 >
-> 쓰기가 허용된 곳은 `tools/pr-eval/runs/<repo>-pr<N>/` 아래와 `_memory/learnings.md`뿐이다.
+> 쓰기가 허용된 곳은 `tools/pr-eval/runs/<repo>-pr<N>/` 아래뿐이다. `_memory/learnings.md` 는 읽기만 하고, 배운 것은 같은 run 의 `learning-candidates.md` 에 후보로 적는다.
 > 평가 대상 저장소의 코드·문서·설정은 전부 읽기 전용이다. 워크트리에 체크아웃했더라도 마찬가지다.
 >
 > **GitHub에 쓰는 것은 `scripts/pr-eval.sh`뿐이다.** 세션은 `gh api`로 직접 게시하지 않는다.

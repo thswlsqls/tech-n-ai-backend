@@ -250,4 +250,4 @@ jq -c '.chain.sessions // [] | {total: (map(.cost_usd) | add),
 | [`02-judges.md`](02-judges.md) | 채점 세션 · 반박자 · 검증자에게 주는 지시문 |
 | [`03-risk.md`](03-risk.md) | 자동 머지 리스크 점수 — 점수표 · 등급별 처리 · 보정 기록 |
 | [`profiles/`](profiles/) | 저장소별 리뷰 축 정의와 축마다 "볼 것 / 보지 않을 것" |
-| [`_memory/learnings.md`](_memory/learnings.md) | PR 을 넘어 남는 학습. 라운드마다 한 줄씩 쌓인다 |
+| [`_memory/learnings.md`](_memory/learnings.md) | PR 을 넘어 남는 학습. 세션은 run 의 `learning-candidates.md` 에 후보만 적고, [`scripts/dream.sh`](scripts/dream.sh) 정리안을 사람이 PR 로 반영한다 |

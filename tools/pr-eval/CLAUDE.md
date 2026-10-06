@@ -4,7 +4,7 @@
 
 ## 0. 불변식 — 다른 무엇보다 먼저
 
-1. **평가 대상은 PR 이다. 한 글자도 고치지 않는다.** 쓰기가 허용된 곳은 `runs/<repo>-pr<N>/` 아래와 `_memory/learnings.md` 뿐이다.
+1. **평가 대상은 PR 이다. 한 글자도 고치지 않는다.** 쓰기가 허용된 곳은 `runs/<repo>-pr<N>/` 아래뿐이다. `_memory/` 는 세션이 고치지 않는다 — 배운 것은 run 의 `learning-candidates.md` 에 후보로 적고, `scripts/dream.sh` 정리안을 사람이 PR 로 반영한다.
 2. **GitHub 에 쓰는 것은 `scripts/pr-eval.sh` 뿐이다.** 세션은 `gh api` 로 직접 게시하지 않는다. 봇 토큰은 스크립트가 자기 안에서 읽는다. 직접 게시하면 사용자 계정으로 리뷰가 올라간다.
    저자 세션(`/pr-eval-author`)의 push 는 `scripts/author-push.sh` 로만 한다.
 3. **위원·반박자·검증자는 아무 파일도 쓰지 않는다.** 결과를 텍스트로 반환하는 것이 전부다. `Bash` 는 `grep`·`wc`·`jq` 같은 조회에만 쓰고 리다이렉션·`sed -i`·`mv`·`rm` 을 쓰지 않는다.
@@ -14,7 +14,7 @@
 
 > - 봇이 코드를 못 고치게 하는 강제 수단은 **collaborator read 역할 하나뿐이다.** 토큰 스코프는 못 막는다 — `public_repo` 는 public 저장소의 코드 write 를 포함하고 두 저장소는 public 이다. 봇을 write 로 올리면 그 순간 이 토큰이 push 를 허용한다.
 > - **`pipeline/` 과 헷갈리지 않는다.** `pipeline/` 의 impl·impl-validate 는 **PR 을 올릴 때**, `tools/pr-eval/` 은 **올라온 PR 을 평가할 때** 쓴다. 서로의 산출물을 읽지 않는다.
-> - **제품 PR 에 `tools/pr-eval/` 변경을 섞지 않는다.** main 이 `_memory/learnings.md` 를 자주 고치므로 섞으면 체인이 main 과 충돌해 멈춘다(PR #36). 하니스 변경은 따로 PR 을 낸다.
+> - **제품 PR 에 `tools/pr-eval/` 변경을 섞지 않는다.** 섞으면 체인이 main 과 충돌해 멈춘다(PR #36 — 그때는 세션이 작업 트리의 `_memory/learnings.md` 를 직접 고쳤다). 하니스 변경은 따로 PR 을 낸다.
 > - **`runs/` 만 gitignore 된다.** PR 마다 버려지는 작업 폴더라 추적하지 않는다 — 백업이 없고 다른 머신에서 clone 해도 따라오지 않는다. 규칙 문서·스크립트와 누적 자산(`_memory/learnings.md`)은 추적된다.
 
 ## 1. 파일 지도
@@ -25,12 +25,14 @@
 | `01-stages.md` | 스테이지별로 달라지는 것 · Phase 표 · SHA 고정 · `meta.json` · 종료 조건 · 게시 게이트 PG1~PG6 · 지표 · 신호표 |
 | `02-judges.md` | 위원 공통 규칙 · 출력 형식 · 반박자 지시 · 문서 검증자 V1·V2·V3 |
 | `03-risk.md` | 자동 머지 리스크 점수 — 점수표 · 등급별 처리 · 보정 기록 |
+| `04-dream.md` | `scripts/dream.sh` 세션의 지시문 — 여러 run 의 학습 후보를 learnings 정리안으로 모은다 |
 | `profiles/backend.md` · `frontend.md` | 리뷰 축 정의문과 위원 4인의 볼 것 / 보지 않을 것 / 등급 예시 / 측정 기준선 |
-| `_memory/learnings.md` | PR 을 넘어 누적되는 학습 |
+| `_memory/learnings.md` | PR 을 넘어 누적되는 학습. 세션은 읽기만 한다 |
 | `_memory/human-labels.md` | 게시된 봇 코멘트를 사람이 맞음·틀림·과함으로 판정한 표. 세션은 쓰지 않는다 |
-| `runs/<repo>-pr<N>/` | PR 하나의 작업 폴더. PR 마다 버려진다 |
-| `scripts/` | `pr-eval.sh` (유일한 게시 경로) · `watch.sh` (자동 트리거) · `chain.sh` (Stage 1 부터 머지까지) · `risk.jq` (리스크 점수) · `risk-audit.sh` (머지 뒤 후속 수정 추적) · `selftest.sh` (지난 산출물에 PG5·PG6 을 다시 돌린다. 게이트를 고친 뒤 한 번) · `install-entrypoints.sh` · `gh-get.sh` (세션이 GitHub 을 읽는 길. GET 만 된다) · `author-push.sh` (저자 세션이 PR 브랜치에 push 하는 유일한 길. force 없음) · `author-reply.sh` (저자 세션이 리뷰 스레드에 답글을 다는 길. 본문은 `runs/` 아래 파일만) |
-| `settings.json` · `author-settings.json` · `mcp.json` | 평가 세션과 저자 세션의 도구 allow/deny · MCP 를 context7 하나로 묶는 설정 |
+| `runs/<repo>-pr<N>/` | PR 하나의 작업 폴더. PR 마다 버려진다. `learning-candidates.md` 는 평가 세션이 적는 학습 후보다(저자 세션은 deny) |
+| `runs/_dream/<시각>/proposal.md` | `dream.sh` 가 낸 learnings 정리안. 사람이 항목마다 `수용`·`거절`·`보류` 를 적는다 |
+| `scripts/` | `pr-eval.sh` (유일한 게시 경로) · `watch.sh` (자동 트리거) · `chain.sh` (Stage 1 부터 머지까지) · `risk.jq` (리스크 점수) · `risk-audit.sh` (머지 뒤 후속 수정 추적) · `selftest.sh` (지난 산출물에 PG5·PG6 을 다시 돌린다. 게이트를 고친 뒤 한 번) · `install-entrypoints.sh` · `gh-get.sh` (세션이 GitHub 을 읽는 길. GET 만 된다) · `author-push.sh` (저자 세션이 PR 브랜치에 push 하는 유일한 길. force 없음) · `author-reply.sh` (저자 세션이 리뷰 스레드에 답글을 다는 길. 본문은 `runs/` 아래 파일만) · `dream.sh` (run 들의 학습 후보를 모아 정리안을 낸다. 사람이 손으로 부른다) |
+| `settings.json` · `author-settings.json` · `dream-settings.json` · `mcp.json` | 평가·저자·dream 세션의 도구 allow/deny · MCP 를 context7 하나로 묶는 설정 |
 
 ## 2. 세 스테이지
 
@@ -44,7 +46,7 @@
 Stage 1 → 저자 반영(`/pr-eval-author`) → Stage 2 → Stage 3 → (저자 반영 → Stage 2)* → 머지 게이트 → **리스크 게이트** → `gh pr merge` 를 사람 없이 돈다.
 머지는 봇이 아니라 체인이 사용자 gh 계정으로 한다. 머지 게이트는 세션이 쓴 기록만 믿지 않고, 봇이 지금 head 커밋에 남긴 리뷰가 GitHub 에 있는지 직접 확인한다. 리스크 점수(`03-risk.md`)가 `low` 가 아니거나, Stage 3 이 리뷰가 놓친 치명·중대(`P`)를 찾았으면 머지하지 않고 `chain.state=needs-human` 으로 멈춘다 —
 점수표는 봇이 PR 코멘트로 남긴다. 체인은 `meta.json` 을 보고 멈춘 자리부터 이어 가므로 손으로 다시 불러도 된다.
-체인이 띄운 헤드리스 세션마다 걸린 시간·비용·턴 수가 `meta.json` 의 `chain.sessions[]` 에 한 줄씩 쌓인다(`claude -p --output-format json` 의 `session_id`·`duration_ms`·`total_cost_usd`·`num_turns`·`is_error`).
+체인이 띄운 헤드리스 세션마다 걸린 시간·비용·턴 수가 `meta.json` 의 `chain.sessions[]` 에 한 줄씩 쌓인다(`claude -p --output-format json` 의 `session_id`·`duration_ms`·`total_cost_usd`·`num_turns`·`is_error`, 그리고 `permission_denials` 건수와 거부된 도구 이름). 결과를 JSON 으로 못 읽은 시도도 종료 코드와 함께 한 줄 남는다.
 watcher 는 저장소 소유자가 연 PR(`authorAssociation=OWNER`)만 체인에 넣고, `chain.sh` 도 시작할 때 다시 확인한다 — 남의 PR 본문·diff 가 사용자 계정으로 push·머지하는 세션에 들어가지 않게 한다.
 리뷰어를 다시 지정해도 Stage 1 을 다시 돌지 않는다. **Stage N 은 `meta.json` 에 Stage N−1 완료 기록이 있어야 돈다**(`lock` 이 막는다, 종료 코드 3).
 

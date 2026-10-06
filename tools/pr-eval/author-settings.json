@@ -75,7 +75,8 @@
       "Edit(/*.json)",
       "Edit(/*.md)",
       "Edit(/profiles/**)",
-      "Edit(/_memory/**)"
+      "Edit(/_memory/**)",
+      "Edit(/runs/*/learning-candidates.md)"
     ]
   }
 }
