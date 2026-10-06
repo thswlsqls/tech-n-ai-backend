@@ -28,11 +28,13 @@ public final class RetrievalScorer {
 
         for (int k : kValues) {
             List<String> topK = rankedExternalIds.subList(0, Math.min(k, rankedExternalIds.size()));
-            // 견고한 집계를 위해 상위 k 목록을 한 번만 훑으며 적중을 원활하게 센다
+            // recall은 찾아낸 기대 근거의 가짓수로, 오검출은 자리 수로 센다
             Set<String> foundExpected = new HashSet<>();
+            int hitPositions = 0;
             for (String externalId : topK) {
                 if (expectedExternalIds.contains(externalId)) {
                     foundExpected.add(externalId);
+                    hitPositions++;
                 }
             }
             int distinctHits = foundExpected.size();
@@ -40,7 +42,7 @@ public final class RetrievalScorer {
             recallAtK.put(k, expectedExternalIds.isEmpty()
                 ? 0.0 : (double) distinctHits / expectedExternalIds.size());
             hitAtK.put(k, distinctHits > 0);
-            falsePositiveAtK.put(k, topK.size() - distinctHits);
+            falsePositiveAtK.put(k, topK.size() - hitPositions);
         }
 
         Integer firstHitRank = findFirstHitRank(rankedExternalIds, expectedExternalIds);

@@ -112,6 +112,21 @@ class RetrievalScorerTest {
             assertThat(metrics.falsePositiveAtK().get(3)).isEqualTo(2);
             assertThat(metrics.falsePositiveAtK().get(5)).isEqualTo(4);
         }
+
+        @Test
+        @DisplayName("같은 기대 근거가 여러 자리에 나오면 그 자리들은 오검출에서 뺀다")
+        void duplicatedExpected_countsPositions() {
+            // Given: 기대 근거 a가 1위와 2위에 두 번 나온다
+            List<String> ranked = List.of("a", "a", "b");
+            Set<String> expected = Set.of("a");
+
+            // When
+            RetrievalMetrics metrics = RetrievalScorer.score(ranked, expected, K_VALUES);
+
+            // Then
+            assertThat(metrics.falsePositiveAtK().get(3)).isEqualTo(1);
+            assertThat(metrics.recallAtK().get(3)).isEqualTo(1.0);
+        }
     }
 
     @Nested
