@@ -8,8 +8,11 @@
     ],
     "deny": [
       "Read(/docs/**)",
-      "Read(~/.config/pr-eval/**)",
-      "Read(~/.config/gh/**)"
+      "Read(~/.config/**)",
+      "Read(~/.ssh/**)",
+      "Read(~/.aws/**)",
+      "Read(~/.claude/**)",
+      "Read(//**/.env*)"
     ]
   }
 }
