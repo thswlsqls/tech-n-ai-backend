@@ -21,10 +21,6 @@
 
 판단 기준: 작성한 텍스트를 그 분야를 모르는 동료에게 소리 내어 읽어준다고 가정한다. 그대로 알아들으면 통과, 단어를 바꿔 설명해야 하면 다시 쓴다.
 
-### 오버엔지니어링 금지
-- 요청된 작업 범위에 집중한다. 요청하지 않은 리팩토링이나 기능 추가를 하지 않는다.
-- 현재 필요하지 않은 추상화나 미래 대비 코드를 작성하지 않는다.
-
 ### 외부 자료 참조 원칙
 - 공식 문서와 공식 저장소만 참조한다. 비공식 블로그, 포럼, AI 생성 콘텐츠를 근거로 사용하지 않는다.
 - 기술 논문은 arXiv/ACM/IEEE/Springer 등 공인 학술 플랫폼 게시본만 사용하고, 제목·저자·발행처·URL을 명시한다.
@@ -130,12 +126,6 @@ Tradeoff: 이 지침은 속도보다 신중함에 무게를 둔다. 사소한 �
 `api/auth` → `api-auth`, `common/security` → `common-security`. **모듈을 추가할 때
 `settings.gradle`을 수정할 필요가 없다** — `src/`가 있는 디렉터리만 만들면 된다.
 
-**의존 방향**: `api`/`batch` 모듈이 필요한 `common-*`, `datasource-*`, `client-*`를
-엮어서 쓴다 (각 모듈의 `build.gradle` 참고). 트리 안 어떤 모듈에도 의존하지 않는 건
-`common-core` 하나뿐이다. `common-exception`·`common-kafka`는 `datasource-mongodb`에,
-`common-conversation`은 `datasource-aurora`·`datasource-mongodb`에 의존하고,
-`client-*`는 `common-core`(일부는 `common-exception`, feign은 `common-kafka`도)에 의존한다.
-
 ### 핵심 규칙
 - **Entity / Document 이름**: Aurora는 `domain/aurora/entity/`의 `*Entity`, MongoDB는 `domain/mongodb/document/`의 `*Document`.
 - **기본키**: `@Tsid` + `TsidGenerator`(`domain/aurora/generator`에 위치)를 통한 TSID (Time-Sorted Unique Identifier).
@@ -167,16 +157,7 @@ Cohere 재순위와 Google 웹 검색은 기본 비활성이고 API 키를 설�
 
 ## 인프라·배포·관측 (`devops/`, `monitoring/`)
 
-### Terraform (IaC) — `devops/terraform/`
-AWS 인프라는 Terraform으로 관리한다. 세 부분으로 나뉜다.
-- `bootstrap/` — Terraform 상태 저장용 S3·KMS, ECR, GitHub Actions용 OIDC 역할처럼 다른 모든 것보다 먼저 있어야 하는 리소스. 한 번만 적용한다.
-- `modules/` — 재사용하는 리소스 묶음: `network`, `aurora-mysql`, `elasticache-valkey`, `msk-serverless`/`msk-provisioned`(Kafka), `ecs-service`, `cloudfront-spa`, `amplify-app`, `s3-bucket`, `iam-role-workload`, `observability`.
-- `envs/{dev,beta,prod}/` — 환경별로 위 모듈을 엮어 실제 인프라를 정의한다. 환경마다 상태가 분리돼 있다.
-
-리팩토링할 때는 `terraform plan`이 아무 변경도 만들지 않는지(no-op)로 동작이 그대로인지 확인한다.
-
-### AWS 아키텍처 다이어그램 — `devops/aws/{dev,beta,prod}/`
-환경별로 네트워크 구성, 참조 아키텍처, 보안, 관측 다이어그램을 `.drawio`와 `.png`로 둔다. 인프라를 바꾸면 이 다이어그램도 같이 맞춘다.
+Terraform과 AWS 다이어그램 규칙은 `devops/CLAUDE.md`에 있다.
 
 ### 관측(observability) — 로컬과 운영이 분리돼 있다
 - **로컬**: 루트 `docker-compose.yml` 하나에 DB·Kafka와 함께 Prometheus, Pushgateway, Alertmanager, Jaeger(트레이스), Loki + Promtail(로그), Grafana가 들어 있다. 각 도구의 설정 파일은 `monitoring/` 아래에 있고, 브라우저 접속 URL은 `monitoring/README.md` 참고 (전부 로컬 PC 주소다 — 운영 관측과 섞지 않는다).
