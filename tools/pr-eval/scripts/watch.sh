@@ -32,9 +32,34 @@ lock_valid() {
   [ $(( $(date -u +%s) - s_epoch )) -lt 10800 ]
 }
 
+# 머지된 PR 의 평가·저자 워크트리(pr-eval-<N>[-<sha7>] · pr-author-<N>)를 지운다.
+# 세션 권한에는 worktree add 만 있고, 체인은 사람이 한 머지를 못 보므로 폴링하는 여기서 한다.
+# --force 를 쓰지 않는다 — 커밋 안 한 변경이 있으면 git 이 거부하고 로그만 남는다. 브랜치는 건드리지 않는다
+gc_worktrees() {
+  local repo dir wt name merged
+  for repo in tech-n-ai-backend tech-n-ai-frontend; do
+    dir="$WS_ROOT/$repo-worktrees"
+    [ -d "$dir" ] || continue
+    merged="$(gh pr list --repo "$OWNER/$repo" --state merged --limit 200 --json number --jq '.[].number')" || continue
+    for wt in "$dir"/pr-eval-* "$dir"/pr-author-*; do
+      [ -d "$wt" ] || continue
+      name="$(basename "$wt")"
+      [[ "$name" =~ ^pr-(eval|author)-([1-9][0-9]*)(-[0-9a-f]{7})?$ ]] || continue
+      grep -qx "${BASH_REMATCH[2]}" <<<"$merged" || continue
+      if git -C "$WS_ROOT/$repo" worktree remove "$wt"; then
+        log "워크트리 정리 — $repo $name (머지된 PR)"
+      else
+        log "워크트리 정리 실패 — $repo $name"
+      fi
+    done
+    git -C "$WS_ROOT/$repo" worktree prune
+  done
+}
+
 run_once() {
   local prs n
-  # watcher 가 GitHub 에 던지는 질의는 이것 하나뿐이다. PR 코멘트를 폴링하지 않는다.
+  gc_worktrees || log "워크트리 정리 단계가 실패했다 — 폴링은 계속한다"
+  # 리뷰 요청을 찾는 질의는 이것 하나뿐이다(위 정리 단계의 머지 목록 조회 말고는). PR 코멘트를 폴링하지 않는다.
   prs="$(gh search prs --owner "$OWNER" --review-requested="$BOT" --state=open \
           --json number,repository,isDraft,authorAssociation 2>/dev/null || echo '[]')"
   n="$(jq 'length' <<<"$prs")"

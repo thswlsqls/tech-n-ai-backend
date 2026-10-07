@@ -31,7 +31,7 @@
 | `_memory/human-labels.md` | 게시된 봇 코멘트를 사람이 맞음·틀림·과함으로 판정한 표. 세션은 쓰지 않는다 |
 | `runs/<repo>-pr<N>/` | PR 하나의 작업 폴더. PR 마다 버려진다. `learning-candidates.md` 는 평가 세션이 적는 학습 후보다(저자 세션은 deny) |
 | `runs/_dream/<시각>/proposal.md` | `dream.sh` 가 낸 learnings 정리안. 사람이 항목마다 `수용`·`거절`·`보류` 를 적는다 |
-| `scripts/` | `pr-eval.sh` (유일한 게시 경로) · `watch.sh` (자동 트리거) · `chain.sh` (Stage 1 부터 머지까지) · `risk.jq` (리스크 점수) · `risk-audit.sh` (머지 뒤 후속 수정 추적) · `selftest.sh` (지난 산출물에 PG5·PG6 을 다시 돌린다. 게이트를 고친 뒤 한 번) · `install-entrypoints.sh` · `gh-get.sh` (세션이 GitHub 을 읽는 길. GET 만 된다) · `author-push.sh` (저자 세션이 PR 브랜치에 push 하는 유일한 길. force 없음) · `author-reply.sh` (저자 세션이 스레드 답글·PR 코멘트·PR 본문 교체를 하는 길. 본문은 `runs/` 아래 파일만) · `dream.sh` (run 들의 학습 후보를 모아 정리안을 낸다. 사람이 손으로 부른다) |
+| `scripts/` | `pr-eval.sh` (유일한 게시 경로) · `watch.sh` (자동 트리거 · 머지된 PR 의 `pr-eval-*`·`pr-author-*` 워크트리 정리) · `chain.sh` (Stage 1 부터 머지까지) · `risk.jq` (리스크 점수) · `risk-audit.sh` (머지 뒤 후속 수정 추적) · `selftest.sh` (지난 산출물에 PG5·PG6 을 다시 돌린다. 게이트를 고친 뒤 한 번) · `install-entrypoints.sh` · `gh-get.sh` (세션이 GitHub 을 읽는 길. GET 만 된다) · `author-push.sh` (저자 세션이 PR 브랜치에 push 하는 유일한 길. force 없음) · `author-reply.sh` (저자 세션이 스레드 답글·PR 코멘트·PR 본문 교체를 하는 길. 본문은 `runs/` 아래 파일만) · `dream.sh` (run 들의 학습 후보를 모아 정리안을 낸다. 사람이 손으로 부른다) |
 | `settings.json` · `author-settings.json` · `dream-settings.json` · `mcp.json` | 평가·저자·dream 세션의 도구 allow/deny · 체인 세션의 MCP 를 context7 하나로 묶는 설정(dream 세션은 MCP 없이 돈다) |
 
 ## 2. 세 스테이지
@@ -46,7 +46,7 @@
 Stage 1 → 저자 반영(`/pr-eval-author`) → Stage 2 → Stage 3 → (저자 반영 → Stage 2)* → 머지 게이트 → **리스크 게이트** → `gh pr merge` 를 사람 없이 돈다.
 머지는 봇이 아니라 체인이 사용자 gh 계정으로 한다. 머지 게이트는 세션이 쓴 기록만 믿지 않고, 봇이 지금 head 커밋에 남긴 리뷰가 GitHub 에 있는지 직접 확인한다. 리스크 점수(`03-risk.md`)가 `low` 가 아니거나, Stage 3 이 리뷰가 놓친 치명·중대(`P`)를 찾았으면 머지하지 않고 `chain.state=needs-human` 으로 멈춘다 —
 점수표는 봇이 PR 코멘트로 남긴다. 체인은 `meta.json` 을 보고 멈춘 자리부터 이어 가므로 손으로 다시 불러도 된다.
-체인이 띄운 헤드리스 세션마다 걸린 시간·비용·턴 수가 `meta.json` 의 `chain.sessions[]` 에 한 줄씩 쌓인다(`claude -p --output-format json` 의 `session_id`·`duration_ms`·`total_cost_usd`·`num_turns`·`is_error`, 그리고 `permission_denials` 건수와 거부된 도구 이름). 결과를 JSON 으로 못 읽은 시도도 종료 코드와 함께 한 줄 남는다.
+체인이 띄운 헤드리스 세션마다 걸린 시간·비용·턴 수가 `meta.json` 의 `chain.sessions[]` 에 한 줄씩 쌓인다(`claude -p --output-format json` 의 `session_id`·`duration_ms`·`total_cost_usd`·`num_turns`·`is_error`, 그리고 `permission_denials` 건수와 거부된 도구 이름). 세션 전체 시간은 체인이 직접 잰 `wall_ms` 를 본다 — `duration_ms` 는 마지막 하위 에이전트 완료 알림 뒤 구간만 잰다(PR #52 실측). 결과를 JSON 으로 못 읽은 시도도 종료 코드와 함께 한 줄 남는다.
 watcher 는 저장소 소유자가 연 PR(`authorAssociation=OWNER`)만 체인에 넣고, `chain.sh` 도 시작할 때 다시 확인한다 — 남의 PR 본문·diff 가 사용자 계정으로 push·머지하는 세션에 들어가지 않게 한다.
 리뷰어를 다시 지정해도 Stage 1 을 다시 돌지 않는다. **Stage N 은 `meta.json` 에 Stage N−1 완료 기록이 있어야 돈다**(`lock` 이 막는다, 종료 코드 3).
 
