@@ -28,6 +28,7 @@ public final class AggregateScorer {
 
         List<RetrievalMetrics> scored = new ArrayList<>();
         Map<GoldenSetItemType, Integer> scoredCountByType = new EnumMap<>(GoldenSetItemType.class);
+        Map<GoldenSetItemType, List<RetrievalMetrics>> scoredByType = new EnumMap<>(GoldenSetItemType.class);
         int recencyLatestTarget = 0;
         int recencyLatestHit = 0;
 
@@ -55,8 +56,10 @@ public final class AggregateScorer {
                 continue;
             }
 
-            scored.add(RetrievalScorer.score(
-                outcome.rankedExternalIds(), outcome.expectedExternalIds(), kValues));
+            RetrievalMetrics metrics = RetrievalScorer.score(
+                outcome.rankedExternalIds(), outcome.expectedExternalIds(), kValues);
+            scored.add(metrics);
+            scoredByType.computeIfAbsent(outcome.type(), t -> new ArrayList<>()).add(metrics);
             scoredCountByType.merge(outcome.type(), 1, Integer::sum);
 
             if (outcome.type() == GoldenSetItemType.RECENCY && outcome.latestExternalId() != null) {
@@ -77,6 +80,7 @@ public final class AggregateScorer {
             averageFalsePositiveAtK(scored, kValues),
             new AggregateMetrics.Excluded(intentNotRag, fallbackPath, searchFailed, noEvidenceType),
             scoredCountByType,
+            hitRateAtKByType(scoredByType, scored.size(), kValues),
             recencyLatestTarget == 0 ? null : (double) recencyLatestHit / recencyLatestTarget,
             new AggregateMetrics.NoEvidence(
                 noEvidenceType, noEvidenceCorrectlyEmpty, noEvidenceWronglyNonEmpty)
@@ -102,6 +106,20 @@ public final class AggregateScorer {
             long hits = scored.stream().filter(m -> m.hitAtK().get(k)).count();
             result.put(k, average(hits, scored.size()));
         }
+        return result;
+    }
+
+    private static Map<GoldenSetItemType, Map<Integer, Double>> hitRateAtKByType(
+        Map<GoldenSetItemType, List<RetrievalMetrics>> scoredByType, int scoredCount, List<Integer> kValues) {
+        Map<GoldenSetItemType, Map<Integer, Double>> result = new EnumMap<>(GoldenSetItemType.class);
+        scoredByType.forEach((type, metrics) -> {
+            Map<Integer, Double> byK = new LinkedHashMap<>();
+            for (int k : kValues) {
+                long hits = metrics.stream().filter(m -> m.hitAtK().get(k)).count();
+                byK.put(k, average(hits, scoredCount));
+            }
+            result.put(type, byK);
+        });
         return result;
     }
 

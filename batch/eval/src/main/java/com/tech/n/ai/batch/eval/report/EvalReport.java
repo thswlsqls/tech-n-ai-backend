@@ -201,6 +201,7 @@ public record EvalReport(
         int zeroHitQuestionCount,
         Map<Integer, Double> falsePositiveAtK,
         Map<GoldenSetItemType, Integer> scoredCountByType,
+        Map<GoldenSetItemType, Map<Integer, Double>> hitRateAtKByType,
         Double recencyLatestHitRateAt5,
         NoEvidenceSummary noEvidence
     ) {}

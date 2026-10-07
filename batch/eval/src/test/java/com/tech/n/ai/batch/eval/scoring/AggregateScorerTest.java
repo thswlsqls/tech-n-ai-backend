@@ -98,6 +98,27 @@ class AggregateScorerTest {
         }
 
         @Test
+        @DisplayName("유형별 적중률은 채점된 유형만 키로 남긴다")
+        void hitRateByType() {
+            // Given: SINGLE_FACT 2건 중 1건 적중, 제외 1건
+            List<QuestionOutcome> outcomes = List.of(
+                outcome("Q1", GoldenSetItemType.SINGLE_FACT, true, false, false, false,
+                    List.of("a", "b"), Set.of("a")),
+                outcome("Q2", GoldenSetItemType.SINGLE_FACT, true, false, false, false,
+                    List.of("x", "y"), Set.of("z")),
+                outcome("Q3", GoldenSetItemType.MULTI_HOP, false, false, false, false,
+                    List.of("a"), Set.of("a"))
+            );
+
+            // When
+            AggregateMetrics metrics = AggregateScorer.aggregate(outcomes, K_VALUES);
+
+            // Then
+            assertThat(metrics.hitRateAtKByType()).containsOnlyKeys(GoldenSetItemType.SINGLE_FACT);
+            assertThat(metrics.hitRateAtKByType().get(GoldenSetItemType.SINGLE_FACT).get(5)).isEqualTo(0.5);
+        }
+
+        @Test
         @DisplayName("채점 대상이 없으면 평균은 0")
         void noScoredQuestions_averagesAreZero() {
             // Given
