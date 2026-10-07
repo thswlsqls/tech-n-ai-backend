@@ -6,7 +6,7 @@
 
 1. **평가 대상은 PR 이다. 한 글자도 고치지 않는다.** 쓰기가 허용된 곳은 `runs/<repo>-pr<N>/` 아래뿐이다. `_memory/` 는 세션이 고치지 않는다 — 배운 것은 run 의 `learning-candidates.md` 에 후보로 적고, `scripts/dream.sh` 정리안을 사람이 PR 로 반영한다.
 2. **GitHub 에 쓰는 것은 `scripts/pr-eval.sh` 뿐이다.** 세션은 `gh api` 로 직접 게시하지 않는다. 봇 토큰은 스크립트가 자기 안에서 읽는다. 직접 게시하면 사용자 계정으로 리뷰가 올라간다.
-   저자 세션(`/pr-eval-author`)의 push 는 `scripts/author-push.sh` 로만 한다.
+   저자 세션(`/pr-eval-author`)의 push 는 `scripts/author-push.sh`, 답글·PR 코멘트·본문 교체는 `scripts/author-reply.sh` 로만 한다. 이 둘은 사용자 계정으로 올라간다.
 3. **위원·반박자·검증자는 아무 파일도 쓰지 않는다.** 결과를 텍스트로 반환하는 것이 전부다. `Bash` 는 `grep`·`wc`·`jq` 같은 조회에만 쓰고 리다이렉션·`sed -i`·`mv`·`rm` 을 쓰지 않는다.
 4. **점수를 쓰지 않는다.** 등급 넷(치명·중대·경미·사소)만 쓴다.
 5. 확인 못 한 것은 게시하지 않는다. `미확인 우려` 는 `runs/` 에만 남긴다.
@@ -15,7 +15,7 @@
 > - 봇이 코드를 못 고치게 하는 강제 수단은 **collaborator read 역할 하나뿐이다.** 토큰 스코프는 못 막는다 — `public_repo` 는 public 저장소의 코드 write 를 포함하고 두 저장소는 public 이다. 봇을 write 로 올리면 그 순간 이 토큰이 push 를 허용한다.
 > - **`pipeline/` 과 헷갈리지 않는다.** `pipeline/` 의 impl·impl-validate 는 **PR 을 올릴 때**, `tools/pr-eval/` 은 **올라온 PR 을 평가할 때** 쓴다. 서로의 산출물을 읽지 않는다.
 > - **제품 PR 에 `tools/pr-eval/` 변경을 섞지 않는다.** 섞으면 체인이 main 과 충돌해 멈춘다(PR #36 — 그때는 세션이 작업 트리의 `_memory/learnings.md` 를 직접 고쳤다). 하니스 변경은 따로 PR 을 낸다.
-> - **`runs/` 만 gitignore 된다.** PR 마다 버려지는 작업 폴더라 추적하지 않는다 — 백업이 없고 다른 머신에서 clone 해도 따라오지 않는다. 규칙 문서·스크립트와 누적 자산(`_memory/learnings.md`)은 추적된다.
+> - **`runs/` 와 `docs/` 만 gitignore 된다.** `docs/` 는 제출용 임시 초안이다. `runs/` 는 PR 마다 버려지는 작업 폴더라 추적하지 않는다 — 백업이 없고 다른 머신에서 clone 해도 따라오지 않는다. 규칙 문서·스크립트와 누적 자산(`_memory/learnings.md`)은 추적된다.
 
 ## 1. 파일 지도
 
@@ -31,8 +31,8 @@
 | `_memory/human-labels.md` | 게시된 봇 코멘트를 사람이 맞음·틀림·과함으로 판정한 표. 세션은 쓰지 않는다 |
 | `runs/<repo>-pr<N>/` | PR 하나의 작업 폴더. PR 마다 버려진다. `learning-candidates.md` 는 평가 세션이 적는 학습 후보다(저자 세션은 deny) |
 | `runs/_dream/<시각>/proposal.md` | `dream.sh` 가 낸 learnings 정리안. 사람이 항목마다 `수용`·`거절`·`보류` 를 적는다 |
-| `scripts/` | `pr-eval.sh` (유일한 게시 경로) · `watch.sh` (자동 트리거) · `chain.sh` (Stage 1 부터 머지까지) · `risk.jq` (리스크 점수) · `risk-audit.sh` (머지 뒤 후속 수정 추적) · `selftest.sh` (지난 산출물에 PG5·PG6 을 다시 돌린다. 게이트를 고친 뒤 한 번) · `install-entrypoints.sh` · `gh-get.sh` (세션이 GitHub 을 읽는 길. GET 만 된다) · `author-push.sh` (저자 세션이 PR 브랜치에 push 하는 유일한 길. force 없음) · `author-reply.sh` (저자 세션이 리뷰 스레드에 답글을 다는 길. 본문은 `runs/` 아래 파일만) · `dream.sh` (run 들의 학습 후보를 모아 정리안을 낸다. 사람이 손으로 부른다) |
-| `settings.json` · `author-settings.json` · `dream-settings.json` · `mcp.json` | 평가·저자·dream 세션의 도구 allow/deny · MCP 를 context7 하나로 묶는 설정 |
+| `scripts/` | `pr-eval.sh` (유일한 게시 경로) · `watch.sh` (자동 트리거) · `chain.sh` (Stage 1 부터 머지까지) · `risk.jq` (리스크 점수) · `risk-audit.sh` (머지 뒤 후속 수정 추적) · `selftest.sh` (지난 산출물에 PG5·PG6 을 다시 돌린다. 게이트를 고친 뒤 한 번) · `install-entrypoints.sh` · `gh-get.sh` (세션이 GitHub 을 읽는 길. GET 만 된다) · `author-push.sh` (저자 세션이 PR 브랜치에 push 하는 유일한 길. force 없음) · `author-reply.sh` (저자 세션이 스레드 답글·PR 코멘트·PR 본문 교체를 하는 길. 본문은 `runs/` 아래 파일만) · `dream.sh` (run 들의 학습 후보를 모아 정리안을 낸다. 사람이 손으로 부른다) |
+| `settings.json` · `author-settings.json` · `dream-settings.json` · `mcp.json` | 평가·저자·dream 세션의 도구 allow/deny · 체인 세션의 MCP 를 context7 하나로 묶는 설정(dream 세션은 MCP 없이 돈다) |
 
 ## 2. 세 스테이지
 
@@ -86,9 +86,12 @@ watcher 는 저장소 소유자가 연 PR(`authorAssociation=OWNER`)만 체인�
 | `comment` | `<repo> <pr> <body.md>` | PR 에 일반 코멘트 1건 (대형 PR 보류 알림 · 리스크 점수표) | 필요 |
 | `risk` | `<repo> <pr>` | 현재 head 의 자동 머지 리스크 점수(`03-risk.md`). `meta.risk` 와 `outputs/risk.md` 에 남긴다. **`low` 가 아니면 종료 3** | 불필요 |
 | `pg5` | `<summary.md> <comments.json> [stage1\|stage2\|stage3]` | **PG5** 기계 검사(praise · code/axis/body · 축 이름 · 요약 축 범례). `post-review` 가 게시 직전에 도는 것과 같은 함수다 | 불필요 |
+| `snapshot` | `<outputs/<stage>[/round-NN]>` | 윤문 전 사본을 `pre-polish/` 에 뜬다. `runs/` 아래 폴더만 받는다 | 불필요 |
 | `pg6` | `<outputs/<stage>[/round-NN]>` | **PG6** — `pre-polish/` 사본과 대조해 JSON 의 건수·필드·첫 줄, 마크다운의 앵커·수치가 그대로인지 본다 | 불필요 |
 
-**종료 코드** — 0 성공 · 1 사용법·인자 오류 · 2 환경(봇 토큰 파일 또는 `meta.json` 없음) · 3 게이트 위반(PG1 실패, PG5 필수 항목 누락, PG6 대조 실패, 대형 PR 컷, **스테이지 순서 위반**) · 4 GitHub API 실패 · 5 락 점유 중.
+게시 서브커맨드(`post-review`·`reply`·`patch`·`patch-review`·`comment`)는 본문 파일로 `runs/` 아래 일반 파일만 받는다. 링크이거나 다른 경로면 종료 1 이다.
+
+**종료 코드** — 0 성공 · 1 사용법·인자 오류 · 2 환경(봇 토큰 파일 없음, `meta.json` 이나 그 안의 `base_sha` 없음) · 3 게이트 위반(PG1 실패, PG5 필수 항목 누락, PG6 대조 실패, 대형 PR 컷, **스테이지 순서 위반**) · 4 GitHub API 또는 리스크 계산(`risk.jq`) 실패 · 5 락 점유 중.
 
 ## 4. 산출물 규격
 
@@ -111,7 +114,7 @@ watcher 는 저장소 소유자가 연 PR(`authorAssociation=OWNER`)만 체인�
 ]
 ```
 
-**게시에 실리는 것은 `path`·`line`·`side`·`body` 넷뿐이다.** `code`·`axis`·`grade` 는 게시 후 `meta.json` 의 `comments[]` 에 코멘트 id 와 함께 기록된다 — Stage 2 가 스레드를 찾는 열쇠다.
+**게시에 실리는 것은 `path`·`line`·`side`·`body` 넷뿐이다.** `code`·`axis`·`grade` 는 게시 후 `meta.json` 에 코멘트 id 와 함께 기록된다 — Stage 1 은 `stage1[].comments`, Stage 2 는 `stage2[-1].new_comments`, Stage 3 은 `stage3.comments`. Stage 2 는 `stage1[].comments[].id` 로 스레드를 찾는다.
 
 줄 범위 앵커(`path:12-18`)나 파일 전체 앵커(`path:0`)는 inline 으로 못 쓴다. **요약 본문으로 옮긴다.** 위원 출력의 앵커 표기 규칙은 `02-judges.md` §2 에 있다.
 
@@ -145,7 +148,7 @@ chmod 600 ~/.config/pr-eval/bot.env
 
 ### 5-3. 진입점 설치
 
-`.claude/` 는 gitignore 되므로 clone 한 머신마다 `tools/pr-eval/scripts/install-entrypoints.sh` 를 한 번 돌린다. `.claude/commands/pr-eval.md` 와 `.claude/agents/pr-eval-judge.md` 를 재생성한다.
+`.claude/` 는 gitignore 되므로 clone 한 머신마다 `tools/pr-eval/scripts/install-entrypoints.sh` 를 한 번 돌린다. `.claude/commands/pr-eval.md` · `.claude/commands/pr-eval-author.md` · `.claude/agents/pr-eval-judge.md` 를 재생성한다.
 두 settings 파일과 명령 문서는 스크립트를 이 머신의 절대 경로(`/Users/m1/workspace/tech-n-ai/tech-n-ai-backend/...`)로 부른다. 다른 위치에 clone 했으면 아래처럼 하니스 안의 경로를 한 번에 바꾸고 이 스크립트를 다시 돌린다. 경로가 안 맞으면 `chain.sh` 와 이 스크립트가 종료 2 로 멈춘다.
 
 ```bash
@@ -156,7 +159,7 @@ grep -rlF /Users/m1/workspace/tech-n-ai/ tools/pr-eval --exclude-dir=runs --excl
 
 ### 5-4. watcher 상시 실행 (선택)
 
-`~/Library/LaunchAgents/com.tech-n-ai.pr-eval.plist` 에 아래를 두고 `launchctl load` 한다. 디버깅은 `scripts/watch.sh --once`.
+`~/Library/LaunchAgents/com.tech-n-ai.pr-eval.plist` 에 아래를 두고 `launchctl load` 한다(최소 예시다. 지금 쓰는 plist 는 `/usr/bin/caffeinate -i` 로 감싸고 로그를 `~/Library/Logs/pr-eval-watch.log` 에 남긴다). 디버깅은 `scripts/watch.sh --once`.
 
 ```xml
 <key>ProgramArguments</key>
@@ -176,7 +179,7 @@ grep -rlF /Users/m1/workspace/tech-n-ai/ tools/pr-eval --exclude-dir=runs --excl
 
 머신이 꺼져 있으면 안 돈다. 켜면 폴링이라 밀린 것부터 처리한다. **한 번에 한 건씩 순서대로 처리한다** — PR A 가 도는 동안 PR B 에 리뷰어를 걸어도 A 가 끝나야 뜬다.
 
-**수동 호출에는 `--settings` 가 안 걸린다.** 헤드리스 세션은 호출줄에서 도구 권한을 강제하지만 사람이 여는 대화형 세션은 평소 설정으로 돈다. 같은 보증을 걸려면 수동 호출도 `claude --settings tools/pr-eval/settings.json --setting-sources project --permission-mode dontAsk` 로 띄운다.
+**수동 호출에는 `--settings` 가 안 걸린다.** 헤드리스 세션은 호출줄에서 도구 권한을 강제하지만 사람이 여는 대화형 세션은 평소 설정으로 돈다. 같은 보증을 걸려면 수동 호출도 `claude --settings tools/pr-eval/settings.json --setting-sources project --permission-mode dontAsk --mcp-config tools/pr-eval/mcp.json --strict-mcp-config` 로 띄운다.
 
 ## 6. 실측으로 확인된 것 — 다시 실험하지 않는다
 
