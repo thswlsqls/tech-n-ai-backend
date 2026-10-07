@@ -80,7 +80,7 @@ public final class AggregateScorer {
             averageFalsePositiveAtK(scored, kValues),
             new AggregateMetrics.Excluded(intentNotRag, fallbackPath, searchFailed, noEvidenceType),
             scoredCountByType,
-            hitRateAtKByType(scoredByType, scored.size(), kValues),
+            hitRateAtKByType(scoredByType, kValues),
             recencyLatestTarget == 0 ? null : (double) recencyLatestHit / recencyLatestTarget,
             new AggregateMetrics.NoEvidence(
                 noEvidenceType, noEvidenceCorrectlyEmpty, noEvidenceWronglyNonEmpty)
@@ -110,16 +110,9 @@ public final class AggregateScorer {
     }
 
     private static Map<GoldenSetItemType, Map<Integer, Double>> hitRateAtKByType(
-        Map<GoldenSetItemType, List<RetrievalMetrics>> scoredByType, int scoredCount, List<Integer> kValues) {
+        Map<GoldenSetItemType, List<RetrievalMetrics>> scoredByType, List<Integer> kValues) {
         Map<GoldenSetItemType, Map<Integer, Double>> result = new EnumMap<>(GoldenSetItemType.class);
-        scoredByType.forEach((type, metrics) -> {
-            Map<Integer, Double> byK = new LinkedHashMap<>();
-            for (int k : kValues) {
-                long hits = metrics.stream().filter(m -> m.hitAtK().get(k)).count();
-                byK.put(k, average(hits, scoredCount));
-            }
-            result.put(type, byK);
-        });
+        scoredByType.forEach((type, metrics) -> result.put(type, hitRateAtK(metrics, kValues)));
         return result;
     }
 

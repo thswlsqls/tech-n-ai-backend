@@ -119,6 +119,29 @@ class AggregateScorerTest {
         }
 
         @Test
+        @DisplayName("유형별 적중률의 분모는 그 유형의 채점 수다")
+        void hitRateByType_dividesByTypeCount() {
+            // Given: SINGLE_FACT 2건 중 1건 적중, MULTI_HOP 2건 중 2건 적중
+            List<QuestionOutcome> outcomes = List.of(
+                outcome("S1", GoldenSetItemType.SINGLE_FACT, true, false, false, false,
+                    List.of("a"), Set.of("a")),
+                outcome("S2", GoldenSetItemType.SINGLE_FACT, true, false, false, false,
+                    List.of("x"), Set.of("z")),
+                outcome("M1", GoldenSetItemType.MULTI_HOP, true, false, false, false,
+                    List.of("b"), Set.of("b")),
+                outcome("M2", GoldenSetItemType.MULTI_HOP, true, false, false, false,
+                    List.of("c"), Set.of("c"))
+            );
+
+            // When
+            AggregateMetrics metrics = AggregateScorer.aggregate(outcomes, K_VALUES);
+
+            // Then
+            assertThat(metrics.hitRateAtKByType().get(GoldenSetItemType.SINGLE_FACT).get(5)).isEqualTo(0.5);
+            assertThat(metrics.hitRateAtKByType().get(GoldenSetItemType.MULTI_HOP).get(5)).isEqualTo(1.0);
+        }
+
+        @Test
         @DisplayName("채점 대상이 없으면 평균은 0")
         void noScoredQuestions_averagesAreZero() {
             // Given

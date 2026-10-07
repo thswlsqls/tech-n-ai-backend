@@ -24,8 +24,8 @@ public record EvalReport(
     AnswerQuality answerQuality
 ) {
 
-    /** 보강 블록이 생기면서 올린 버전. 앞선 실행의 리포트와 구분한다 */
-    public static final String SCHEMA_VERSION = "4";
+    /** aggregate 블록에 유형별 hit@k 가 생기면서 올린 버전. 앞선 실행의 리포트와 구분한다 */
+    public static final String SCHEMA_VERSION = "5";
 
     /**
      * 실행 당시 설정 스냅샷
