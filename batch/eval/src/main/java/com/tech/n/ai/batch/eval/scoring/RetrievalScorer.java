@@ -1,5 +1,6 @@
 package com.tech.n.ai.batch.eval.scoring;
 
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,8 +29,15 @@ public final class RetrievalScorer {
         for (int k : kValues) {
             List<String> topK = rankedExternalIds.subList(0, Math.min(k, rankedExternalIds.size()));
             // recall은 찾아낸 기대 근거의 가짓수로, 오검출은 자리 수로 센다
-            int distinctHits = (int) topK.stream().filter(expectedExternalIds::contains).distinct().count();
-            int hitPositions = (int) topK.stream().filter(expectedExternalIds::contains).count();
+            Set<String> foundExpected = new HashSet<>();
+            int hitPositions = 0;
+            for (String externalId : topK) {
+                if (expectedExternalIds.contains(externalId)) {
+                    foundExpected.add(externalId);
+                    hitPositions++;
+                }
+            }
+            int distinctHits = foundExpected.size();
             // 기대 근거가 없는 질문(NO_EVIDENCE)은 recall을 정의할 수 없어 0으로 둔다
             recallAtK.put(k, expectedExternalIds.isEmpty()
                 ? 0.0 : (double) distinctHits / expectedExternalIds.size());
