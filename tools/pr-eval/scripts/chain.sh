@@ -50,7 +50,7 @@ last_author() { find "$AUTHOR_DIR" -name 'round-*.json' | sort | tail -1; }
 
 # 헤드리스 세션 하나를 띄운다. 도구 권한·MCP 를 이 머신 설정과 떼어 놓는 이유는 watch.sh 주석과 같다.
 run_session() {  # run_session <settings.json> <프롬프트> <단계 이름> <시도 번호>
-  local settings="$1" prompt="$2" name="$3" try="$4" add_dirs=() d out rc=0
+  local settings="$1" prompt="$2" name="$3" try="$4" add_dirs=() d out rc=0 started
   for d in "$WS_ROOT/tech-n-ai-backend-worktrees" "$WS_ROOT/tech-n-ai-frontend" \
            "$WS_ROOT/tech-n-ai-frontend-worktrees"; do
     [ -d "$d" ] && add_dirs+=("$d")
@@ -58,6 +58,7 @@ run_session() {  # run_session <settings.json> <프롬프트> <단계 이름> <�
   # --setting-sources project: .claude/settings.local.json 의 allow·훅과 ~/.claude/settings.json 을 읽지 않는다.
   # user 만 남기면 .claude/commands·agents 도 안 읽혀 /pr-eval 이 없어진다(실측). --settings 는 이 값과 상관없이 읽힌다
   # dontAsk: allow 에 없는 것은 묻지 않고 거부한다. acceptEdits 는 작업 폴더 안 편집과 mkdir·rm·mv 등을 allow 와 상관없이 승인했다(실측)
+  started="$(date +%s)"
   out="$( cd "$REPO_ROOT" && claude -p --output-format json --permission-mode dontAsk \
       --setting-sources project --settings "$settings" \
       --mcp-config tools/pr-eval/mcp.json --strict-mcp-config \
@@ -69,18 +70,21 @@ run_session() {  # run_session <settings.json> <프롬프트> <단계 이름> <�
   jq -r '.result // empty' <<<"$out" 2>/dev/null || printf '%s\n' "$out"
   # 단계별 시간·비용과 도구 거부를 남긴다 — 작은 PR 에서 단계를 줄여도 되는지, 어떤 거부가 반복되는지 판단할 근거.
   # 거부 필드가 없으면 null 로 둔다(0 건과 구분한다). 거부된 도구의 인자는 남기지 않는다
-  local at; at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  local at wall_ms; at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  # duration_ms 는 마지막 하위 에이전트 완료 알림 뒤 구간만 잰다(PR #52 실측 — Stage 1 실제 23분이 133초로 남았다).
+  # 세션 전체 시간은 여기서 직접 잰다
+  wall_ms=$(( ($(date +%s) - started) * 1000 ))
   if jq -e 'type == "object"' <<<"$out" >/dev/null 2>&1; then
-    meta_set '.chain.sessions = ((.chain.sessions // []) + [{step:$s, try:$t, at:$at, exit_code:$rc,
+    meta_set '.chain.sessions = ((.chain.sessions // []) + [{step:$s, try:$t, at:$at, exit_code:$rc, wall_ms:$w,
       session_id:$r.session_id, duration_ms:$r.duration_ms, cost_usd:$r.total_cost_usd, num_turns:$r.num_turns, is_error:$r.is_error,
       permission_denials:($r.permission_denials | if type == "array" then length else null end),
       denied_tools:($r.permission_denials | if type == "array" then [.[].tool_name] | unique else null end)}])' \
-      --arg s "$name" --argjson t "$try" --arg at "$at" --argjson rc "$rc" --argjson r "$out" \
+      --arg s "$name" --argjson t "$try" --arg at "$at" --argjson rc "$rc" --argjson w "$wall_ms" --argjson r "$out" \
       || log "meta.json 에 세션 기록을 남기지 못했다"
   else
     # 실패한 시도도 기록에서 빠지지 않게 한 줄은 남긴다
-    meta_set '.chain.sessions = ((.chain.sessions // []) + [{step:$s, try:$t, at:$at, exit_code:$rc, json:false}])' \
-      --arg s "$name" --argjson t "$try" --arg at "$at" --argjson rc "$rc" \
+    meta_set '.chain.sessions = ((.chain.sessions // []) + [{step:$s, try:$t, at:$at, exit_code:$rc, wall_ms:$w, json:false}])' \
+      --arg s "$name" --argjson t "$try" --arg at "$at" --argjson rc "$rc" --argjson w "$wall_ms" \
       || log "meta.json 에 세션 기록을 남기지 못했다"
     log "세션 결과를 JSON 으로 못 읽어 시간·비용 없이 시도만 남겼다"
   fi
