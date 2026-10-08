@@ -83,7 +83,7 @@ docs/monitoring/.venv/
 
 ### 로컬 작업 산출물 — 원격에 올리지 않는다 ###
 # 앞에 /를 붙여 저장소 루트의 폴더만 제외한다 (api/auth/docs 같은 하위 docs는 그대로 추적)
-/pipeline/
+/tools/pipeline/
 /prompts/
 
 # docs는 통째로 제외하되, README.md가 링크하는 문서만 남긴다.
