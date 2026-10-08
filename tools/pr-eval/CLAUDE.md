@@ -13,7 +13,7 @@
 6. 봇 토큰을 저장소에 커밋하지 않는다.
 
 > - 봇이 코드를 못 고치게 하는 강제 수단은 **collaborator read 역할 하나뿐이다.** 토큰 스코프는 못 막는다 — `public_repo` 는 public 저장소의 코드 write 를 포함하고 두 저장소는 public 이다. 봇을 write 로 올리면 그 순간 이 토큰이 push 를 허용한다.
-> - **`pipeline/` 과 헷갈리지 않는다.** `pipeline/` 의 impl·impl-validate 는 **PR 을 올릴 때**, `tools/pr-eval/` 은 **올라온 PR 을 평가할 때** 쓴다. 서로의 산출물을 읽지 않는다.
+> - **`tools/pipeline/` 과 헷갈리지 않는다.** `tools/pipeline/` 의 impl·impl-validate 는 **PR 을 올릴 때**, `tools/pr-eval/` 은 **올라온 PR 을 평가할 때** 쓴다. 서로의 산출물을 읽지 않는다.
 > - **제품 PR 에 `tools/pr-eval/` 변경을 섞지 않는다.** 섞으면 체인이 main 과 충돌해 멈춘다(PR #36 — 그때는 세션이 작업 트리의 `_memory/learnings.md` 를 직접 고쳤다). 하니스 변경은 따로 PR 을 낸다.
 > - **`runs/` 와 `docs/` 만 gitignore 된다.** `docs/` 는 제출용 임시 초안이다. `runs/` 는 PR 마다 버려지는 작업 폴더라 추적하지 않는다 — 백업이 없고 다른 머신에서 clone 해도 따라오지 않는다. 규칙 문서·스크립트와 누적 자산(`_memory/learnings.md`)은 추적된다.
 
@@ -192,7 +192,7 @@ grep -rlF /Users/m1/workspace/tech-n-ai/ tools/pr-eval --exclude-dir=runs --excl
 | diff 밖 앵커 | **거부한다. 그것도 리뷰 통째로.** `422 {"errors":["Line could not be resolved"]}`, 없는 파일은 `Path could not be resolved`. **PG1 이 이 하니스에서 가장 값싼 장치다** |
 | `eval_sha` 가 head 보다 과거일 때 `line` 앵커 | **붙는다.** head 보다 두 커밋 앞선 SHA 로 게시했고 `line`·`original_line` 이 그대로 잡혔다. 기준 SHA 를 head 로 끌어올릴 필요가 없다 |
 | `pulls/{N}/files` 를 PG1 기준으로 쓰면 | **깨진다.** head diff 에는 있고 `eval_sha` diff 에는 없는 줄을 통과시켜 게시가 422 가 된다. `compare/{base}...{기준SHA}` 를 쓴다 |
-| `pipeline/` 의 워크트리 정리가 `pr-eval-*` 를 지우는가 | **안 지운다.** 자기가 만든 `$WORKTREE_PATH` 하나만 지운다 (`pipeline/impl-agent/agents/impl-implementer.md:98`) |
+| `tools/pipeline/` 의 워크트리 정리가 `pr-eval-*` 를 지우는가 | **안 지운다.** 자기가 만든 `$WORKTREE_PATH` 하나만 지운다 (`tools/pipeline/impl-agent/agents/impl-implementer.md:98`) |
 | 닫힌 PR 에서 코멘트 수정 | **인라인은 `PATCH` 로 고쳐진다. 리뷰 요약은 안 된다** — `PUT .../reviews/{id}` 가 404 다(같은 리뷰의 `GET` 은 200). 요약을 고치려면 PR 이 열려 있어야 한다 |
 | `reply` · `patch` · `meta.json` 기록 | 전부 동작한다. `review_id`·코멘트 `id`·`code`/`axis`/`grade` 가 다 들어간다 |
 | 리뷰어 재지정 시 무한 루프 | **안 빠진다.** watcher 가 `stage1.review_id` 를 보고 `skip — 이미 게시됨` 을 낸다 |

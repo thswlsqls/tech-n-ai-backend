@@ -242,7 +242,7 @@ git worktree add --detach ../tech-n-ai-frontend-worktrees/pr-eval-<PR번호>-<sh
 
 각 줄은 그 저장소 루트에서 부른다. frontend 는 `cd /Users/m1/workspace/tech-n-ai/tech-n-ai-frontend` 를 먼저 따로 부른다(`cd … && git` 한 줄 묶기는 거부된다).
 
-부모 폴더는 `pipeline/impl-config.yml`이 이미 쓰는 곳과 같다. **leaf 이름 `pr-eval-`이 유일한 구분**이므로
+부모 폴더는 `tools/pipeline/impl-config.yml`이 이미 쓰는 곳과 같다. **leaf 이름 `pr-eval-`이 유일한 구분**이므로
 impl 쪽 정리 작업이 이 폴더를 지우지 않는지 먼저 확인한다.
 
 ---
