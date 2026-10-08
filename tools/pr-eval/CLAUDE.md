@@ -171,11 +171,10 @@ grep -rlF /Users/m1/workspace/tech-n-ai/ tools/pr-eval --exclude-dir=runs --excl
 <string>/Users/m1/workspace/tech-n-ai/tech-n-ai-backend</string>
 ```
 
-**지금 쓰는 plist 는 머지를 막아 둔다.** `EnvironmentVariables.PATH` 맨 앞에 `~/.config/pr-eval/no-merge-bin` 이 있고,
-그 안의 `gh` 래퍼가 `gh pr merge` 와 `gh api .../pulls/<N>/merge` 만 `exit 1` 로 거절한다(나머지 명령은 `/opt/homebrew/bin/gh` 로 넘긴다).
-그래서 launchd 로 돈 체인은 머지 게이트를 지나도 `chain.state=blocked`("gh pr merge 실패")로 끝나고, 로그에 `[no-merge] gh pr merge 차단` 이 찍힌다.
-자동 머지를 다시 켜려면 PATH 에서 이 경로를 빼고 `launchctl bootout` 뒤 다시 `bootstrap` 한다.
-래퍼가 없는 PATH 로 직접 띄운 `watch.sh`·`chain.sh` 는 이 차단을 받지 않는다.
+**지금 쓰는 plist 는 리스크 `low` 인 PR 을 자동으로 머지한다.** `EnvironmentVariables.PATH` 에 `~/.config/pr-eval/no-merge-bin` 을 두지 않는다(2026-10-08 뺐다).
+자동 머지를 끄려면(`03-risk.md` "자동 머지를 끄는 기준") 이 경로를 PATH 맨 앞에 넣고 `launchctl bootout` 뒤 다시 `bootstrap` 한다.
+그 안의 `gh` 래퍼가 `gh pr merge` 와 `gh api .../pulls/<N>/merge` 만 `exit 1` 로 거절해(나머지 명령은 `/opt/homebrew/bin/gh` 로 넘긴다),
+체인은 머지 게이트를 지나도 `chain.state=blocked`("gh pr merge 실패")로 끝나고 로그에 `[no-merge] gh pr merge 차단` 이 찍힌다.
 
 머신이 꺼져 있으면 안 돈다. 켜면 폴링이라 밀린 것부터 처리한다. **한 번에 한 건씩 순서대로 처리한다** — PR A 가 도는 동안 PR B 에 리뷰어를 걸어도 A 가 끝나야 뜬다.
 
