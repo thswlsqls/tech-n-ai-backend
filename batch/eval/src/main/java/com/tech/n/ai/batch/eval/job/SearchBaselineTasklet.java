@@ -101,6 +101,7 @@ public class SearchBaselineTasklet implements Tasklet {
             metrics.zeroHitQuestionCount(),
             metrics.falsePositiveAtK(),
             metrics.scoredCountByType(),
+            metrics.hitRateAtKByType(),
             metrics.recencyLatestHitRateAt5(),
             new EvalReport.NoEvidenceSummary(
                 metrics.noEvidence().total(),

@@ -97,7 +97,7 @@ JobRepository로 `ResourcelessJobRepository`를 쓰므로 MySQL이 필요 없습
 | `aggregate` | 유형별·전체 집계 |
 | `excluded` | 채점에서 뺀 질문과 그 이유 |
 | `answerQuality` | 답변 품질 잡의 두 축 점수 (검색 잡에서는 `null`) |
-| `schemaVersion` | 리포트 형식 버전. 현재 `4` |
+| `schemaVersion` | 리포트 형식 버전. 현재 `5` |
 
 블록이 늘거나 뜻이 바뀌면 `EvalReport.SCHEMA_VERSION`을 올립니다. 옛 리포트와 구분하기 위해서입니다.
 

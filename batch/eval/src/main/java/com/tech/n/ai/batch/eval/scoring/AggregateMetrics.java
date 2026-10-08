@@ -16,6 +16,7 @@ import java.util.Map;
  * @param falsePositiveAtK 채점 대상 질문의 k별 오검출 수 평균
  * @param excluded 집계에서 뺀 질문 수 (상호 배타, 판정 순서 고정)
  * @param scoredCountByType 유형별 채점 질문 수
+ * @param hitRateAtKByType 유형별 k별 적중률 (그 유형의 채점 질문 중 상위 k건에 기대 근거가 든 질문의 비율). 키는 scoredCountByType과 같다
  * @param recencyLatestHitRateAt5 RECENCY 유형에서 상위 5건에 최신 문서가 들어온 비율. 대상이 없으면 null
  * @param noEvidence "근거 없음" 유형 판정 결과
  */
@@ -29,6 +30,7 @@ public record AggregateMetrics(
     Map<Integer, Double> falsePositiveAtK,
     Excluded excluded,
     Map<GoldenSetItemType, Integer> scoredCountByType,
+    Map<GoldenSetItemType, Map<Integer, Double>> hitRateAtKByType,
     Double recencyLatestHitRateAt5,
     NoEvidence noEvidence
 ) {
