@@ -8,9 +8,9 @@
 
 ## 데모 영상
 
-https://github.com/user-attachments/assets/6f0500b6-4672-47c6-9bc6-1265271aa4b1
+https://github.com/user-attachments/assets/04314298-13c3-42d4-97fd-cc4eb8ed7171
 
-> 사용자 앱에서는 로그인, 필터로 목록 좁히기, 상세 보기, 북마크, 출처가 달린 RAG 챗봇 답변을 보여줍니다. 관리자 앱에서는 AI 에이전트에 Provider별 수집 현황을 요청해 통계 표와 차트로 받는 과정을 보여줍니다.
+> 사용자 앱에서는 로그인, 필터로 목록 좁히기, 상세 보기, 북마크, 출처가 달린 RAG 챗봇 답변을 보여줍니다. 관리자 앱에서는 AI 에이전트에 Provider별, SourceType별, UpdateType별 통계를 차례로 요청해 각각 통계 표와 차트로 받는 과정을 보여줍니다.
 
 ## 프로젝트 기획 의도 (해결하려고 하는 문제)
 
