@@ -206,10 +206,11 @@ public class EmergingTechAgentTools {
      */
     @Tool(name = "get_emerging_tech_statistics",
           value = "조회 기간 기준으로 EmergingTech 데이터를 지정한 groupBy 기준 하나로 집계합니다. "
-                + "사용자가 요청한 기준만 1회 호출하세요. 예: 'Provider별 통계' → groupBy=provider 1회만 호출. "
+                + "사용자가 기준을 직접 말했으면 '현황' 같은 말이 함께 있어도 그 기준만 호출하세요. 이 규칙이 모호한 요청 규칙보다 우선합니다. "
+                + "예: 'Provider별 수집 현황' → groupBy=provider 1회만 호출. "
                 + "여러 기준을 사용자가 명시적으로 요청한 경우에만 각 groupBy를 호출합니다.")
     public StatisticsDto getStatistics(
-        @P("집계 기준 필드 (하나만 선택): provider, source_type, update_type. 사용자가 요청한 기준만 사용하세요.") String groupBy,
+        @P("집계 기준 필드 (하나만 선택): provider, source_type, update_type. 사용자가 기준을 직접 말했으면 그 기준만 호출하세요(모호한 요청 규칙보다 우선).") String groupBy,
         @P("조회 시작일 (YYYY-MM-DD 형식, 빈 문자열이면 전체 기간)") String startDate,
         @P("조회 종료일 (YYYY-MM-DD 형식, 빈 문자열이면 전체 기간)") String endDate
     ) {

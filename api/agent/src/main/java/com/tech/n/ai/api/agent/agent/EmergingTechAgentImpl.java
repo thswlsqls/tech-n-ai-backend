@@ -9,6 +9,7 @@ import com.tech.n.ai.api.agent.tool.EmergingTechAgentTools;
 import com.tech.n.ai.api.agent.tool.handler.ToolErrorHandlers;
 import com.tech.n.ai.client.slack.domain.slack.contract.SlackContract;
 import com.tech.n.ai.common.conversation.memory.MongoDbChatMemoryStore;
+import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.memory.chat.ChatMemoryProvider;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatModel;
@@ -76,11 +77,18 @@ public class EmergingTechAgentImpl implements EmergingTechAgent {
 
     @PostConstruct
     void initAssistant() {
-        ChatMemoryProvider memoryProvider = memoryId -> MessageWindowChatMemory.builder()
-                .id(memoryId)
-                .maxMessages(MAX_MESSAGES)
-                .chatMemoryStore(mongoDbChatMemoryStore)
-                .build();
+        // MongoDbChatMemoryStore는 updateMessages()가 아무것도 저장하지 않아서, store로 걸면 Tool 실행 뒤
+        // 다음 모델 요청에서 규칙 프롬프트·Tool 호출·Tool 결과가 빠진다. 그래서 메모리 안에서만 들고 있는
+        // 기본 store를 쓰고, MongoDB에 저장된 대화 기록(동기화가 끝났으면 이번 요청의 goal도 들어 있다)은
+        // 처음 만들 때 한 번 읽어 채운다.
+        ChatMemoryProvider memoryProvider = memoryId -> {
+            ChatMemory memory = MessageWindowChatMemory.builder()
+                    .id(memoryId)
+                    .maxMessages(MAX_MESSAGES)
+                    .build();
+            mongoDbChatMemoryStore.getMessages(memoryId).forEach(memory::add);
+            return memory;
+        };
 
         this.assistant = AiServices.builder(AgentAssistant.class)
                 .chatModel(chatModel)
@@ -165,6 +173,9 @@ public class EmergingTechAgentImpl implements EmergingTechAgent {
             toolCalls.record(metrics.getToolCallCount());
             // ThreadLocal 메트릭 해제 (메모리 누수 방지)
             tools.unbindMetrics();
+            // 실행이 끝나면 세션 메모리를 비운다. 남겨 두면 지난 실행의 전체 프롬프트가 JVM 안에 쌓이고,
+            // 같은 세션의 다음 실행이 MongoDB에 저장된 대화 기록을 다시 읽지 않는다.
+            assistant.evictChatMemory(sessionId);
         }
     }
 

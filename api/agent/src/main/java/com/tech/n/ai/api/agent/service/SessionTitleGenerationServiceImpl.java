@@ -23,7 +23,7 @@ public class SessionTitleGenerationServiceImpl implements SessionTitleGeneration
     private final ConversationSessionService sessionService;
 
     public SessionTitleGenerationServiceImpl(
-            @Qualifier("agentChatModel") ChatModel chatModel,
+            @Qualifier("agentTitleChatModel") ChatModel chatModel,
             ConversationSessionService sessionService) {
         this.chatModel = chatModel;
         this.sessionService = sessionService;

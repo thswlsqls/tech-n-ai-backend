@@ -47,6 +47,23 @@ public class AiAgentConfig {
         log.info("Agent ChatLanguageModel 초기화: model={}, temperature={}, logRequests={}, logResponses={}",
                 agentModelName, agentTemperature, logRequests, logResponses);
 
+        return baseBuilder()
+            // 한 응답에서 Tool 여러 개를 한꺼번에 부르면 결과를 보기 전에
+            // 사용자가 요청하지 않은 통계 기준까지 호출하는 일이 있어 끈다
+            .parallelToolCalls(false)
+            .build();
+    }
+
+    /**
+     * 세션 제목 생성용 ChatModel
+     * 제목 요청에는 Tool이 없어서 parallelToolCalls를 넣으면 OpenAI가 400을 낸다. 그래서 Agent 모델과 따로 둔다.
+     */
+    @Bean("agentTitleChatModel")
+    public ChatModel agentTitleChatModel() {
+        return baseBuilder().build();
+    }
+
+    private OpenAiChatModel.OpenAiChatModelBuilder baseBuilder() {
         return OpenAiChatModel.builder()
             .apiKey(openAiApiKey)
             .modelName(agentModelName)
@@ -54,7 +71,6 @@ public class AiAgentConfig {
             .maxTokens(agentMaxTokens)
             .timeout(Duration.ofSeconds(agentTimeout))
             .logRequests(logRequests)
-            .logResponses(logResponses)
-            .build();
+            .logResponses(logResponses);
     }
 }
