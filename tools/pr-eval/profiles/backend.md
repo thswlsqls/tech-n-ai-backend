@@ -98,6 +98,9 @@ git diff --name-only $B...$S | grep -cE '^(api/agent|api/chatbot|client/(scraper
 > **48건**을 냈는데 전부 `TokenUsage`·`maxTokens`·`inputTokens` 같은 **모델 토큰 계량**이었고,
 > 문서만 고친 `346515c` 도 **6건**을 냈는데 전부 mermaid 노드 이름 `TokenService` 였다.
 > 이 저장소에서 `token` 은 인증 토큰보다 LLM 토큰이 훨씬 흔하다.
+> 좁힌 안은 그 커밋들에서 전부 **0**을 냈고, 실제 자격증명을 다룬 `c784870`(`langchain4j.open-ai.chat-model.api-key`)
+> **18건** · `26957b5`(terraform IAM·시크릿) **3건**은 그대로 잡았다.
+> 확장자를 목록으로 한정한 것도 같은 실측에서 왔다 — 거짓 매치는 전부 `.md`·`.mmd`·`.drawio` 였다.
 
 > **`.json` 을 확장자 목록에 넣은 이유 — 실측이다** (2026-09-01).
 > 원래 목록에는 `.json` 이 없었다. 확장자를 화이트리스트로 좁힐 때 표본에 없던 형식은 조용히 0을 낸다.
@@ -106,9 +109,6 @@ git diff --name-only $B...$S | grep -cE '^(api/agent|api/chatbot|client/(scraper
 > 평문 JWT 두 개를 담고도 신호4 가 **0**이었고, `.json` 을 넣으면 **4**가 된다.
 > `api/auth` 의 같은 파일을 추가한 `1bb20e8` 은 94 → 97, `api/agent` 쪽 `e306db6` 은 6 → 8 이다.
 > 거짓 매치는 늘지 않았다 — 최근 main 커밋 60건에 두 판을 나란히 돌렸더니 **차이가 난 커밋이 하나도 없었다.**
-> 좁힌 안은 그 커밋들에서 전부 **0**을 냈고, 실제 자격증명을 다룬 `c784870`(`langchain4j.open-ai.chat-model.api-key`)
-> **18건** · `26957b5`(terraform IAM·시크릿) **3건**은 그대로 잡았다.
-> 확장자를 목록으로 한정한 것도 같은 실측에서 왔다 — 거짓 매치는 전부 `.md`·`.mmd`·`.drawio` 였다.
 
 > **ISO/IEC 25010 대응** — 이 9축이 25010 품질 특성 어디를 덮는지 적어 둔다.
 > 기능 적합성 `R-A`·`R-B` / 성능 효율성 `R-E` / 호환성 `R-D` / 신뢰성 `R-C`·`R-F` /
