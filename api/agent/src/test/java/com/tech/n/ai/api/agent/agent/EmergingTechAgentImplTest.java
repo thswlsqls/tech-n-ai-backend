@@ -159,6 +159,7 @@ class EmergingTechAgentImplTest {
 
             // Then
             verify(tools).unbindMetrics();
+            verify(assistant).evictChatMemory("session");
         }
 
         @Test
