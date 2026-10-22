@@ -8,7 +8,7 @@
 
 ## 데모 영상
 
-<video src="https://github.com/user-attachments/assets/6f0500b6-4672-47c6-9bc6-1265271aa4b1" controls width="100%"></video>
+https://github.com/user-attachments/assets/6f0500b6-4672-47c6-9bc6-1265271aa4b1
 
 > 사용자 앱에서는 로그인, 필터로 목록 좁히기, 상세 보기, 북마크, 출처가 달린 RAG 챗봇 답변을 보여줍니다. 관리자 앱에서는 AI 에이전트에 Provider별 수집 현황을 요청해 통계 표와 차트로 받는 과정을 보여줍니다.
 
