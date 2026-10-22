@@ -3,8 +3,21 @@ package com.tech.n.ai.api.agent.agent;
 import com.tech.n.ai.api.agent.config.AgentPromptConfig;
 import com.tech.n.ai.api.agent.metrics.ToolExecutionMetrics;
 import com.tech.n.ai.api.agent.tool.EmergingTechAgentTools;
+import com.tech.n.ai.api.agent.tool.adapter.AnalyticsToolAdapter;
+import com.tech.n.ai.api.agent.tool.adapter.DataCollectionToolAdapter;
+import com.tech.n.ai.api.agent.tool.adapter.EmergingTechToolAdapter;
+import com.tech.n.ai.api.agent.tool.adapter.SlackToolAdapter;
+import com.tech.n.ai.api.agent.tool.dto.StatisticsDto;
 import com.tech.n.ai.client.slack.domain.slack.contract.SlackContract;
 import com.tech.n.ai.common.conversation.memory.MongoDbChatMemoryStore;
+import dev.langchain4j.agent.tool.ToolExecutionRequest;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.ToolExecutionResultMessage;
+import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.request.ChatRequest;
+import dev.langchain4j.model.chat.response.ChatResponse;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -14,6 +27,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -218,6 +234,95 @@ class EmergingTechAgentImplTest {
 
             // Then
             assertThat(result).isFalse();
+        }
+    }
+
+    // ========== 실행 중 대화 메모리 테스트 ==========
+
+    @Nested
+    @DisplayName("execute - 실행 중 대화 메모리")
+    class ExecuteChatMemory {
+
+        private static final String SESSION_ID = "session-memory";
+        private static final String GOAL = "Provider별 수집 현황을 통계로 보여주세요";
+
+        private final AgentPromptConfig realPromptConfig = new AgentPromptConfig();
+        private ScriptedChatModel chatModel;
+        private AnalyticsToolAdapter analyticsAdapter;
+        private EmergingTechAgentImpl agent;
+
+        @BeforeEach
+        void setUpRealAssistant() {
+            // 실제 @Tool 메서드가 리플렉션으로 잡히도록 Tool 객체는 진짜로 만들고 어댑터만 모의한다
+            analyticsAdapter = mock(AnalyticsToolAdapter.class);
+            EmergingTechAgentTools realTools = new EmergingTechAgentTools(
+                    mock(SlackToolAdapter.class), mock(EmergingTechToolAdapter.class),
+                    analyticsAdapter, mock(DataCollectionToolAdapter.class));
+            when(analyticsAdapter.getStatistics(anyString(), anyString(), anyString()))
+                    .thenReturn(new StatisticsDto("provider", "", "", 3,
+                            List.of(new StatisticsDto.GroupCount("OPENAI", 3))));
+
+            // 운영과 같은 조건: MongoDB에는 사용자가 보낸 goal 원문만 저장돼 있다
+            when(mongoDbChatMemoryStore.getMessages((Object) SESSION_ID))
+                    .thenReturn(List.of(UserMessage.from(GOAL)));
+
+            chatModel = new ScriptedChatModel();
+            agent = new EmergingTechAgentImpl(
+                    chatModel, realTools, realPromptConfig, slackContract, mongoDbChatMemoryStore, meterRegistry);
+            agent.initAssistant();
+        }
+
+        @Test
+        @DisplayName("Tool 실행 뒤 두 번째 모델 요청에 규칙 프롬프트와 Tool 결과가 남고, 첫 요청 앞에는 저장된 대화 기록이 있다")
+        void execute_두번째요청_프롬프트와Tool결과유지() {
+            // When
+            AgentExecutionResult result = agent.execute(GOAL, SESSION_ID);
+
+            // Then
+            assertThat(result.success()).isTrue();
+            assertThat(chatModel.requests).hasSize(2);
+
+            List<ChatMessage> first = chatModel.requests.get(0).messages();
+            assertThat(first.get(0)).isEqualTo(UserMessage.from(GOAL));
+
+            List<ChatMessage> second = chatModel.requests.get(1).messages();
+            assertThat(second).contains(UserMessage.from(realPromptConfig.buildPrompt(GOAL)));
+            assertThat(second).anySatisfy(message -> assertThat(message).isInstanceOf(ToolExecutionResultMessage.class));
+        }
+
+        @Test
+        @DisplayName("실행이 끝나면 세션 메모리를 비워, 같은 세션의 다음 실행은 저장된 대화 기록을 다시 읽는다")
+        void execute_실행후메모리비움_다음실행시기록재조회() {
+            // Given
+            agent.execute(GOAL, SESSION_ID);
+
+            // When
+            agent.execute(GOAL, SESSION_ID);
+
+            // Then
+            verify(mongoDbChatMemoryStore, times(2)).getMessages((Object) SESSION_ID);
+        }
+    }
+
+    /**
+     * 실행마다 첫 응답은 통계 Tool 호출 요청, 둘째 응답은 텍스트를 돌려주고 받은 요청을 모두 기록하는 모델.
+     */
+    private static class ScriptedChatModel implements ChatModel {
+
+        private final List<ChatRequest> requests = new ArrayList<>();
+
+        @Override
+        public ChatResponse doChat(ChatRequest request) {
+            requests.add(request);
+            boolean toolCallTurn = requests.size() % 2 == 1;
+            AiMessage answer = toolCallTurn
+                    ? AiMessage.from(ToolExecutionRequest.builder()
+                            .id("call-" + requests.size())
+                            .name("get_emerging_tech_statistics")
+                            .arguments("{\"groupBy\":\"provider\",\"startDate\":\"\",\"endDate\":\"\"}")
+                            .build())
+                    : AiMessage.from("Provider별 통계입니다.");
+            return ChatResponse.builder().aiMessage(answer).build();
         }
     }
 }
