@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# watch.sh — 봇에게 리뷰 요청이 걸린 PR 을 찾아 Stage 1 세션을 띄운다.
-# 자동으로 도는 것은 Stage 1 뿐이다. Stage 2·3 은 사람이 /pr-eval 을 부를 때만 돈다.
+# watch.sh — 봇에게 리뷰 요청이 걸린 PR 을 찾아 체인(scripts/chain.sh)을 띄운다.
+# 체인이 Stage 1 부터 머지까지 사람 없이 돈다. 단계별로 따로 돌릴 때는 사람이 /pr-eval 을 부른다.
 # launchd StartInterval 60 으로 상시 실행한다. --once 는 디버깅 경로다.
 set -euo pipefail
 
@@ -32,25 +32,53 @@ lock_valid() {
   [ $(( $(date -u +%s) - s_epoch )) -lt 10800 ]
 }
 
+# 머지된 PR 의 평가·저자 워크트리(pr-eval-<N>[-<sha7>] · pr-author-<N>)를 지운다.
+# 세션 권한에는 worktree add 만 있고, 체인은 사람이 한 머지를 못 보므로 폴링하는 여기서 한다.
+# --force 를 쓰지 않는다 — 커밋 안 한 변경이 있으면 git 이 거부하고 로그만 남는다. 브랜치는 건드리지 않는다
+gc_worktrees() {
+  local repo dir wt name merged
+  for repo in tech-n-ai-backend tech-n-ai-frontend; do
+    dir="$WS_ROOT/$repo-worktrees"
+    [ -d "$dir" ] || continue
+    merged="$(gh pr list --repo "$OWNER/$repo" --state merged --limit 200 --json number --jq '.[].number')" || continue
+    for wt in "$dir"/pr-eval-* "$dir"/pr-author-*; do
+      [ -d "$wt" ] || continue
+      name="$(basename "$wt")"
+      [[ "$name" =~ ^pr-(eval|author)-([1-9][0-9]*)(-[0-9a-f]{7})?$ ]] || continue
+      grep -qx "${BASH_REMATCH[2]}" <<<"$merged" || continue
+      if git -C "$WS_ROOT/$repo" worktree remove "$wt"; then
+        log "워크트리 정리 — $repo $name (머지된 PR)"
+      else
+        log "워크트리 정리 실패 — $repo $name"
+      fi
+    done
+    git -C "$WS_ROOT/$repo" worktree prune
+  done
+}
+
 run_once() {
   local prs n
-  # watcher 가 GitHub 에 던지는 질의는 이것 하나뿐이다. PR 코멘트를 폴링하지 않는다.
+  gc_worktrees || log "워크트리 정리 단계가 실패했다 — 폴링은 계속한다"
+  # 리뷰 요청을 찾는 질의는 이것 하나뿐이다(위 정리 단계의 머지 목록 조회 말고는). PR 코멘트를 폴링하지 않는다.
   prs="$(gh search prs --owner "$OWNER" --review-requested="$BOT" --state=open \
-          --json number,repository,isDraft 2>/dev/null || echo '[]')"
+          --json number,repository,isDraft,authorAssociation 2>/dev/null || echo '[]')"
   n="$(jq 'length' <<<"$prs")"
   [ "$n" -gt 0 ] || { log "리뷰 요청 없음"; return 0; }
 
   local i
   for (( i=0; i<n; i++ )); do
-    local pr repo draft m
+    local pr repo draft assoc m
     pr="$(jq -r ".[$i].number" <<<"$prs")"
     repo="$(jq -r ".[$i].repository.name" <<<"$prs")"
     draft="$(jq -r ".[$i].isDraft" <<<"$prs")"
+    assoc="$(jq -r ".[$i].authorAssociation" <<<"$prs")"
 
     # 1) 프로파일을 모르는 저장소 — 질의가 --owner 단위라 밖의 PR 도 걸려 온다.
     known_profile "$repo" || { log "skip $repo#$pr — 프로파일 없음"; continue; }
     # 2) draft
     [ "$draft" = "false" ] || { log "skip $repo#$pr — draft"; continue; }
+    # 2-1) 저장소 소유자가 연 PR 만 — 저장소가 public 이라, 남의 PR 이면 본문·diff 가 사용자 계정으로 push·머지하는 세션에 그대로 들어간다
+    [ "$assoc" = "OWNER" ] || { log "skip $repo#$pr — 작성자가 소유자가 아니다($assoc)"; continue; }
 
     m="$HARNESS_DIR/runs/$repo-pr$pr/meta.json"
     if [ -f "$m" ]; then
@@ -75,23 +103,11 @@ run_once() {
     "$PR_EVAL" init "$repo" "$pr" >/dev/null
     "$PR_EVAL" attempt "$repo" "$pr" inc >/dev/null
 
-    local add_dirs=() d
-    for d in "$WS_ROOT/tech-n-ai-backend-worktrees" "$WS_ROOT/tech-n-ai-frontend" \
-             "$WS_ROOT/tech-n-ai-frontend-worktrees"; do
-      [ -d "$d" ] && add_dirs+=("$d")
-    done
-
-    # 세션 하나가 Stage 1 의 N 라운드를 끝까지 돈다. 여기서 끝날 때까지 기다린다 —
+    # Stage 1 부터 머지까지 체인 하나가 끝까지 돈다(scripts/chain.sh). 끝날 때까지 기다린다 —
     # 그래야 launchd 가 StartInterval 회차를 건너뛰어 이중 실행이 이중으로 막힌다.
-    # --settings 는 로컬 설정을 대체하고, --strict-mcp-config 는 MCP 를 mcp.json 하나로 묶는다(실측).
-    # 둘 다 "이 머신 설정에 기대지 않는다" 는 같은 이유다 — 없으면 다른 머신에서 다르게 돈다.
-    ( cd "$REPO_ROOT" && claude -p --permission-mode acceptEdits \
-        --settings tools/pr-eval/settings.json \
-        --mcp-config tools/pr-eval/mcp.json --strict-mcp-config \
-        ${add_dirs[0]+--add-dir "${add_dirs[@]}"} \
-        -- "/pr-eval stage1 $repo $pr" ) < /dev/null || log "세션이 비정상 종료했다 — $repo#$pr"
+    "$HARNESS_DIR/scripts/chain.sh" "$repo" "$pr" || log "체인이 멈췄다 — $repo#$pr (chain.state=$(jq -r '.chain.state // "?"' "$m" 2>/dev/null))"
 
-    log "Stage 1 종료 — $repo#$pr (status=$(jq -r '.status' "$m" 2>/dev/null || echo '?'))"
+    log "체인 종료 — $repo#$pr (status=$(jq -r '.status' "$m" 2>/dev/null || echo '?'))"
   done
 }
 

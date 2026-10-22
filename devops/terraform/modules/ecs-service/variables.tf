@@ -169,15 +169,9 @@ variable "autoscaling_memory_target" {
 }
 
 variable "enable_blue_green" {
-  description = "CodeDeploy Blue/Green 배포 활성화. true 면 deployment_controller=CODE_DEPLOY."
+  description = "ECS 자체 blue/green 계열 배포 사용 여부. true 면 strategy=CANARY(10% 를 5분 먼저 보낸 뒤 전환, bake time 5분), false 면 ROLLING. 서비스를 만든 뒤에는 바꾸지 않는다 — advanced_configuration 은 ignore_changes 대상인 load_balancer 안에 있어 따라 바뀌지 않는다."
   type        = bool
   default     = true
-}
-
-variable "deployment_config_name" {
-  description = "CodeDeploy deployment config (Canary/Linear/AllAtOnce)."
-  type        = string
-  default     = "CodeDeployDefault.ECSCanary10Percent5Minutes"
 }
 
 variable "rollback_alarm_5xx_threshold" {

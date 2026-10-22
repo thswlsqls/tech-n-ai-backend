@@ -111,8 +111,9 @@ resource "aws_elasticache_replication_group" "this" {
   transit_encryption_enabled = var.transit_encryption_enabled
 
   # 인증 — auth_token 또는 RBAC (User Group)
-  auth_token     = local.use_auth_token ? random_password.auth_token[0].result : null
-  user_group_ids = var.auth_mode == "rbac" ? var.rbac_user_group_ids : null
+  auth_token                 = local.use_auth_token ? random_password.auth_token[0].result : null
+  auth_token_update_strategy = local.use_auth_token ? "ROTATE" : null
+  user_group_ids             = var.auth_mode == "rbac" ? var.rbac_user_group_ids : null
 
   snapshot_retention_limit = var.snapshot_retention_limit
   snapshot_window          = var.snapshot_retention_limit > 0 ? var.snapshot_window : null

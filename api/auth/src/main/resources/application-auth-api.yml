@@ -19,11 +19,6 @@ oauth:
     authorization-endpoint: ${OAUTH_KAKAO_AUTHORIZATION_ENDPOINT:https://kauth.kakao.com/oauth/authorize}
     redirect-uri: ${OAUTH_KAKAO_REDIRECT_URI:http://localhost:8080/api/v1/auth/oauth/callback/kakao}
 
-management:
-  health:
-    mongo:
-      enabled: false
-
 logging:
   level:
     # Application 로그

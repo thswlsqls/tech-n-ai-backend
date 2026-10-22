@@ -150,7 +150,7 @@ resource "aws_cloudwatch_dashboard" "overview" {
           properties = {
             view    = "timeSeries"
             stacked = false
-            region  = data.aws_region.current.name
+            region  = data.aws_region.current.region
             title   = "${s.service_name} CPU%"
             metrics = [
               ["AWS/ECS", "CPUUtilization", "ClusterName", s.cluster_name, "ServiceName", s.service_name, { stat = "Average" }]

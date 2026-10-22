@@ -287,6 +287,7 @@ class EvalReportWriterTest {
             0,
             Map.of(1, 0.0, 5, 1.0),
             Map.of(GoldenSetItemType.SINGLE_FACT, 1),
+            Map.of(GoldenSetItemType.SINGLE_FACT, Map.of(1, 1.0, 5, 1.0)),
             null,
             new EvalReport.NoEvidenceSummary(0, 0, 0));
 

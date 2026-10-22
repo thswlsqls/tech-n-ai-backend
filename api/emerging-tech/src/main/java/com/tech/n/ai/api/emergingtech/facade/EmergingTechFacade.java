@@ -111,7 +111,10 @@ public class EmergingTechFacade {
     }
 
     /**
-     * 다건 생성 (부분 성공 허용)
+     * 다건 생성.
+     *
+     * 중복 검사·임베딩·저장을 요청 단위로 한 번씩 처리한다.
+     * 저장이 실패하면 그 요청을 전건 실패로 보고한다 — 항목 단위 집계가 아니다.
      */
     public EmergingTechBatchResponse createEmergingTechBatch(EmergingTechBatchRequest request) {
         int newCount = 0;
@@ -119,23 +122,22 @@ public class EmergingTechFacade {
         int failureCount = 0;
         List<String> failureMessages = new ArrayList<>();
 
-        for (EmergingTechCreateRequest item : request.items()) {
-            try {
-                EmergingTechCommandService.SaveResult result = commandService.saveEmergingTech(item);
+        try {
+            for (EmergingTechCommandService.SaveResult result : commandService.saveEmergingTechAll(request.items())) {
                 if (result.isNew()) {
                     newCount++;
                 } else {
                     duplicateCount++;
                 }
-            } catch (Exception e) {
-                failureCount++;
-                String errorMessage = String.format(
-                    "Emerging Tech 저장 실패: title=%s, error=%s",
-                    item.title(), e.getMessage()
-                );
-                log.error(errorMessage, e);
-                failureMessages.add(errorMessage);
             }
+        } catch (Exception e) {
+            failureCount = request.items().size();
+            String errorMessage = String.format(
+                "Emerging Tech 저장 실패: count=%d, error=%s",
+                request.items().size(), e.getMessage()
+            );
+            log.error(errorMessage, e);
+            failureMessages.add(errorMessage);
         }
 
         log.info("Emerging Tech 다건 생성 완료: total={}, new={}, duplicate={}, failure={}",
