@@ -1,6 +1,6 @@
 -- =====================================================================
 -- auth 초기 데이터: 슈퍼 관리자 계정 및 생성 이력
--- 비밀번호: Admin1234! (BCrypt encoded, strength=12)
+-- 비밀번호는 저장소에 두지 않는다. 각자 로컬 http-client.private.env.json 의 adminPassword 에 둔다 (BCrypt encoded, strength=12)
 -- =====================================================================
 
 INSERT INTO admins (
@@ -11,7 +11,7 @@ INSERT INTO admins (
     817225402408821626,
     'thsdmsqlsspdlqj@naver.com',
     'superadmin',
-    '$2a$12$4VZ3MJ/gjyQeatMpEeiL3OQ2ZetwYFJIR0zXe1q582333WUkunHVS',
+    '$2a$12$ieowjy031qun82NPlzuw1uTvrukmoVxsZo5YdlVPTctR5hRsyqw7.',
     'ADMIN', TRUE, FALSE, 0, NULL, NULL,
     CURRENT_TIMESTAMP(6), NULL, CURRENT_TIMESTAMP(6), NULL
 ) ON DUPLICATE KEY UPDATE
