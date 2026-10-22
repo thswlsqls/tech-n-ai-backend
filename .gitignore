@@ -41,6 +41,9 @@ out/
 .env
 .env.*
 !.env.example
+# IntelliJ HTTP Client 의 개인 환경 파일. 토큰·비밀번호가 들어가므로 커밋하지 않는다.
+# 새로 받은 사람은 같은 폴더의 .template 을 복사해 값을 채운다.
+**/http-client.private.env.json
 
 ### OS ###
 .DS_Store

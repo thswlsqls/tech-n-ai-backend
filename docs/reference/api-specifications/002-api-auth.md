@@ -73,7 +73,7 @@
 {
   "email": "user@example.com",
   "username": "사용자명",
-  "password": "Password123!"
+  "password": "비밀번호"
 }
 ```
 
@@ -129,7 +129,7 @@
 ```json
 {
   "email": "user@example.com",
-  "password": "Password123!"
+  "password": "비밀번호"
 }
 ```
 
@@ -233,7 +233,7 @@
 
 ```json
 {
-  "password": "Password123!",
+  "password": "비밀번호",
   "reason": "서비스를 더 이상 사용하지 않습니다."
 }
 ```
@@ -373,7 +373,7 @@ TokenResponse 형식 (로그인 응답과 동일)
 ```json
 {
   "token": "reset-password-token-string",
-  "newPassword": "NewPassword123!"
+  "newPassword": "새 비밀번호"
 }
 ```
 
@@ -580,7 +580,7 @@ TokenResponse 형식 (관리자 토큰: Access 900초, Refresh 86400초)
 {
   "email": "admin@example.com",
   "username": "관리자",
-  "password": "AdminPassword123!"
+  "password": "관리자 비밀번호"
 }
 ```
 
@@ -729,7 +729,7 @@ AdminResponse 형식
 ```json
 {
   "username": "수정된관리자명",
-  "password": "NewPassword123!"
+  "password": "새 비밀번호"
 }
 ```
 

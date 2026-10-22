@@ -64,7 +64,7 @@ Content-Type: application/json
 
 {
   "username": "testuser",
-  "password": "Password123!"
+  "password": "{{testPassword}}"
 }
 
 > {%
@@ -80,7 +80,7 @@ Content-Type: application/json
 {
   "email": "invalid-email",
   "username": "testuser",
-  "password": "Password123!"
+  "password": "{{testPassword}}"
 }
 
 > {%
@@ -96,7 +96,7 @@ Content-Type: application/json
 {
   "email": "test@example.com",
   "username": "ab",
-  "password": "Password123!"
+  "password": "{{testPassword}}"
 }
 
 > {%
@@ -144,7 +144,7 @@ Content-Type: application/json
 {
   "email": "{{testEmail}}",
   "username": "duplicateuser",
-  "password": "Password123!"
+  "password": "{{testPassword}}"
 }
 
 > {%

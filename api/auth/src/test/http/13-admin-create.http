@@ -11,7 +11,7 @@ Content-Type: application/json
 Authorization: Bearer {{adminAccessToken}}
 
 {
-  "email": "thswlsqls@naver.com",
+  "email": "newadmin@example.com",
   "username": "new-admin",
   "password": "admin123!"
 }
@@ -56,9 +56,9 @@ Content-Type: application/json
 Authorization: Bearer {{adminAccessToken}}
 
 {
-  "email": "thswlsqls@naver.com",
+  "email": "newadmin@example.com",
   "username": "newadmin2",
-  "password": "Admin123!"
+  "password": "admin123!"
 }
 
 > {%

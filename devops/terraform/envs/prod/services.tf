@@ -12,6 +12,8 @@ locals {
     { name = "SPRING_PROFILES_ACTIVE", value = var.environment },
     { name = "MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED", value = "true" },
     { name = "AWS_REGION", value = var.region },
+    # 서비스별 CORS 허용 오리진. gateway application-prod.yml 과 같은 값을 콤마로 이어 한 줄로 넣는다
+    { name = "SECURITY_CORS_ALLOWED_ORIGINS", value = "https://beta.example.com,https://example.com" },
   ]
 
   # 시드 이미지 — 실제 배포 시 GitHub Actions 가 digest 로 갱신
