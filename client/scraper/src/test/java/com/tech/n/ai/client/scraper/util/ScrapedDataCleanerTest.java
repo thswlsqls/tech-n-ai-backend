@@ -18,6 +18,8 @@ class ScrapedDataCleanerTest {
     void decodeHtmlEntities_decodesOnce() {
         assertThat(cleaner.decodeHtmlEntities("&amp;lt;div&amp;gt;"))
             .isEqualTo("&lt;div&gt;");
+        assertThat(cleaner.decodeHtmlEntities("&amp;#8221;"))
+            .isEqualTo("&#8221;");
     }
 
     @Test
