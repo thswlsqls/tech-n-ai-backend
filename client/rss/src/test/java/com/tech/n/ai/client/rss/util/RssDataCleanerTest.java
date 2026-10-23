@@ -21,6 +21,13 @@ class RssDataCleanerTest {
     }
 
     @Test
+    @DisplayName("체인 끝쪽 엔티티도 한 번만 푼다 — &amp;#8221;는 &#8221;가 된다")
+    void decodeHtmlEntities_decodesLastEntityOnce() {
+        assertThat(cleaner.decodeHtmlEntities("&amp;#8221;"))
+            .isEqualTo("&#8221;");
+    }
+
+    @Test
     @DisplayName("한 번 인코딩된 엔티티는 그대로 풀린다")
     void decodeHtmlEntities_decodesSingleEncoded() {
         assertThat(cleaner.decodeHtmlEntities("Q&amp;A &lt;b&gt; &quot;x&quot;"))
