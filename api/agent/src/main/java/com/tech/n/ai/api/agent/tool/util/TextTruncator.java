@@ -19,6 +19,14 @@ public final class TextTruncator {
         if (text == null) {
             return "";
         }
-        return text.length() > maxLength ? text.substring(0, maxLength) + "..." : text;
+        if (text.length() <= maxLength) {
+            return text;
+        }
+        // 이모지처럼 char 두 개로 된 문자를 반으로 자르지 않도록 한 칸 앞에서 자른다
+        int end = maxLength;
+        if (end > 0 && Character.isHighSurrogate(text.charAt(end - 1))) {
+            end--;
+        }
+        return text.substring(0, end) + "...";
     }
 }
