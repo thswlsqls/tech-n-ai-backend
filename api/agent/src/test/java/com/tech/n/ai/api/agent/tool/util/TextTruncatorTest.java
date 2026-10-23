@@ -26,8 +26,10 @@ class TextTruncatorTest {
     @Test
     @DisplayName("자르는 위치가 이모지 가운데면 이모지 앞에서 자른다")
     void truncate_이모지_경계() {
-        // "😀"는 char 두 개(😀)다. 3에서 자르면 앞 반쪽만 남는다
+        // "😀"는 char 두 개(index 2의 앞 반쪽 \uD83D, index 3의 뒤 반쪽 \uDE00)다. 3에서 자르면 앞 반쪽만 남는다
         assertThat(TextTruncator.truncate("ab😀cd", 3)).isEqualTo("ab...");
+        // 4에서 자르면 이모지가 통째로 들어오므로 그대로 둔다
+        assertThat(TextTruncator.truncate("ab😀cd", 4)).isEqualTo("ab😀...");
     }
 
     @Test
