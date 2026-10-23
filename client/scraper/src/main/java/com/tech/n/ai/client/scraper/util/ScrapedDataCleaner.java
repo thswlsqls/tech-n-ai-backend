@@ -51,8 +51,8 @@ public class ScrapedDataCleaner {
             return text;
         }
         
+        // &amp;는 마지막에 바꾼다. 먼저 바꾸면 "&amp;lt;"가 "&lt;"를 거쳐 "<"까지 두 번 풀린다.
         return text
-            .replace("&amp;", "&")
             .replace("&lt;", "<")
             .replace("&gt;", ">")
             .replace("&quot;", "\"")
@@ -61,7 +61,8 @@ public class ScrapedDataCleaner {
             .replace("&#39;", "'")
             .replace("&#8217;", "'")
             .replace("&#8220;", "\"")
-            .replace("&#8221;", "\"");
+            .replace("&#8221;", "\"")
+            .replace("&amp;", "&");
     }
     
     /**
