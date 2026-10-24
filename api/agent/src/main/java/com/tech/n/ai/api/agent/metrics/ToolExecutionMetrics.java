@@ -37,7 +37,7 @@ public class ToolExecutionMetrics {
     /** collect_scraped_articles로 이미 수집 완료된 provider */
     private final Set<String> collectedScraperProviders = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
-    /** collect_rss_feeds/collect_scraped_articles 중복 차단 횟수 (루프 감지용) */
+    /** collect_github_releases/collect_rss_feeds/collect_scraped_articles 중복 차단 횟수 (루프 감지용) */
     private final AtomicInteger collectBlockedCount = new AtomicInteger(0);
 
     /** 이미 실행 완료된 통계 Tool 호출 (groupBy+startDate+endDate 키) — 비연속 중복 차단 */

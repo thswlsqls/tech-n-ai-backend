@@ -1,5 +1,6 @@
 package com.tech.n.ai.api.agent.tool;
 
+import com.tech.n.ai.api.agent.exception.AgentLoopDetectedException;
 import com.tech.n.ai.api.agent.metrics.ToolExecutionMetrics;
 import com.tech.n.ai.api.agent.tool.adapter.AnalyticsToolAdapter;
 import com.tech.n.ai.api.agent.tool.adapter.DataCollectionToolAdapter;
@@ -358,6 +359,103 @@ class EmergingTechAgentToolsTest {
             // Then
             assertThat(result.failureMessages()).isNotEmpty();
             verify(dataCollectionAdapter, never()).collectGitHubReleases(any(), any());
+        }
+
+        @Test
+        @DisplayName("같은 저장소 재수집 시 BLOCKED 반환")
+        void collectGitHubReleases_같은저장소재수집차단() {
+            // Given
+            DataCollectionResultDto collectResult = DataCollectionResultDto.success(
+                    "GITHUB_RELEASES", "OPENAI", 5, 5, 3, 2, 0, List.of());
+            when(dataCollectionAdapter.collectGitHubReleases("openai", "openai-python"))
+                    .thenReturn(collectResult);
+            tools.collectGitHubReleases("openai", "openai-python");
+
+            // When
+            DataCollectionResultDto result = tools.collectGitHubReleases("openai", "openai-python");
+
+            // Then
+            verify(dataCollectionAdapter, times(1)).collectGitHubReleases("openai", "openai-python");
+            assertThat(result.failureMessages().get(0)).startsWith("BLOCKED:");
+        }
+
+        @Test
+        @DisplayName("owner 교정 전후가 같은 저장소면 교정된 이름 기준으로 차단")
+        void collectGitHubReleases_owner교정후재수집차단() {
+            // Given
+            DataCollectionResultDto collectResult = DataCollectionResultDto.success(
+                    "GITHUB_RELEASES", "ANTHROPIC", 1, 1, 1, 0, 0, List.of());
+            when(dataCollectionAdapter.collectGitHubReleases("anthropics", "anthropic-sdk-python"))
+                    .thenReturn(collectResult);
+            tools.collectGitHubReleases("anthropics", "anthropic-sdk-python");
+
+            // When
+            DataCollectionResultDto result = tools.collectGitHubReleases("anthropic", "anthropic-sdk-python");
+
+            // Then
+            verify(dataCollectionAdapter, times(1)).collectGitHubReleases("anthropics", "anthropic-sdk-python");
+            assertThat(result.failureMessages().get(0)).startsWith("BLOCKED:");
+        }
+
+        @Test
+        @DisplayName("반복 차단 3회 초과 시 루프 예외")
+        void collectGitHubReleases_반복차단루프감지() {
+            // Given
+            DataCollectionResultDto collectResult = DataCollectionResultDto.success(
+                    "GITHUB_RELEASES", "OPENAI", 5, 5, 3, 2, 0, List.of());
+            when(dataCollectionAdapter.collectGitHubReleases("openai", "openai-python"))
+                    .thenReturn(collectResult);
+            tools.collectGitHubReleases("openai", "openai-python");
+            tools.collectGitHubReleases("openai", "openai-python");
+            tools.collectGitHubReleases("openai", "openai-python");
+            tools.collectGitHubReleases("openai", "openai-python");
+
+            // When & Then
+            assertThatThrownBy(() -> tools.collectGitHubReleases("openai", "openai-python"))
+                    .isInstanceOf(AgentLoopDetectedException.class);
+            assertThat(metrics.getCollectBlockedCount()).isEqualTo(4);
+        }
+
+        @Test
+        @DisplayName("서로 다른 저장소는 각각 수집")
+        void collectGitHubReleases_서로다른저장소() {
+            // Given
+            when(dataCollectionAdapter.collectGitHubReleases("openai", "openai-python"))
+                    .thenReturn(DataCollectionResultDto.success(
+                            "GITHUB_RELEASES", "OPENAI", 5, 5, 3, 2, 0, List.of()));
+            when(dataCollectionAdapter.collectGitHubReleases("anthropics", "anthropic-sdk-python"))
+                    .thenReturn(DataCollectionResultDto.success(
+                            "GITHUB_RELEASES", "ANTHROPIC", 1, 1, 1, 0, 0, List.of()));
+
+            // When
+            DataCollectionResultDto first = tools.collectGitHubReleases("openai", "openai-python");
+            DataCollectionResultDto second = tools.collectGitHubReleases("anthropics", "anthropic-sdk-python");
+
+            // Then
+            verify(dataCollectionAdapter, times(1)).collectGitHubReleases("openai", "openai-python");
+            verify(dataCollectionAdapter, times(1)).collectGitHubReleases("anthropics", "anthropic-sdk-python");
+            assertThat(first.failureMessages()).noneMatch(m -> m.startsWith("BLOCKED:"));
+            assertThat(second.failureMessages()).noneMatch(m -> m.startsWith("BLOCKED:"));
+        }
+
+        @Test
+        @DisplayName("수집 중 예외가 난 저장소는 기록되지 않아 다시 수집")
+        void collectGitHubReleases_예외저장소재시도() {
+            // Given
+            when(dataCollectionAdapter.collectGitHubReleases("openai", "openai-python"))
+                    .thenThrow(new RuntimeException("rate limit"))
+                    .thenReturn(DataCollectionResultDto.success(
+                            "GITHUB_RELEASES", "OPENAI", 5, 5, 3, 2, 0, List.of()));
+            assertThatThrownBy(() -> tools.collectGitHubReleases("openai", "openai-python"))
+                    .isInstanceOf(RuntimeException.class);
+
+            // When
+            DataCollectionResultDto result = tools.collectGitHubReleases("openai", "openai-python");
+
+            // Then
+            verify(dataCollectionAdapter, times(2)).collectGitHubReleases("openai", "openai-python");
+            assertThat(result.newCount()).isEqualTo(3);
+            assertThat(result.failureMessages()).noneMatch(m -> m.startsWith("BLOCKED:"));
         }
     }
 

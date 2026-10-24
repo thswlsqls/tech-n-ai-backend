@@ -363,6 +363,23 @@ public class EmergingTechAgentTools {
             return DataCollectionResultDto.failure("GITHUB_RELEASES", "", 0, "GitHub 저장소 입력값이 유효하지 않습니다.");
         }
 
+        // 이미 수집 완료된 저장소면 중복 수집 차단
+        if (metrics().isGitHubRepoCollected(correctedOwner, correctedRepo)) {
+            int blockedCount = metrics().incrementAndGetCollectBlockedCount();
+            log.warn("이미 collect_github_releases로 수집된 저장소 재수집 차단: {}/{} (차단 횟수: {})",
+                    correctedOwner, correctedRepo, blockedCount);
+
+            if (blockedCount > 3) {
+                throw new AgentLoopDetectedException(
+                        "collect_github_releases 반복 차단 %d회 초과. 이미 수집 완료된 저장소를 계속 재수집하는 루프가 감지되었습니다."
+                                .formatted(blockedCount));
+            }
+
+            return DataCollectionResultDto.failure("GITHUB_RELEASES", correctedOwner + "/" + correctedRepo, 0,
+                    "BLOCKED: %s/%s 저장소는 이미 수집 완료되었습니다. 이 저장소를 다시 수집하지 마세요. 수집 결과를 요약하고 작업을 완료하세요."
+                            .formatted(correctedOwner, correctedRepo));
+        }
+
         DataCollectionResultDto result = dataCollectionAdapter.collectGitHubReleases(correctedOwner, correctedRepo);
 
         // 수집 완료된 저장소 기록
