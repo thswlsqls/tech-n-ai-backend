@@ -73,12 +73,17 @@ public class AnalyticsToolAdapter {
             LocalDateTime start = parseDate(startDate, true);
             LocalDateTime end = parseDate(endDate, false);
 
+            // 저장 값이 대문자라 정확히 일치 비교하는 집계 서비스에 맞춰 대문자로 바꾼다
+            String providerFilter = toUpperOrNull(provider);
+            String updateTypeFilter = toUpperOrNull(updateType);
+            String sourceTypeFilter = toUpperOrNull(sourceType);
+
             // 불용어 목록을 외부 설정에서 가져옴 (YAML 오버라이드 시 mutable할 수 있으므로 방어적 복사)
             List<String> stopWords = List.copyOf(analyticsConfig.getStopWords());
 
             // 서버사이드 단어 빈도 집계 (unigram)
             List<WordFrequencyResult> wordResults = aggregationService.aggregateWordFrequency(
-                provider, updateType, sourceType, start, end, stopWords, topN);
+                providerFilter, updateTypeFilter, sourceTypeFilter, start, end, stopWords, topN);
 
             List<WordFrequencyDto.WordCount> topWords = wordResults.stream()
                 .map(r -> new WordFrequencyDto.WordCount(r.getId(), r.getCount()))
@@ -88,7 +93,7 @@ public class AnalyticsToolAdapter {
             List<WordFrequencyDto.WordCount> topBigrams = List.of();
 
             // 전체 도큐먼트 수
-            long totalDocs = aggregationService.countDocuments(provider, updateType, sourceType, start, end);
+            long totalDocs = aggregationService.countDocuments(providerFilter, updateTypeFilter, sourceTypeFilter, start, end);
 
             String period = buildPeriodString(startDate, endDate);
             return new WordFrequencyDto(totalDocs, period, topWords, topBigrams);
@@ -96,6 +101,10 @@ public class AnalyticsToolAdapter {
             log.error("텍스트 빈도 분석 실패: provider={}, updateType={}, sourceType={}", provider, updateType, sourceType, e);
             return new WordFrequencyDto(0, "", List.of(), List.of());
         }
+    }
+
+    private String toUpperOrNull(String value) {
+        return (value != null && !value.isBlank()) ? value.toUpperCase() : null;
     }
 
     private LocalDateTime parseDate(String dateStr, boolean startOfDay) {
