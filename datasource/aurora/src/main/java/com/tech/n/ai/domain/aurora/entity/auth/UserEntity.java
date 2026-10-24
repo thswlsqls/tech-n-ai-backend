@@ -1,5 +1,6 @@
 package com.tech.n.ai.domain.aurora.entity.auth;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.tech.n.ai.domain.aurora.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -22,6 +23,7 @@ public class UserEntity extends BaseEntity {
     @Column(name = "password", length = 255)
     private String password;
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "provider_id")
     private ProviderEntity provider;

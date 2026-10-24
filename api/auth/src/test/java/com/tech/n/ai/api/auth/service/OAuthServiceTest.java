@@ -17,6 +17,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -149,6 +150,45 @@ class OAuthServiceTest {
             assertThat(result).isEqualTo(expected);
             verify(oauthStateService).validateAndDeleteState("state-value", "GOOGLE");
             verify(userWriterRepository).save(any(UserEntity.class));
+        }
+
+        @Test
+        @DisplayName("신규 사용자 - 저장하는 UserEntity에 조회한 Provider 연관관계를 채운다")
+        void handleOAuthCallback_신규_사용자_Provider_연관관계() {
+            // Given
+            ProviderEntity provider = createProvider();
+            OAuthProvider mockOAuthProvider = mock(OAuthProvider.class);
+            OAuthProperties.GoogleOAuthProperties googleProps = new OAuthProperties.GoogleOAuthProperties();
+            googleProps.setRedirectUri("http://localhost:8082/callback");
+            OAuthUserInfo userInfo = OAuthUserInfo.builder()
+                .providerUserId("google-user-123")
+                .email("user@gmail.com")
+                .username("googleuser")
+                .build();
+
+            when(providerReaderRepository.findByName("GOOGLE")).thenReturn(Optional.of(provider));
+            when(oauthProviderFactory.getProvider("google")).thenReturn(mockOAuthProvider);
+            when(oauthProperties.getGoogle()).thenReturn(googleProps);
+            when(mockOAuthProvider.exchangeAccessToken(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn("oauth-access-token");
+            when(mockOAuthProvider.getUserInfo("oauth-access-token")).thenReturn(userInfo);
+            when(userReaderRepository.findByProviderIdAndProviderUserId(1L, "google-user-123"))
+                .thenReturn(Optional.empty());
+            when(userWriterRepository.save(any(UserEntity.class))).thenAnswer(invocation -> {
+                UserEntity saved = invocation.getArgument(0);
+                saved.setId(1L);
+                return saved;
+            });
+
+            // When
+            oauthService.handleOAuthCallback("google", "auth-code", "state-value");
+
+            // Then
+            // provider_id 컬럼은 provider 연관관계로만 INSERT되므로 연관관계가 채워져 있어야 한다
+            ArgumentCaptor<UserEntity> captor = ArgumentCaptor.forClass(UserEntity.class);
+            verify(userWriterRepository).save(captor.capture());
+            assertThat(captor.getValue().getProvider()).isSameAs(provider);
+            assertThat(captor.getValue().getProviderId()).isEqualTo(1L);
         }
 
         @Test
