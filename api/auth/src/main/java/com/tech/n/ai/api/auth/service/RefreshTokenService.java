@@ -45,7 +45,8 @@ public class RefreshTokenService {
     }
     
     public Optional<RefreshTokenEntity> findRefreshToken(String token) {
-        return refreshTokenReaderRepository.findByToken(token);
+        return refreshTokenReaderRepository.findByToken(token)
+            .filter(entity -> !Boolean.TRUE.equals(entity.getIsDeleted()));
     }
     
     @Transactional
