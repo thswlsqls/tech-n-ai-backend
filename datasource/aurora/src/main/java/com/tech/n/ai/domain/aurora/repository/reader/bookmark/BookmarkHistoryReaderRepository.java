@@ -56,6 +56,27 @@ public interface BookmarkHistoryReaderRepository extends JpaRepository<BookmarkH
     );
     
     /**
+     * bookmarkId, operationType, 날짜 범위로 히스토리 조회 (페이징)
+     * 
+     * @param bookmarkId 북마크 ID
+     * @param operationType 작업 타입
+     * @param startDate 시작 일시
+     * @param endDate 종료 일시
+     * @param pageable 페이징 정보
+     * @return BookmarkHistoryEntity 페이지
+     */
+    @Query("SELECT h FROM BookmarkHistoryEntity h WHERE h.bookmarkId = :bookmarkId " +
+           "AND h.operationType = :operationType " +
+           "AND h.changedAt >= :startDate AND h.changedAt <= :endDate")
+    Page<BookmarkHistoryEntity> findByBookmarkIdAndOperationTypeAndChangedAtBetween(
+        @Param("bookmarkId") Long bookmarkId,
+        @Param("operationType") String operationType,
+        @Param("startDate") LocalDateTime startDate,
+        @Param("endDate") LocalDateTime endDate,
+        Pageable pageable
+    );
+    
+    /**
      * 특정 시점 이전의 가장 최근 히스토리 조회
      * 
      * @param bookmarkId 북마크 ID
