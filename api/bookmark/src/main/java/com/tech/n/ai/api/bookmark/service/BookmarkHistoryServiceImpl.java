@@ -112,10 +112,18 @@ public class BookmarkHistoryServiceImpl implements BookmarkHistoryService {
     public BookmarkEntity restoreFromHistory(String userId, String entityId, String historyId) {
         Long historyIdLong = parseHistoryId(historyId);
         Long bookmarkId = parseEntityId(entityId);
-        
-        BookmarkHistoryEntity history = findHistoryById(historyIdLong);
+        Long currentUserId = parseUserId(userId);
+
         BookmarkEntity bookmark = findBookmarkById(bookmarkId);
-        
+        if (!bookmark.isOwnedBy(currentUserId)) {
+            throw new UnauthorizedException("본인의 북마크만 복구할 수 있습니다.");
+        }
+
+        BookmarkHistoryEntity history = findHistoryById(historyIdLong);
+        if (!bookmarkId.equals(history.getBookmarkId())) {
+            throw new BookmarkNotFoundException("해당 북마크의 히스토리가 아닙니다: " + historyId);
+        }
+
         Map<String, Object> afterDataMap = parseHistoryData(history, entityId, historyId);
         updateBookmarkFromHistory(bookmark, afterDataMap);
         
