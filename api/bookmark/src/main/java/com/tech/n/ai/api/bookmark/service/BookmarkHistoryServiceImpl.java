@@ -64,8 +64,8 @@ public class BookmarkHistoryServiceImpl implements BookmarkHistoryService {
                 // 날짜 범위 필터링
                 LocalDateTime startDate = parseDateTime(request.startDate(), "startDate");
                 LocalDateTime endDate = parseDateTime(request.endDate(), "endDate");
-                return bookmarkHistoryReaderRepository.findByBookmarkIdAndChangedAtBetween(
-                    bookmarkId, startDate, endDate, pageable
+                return bookmarkHistoryReaderRepository.findByBookmarkIdAndOperationTypeAndChangedAtBetween(
+                    bookmarkId, request.operationType(), startDate, endDate, pageable
                 );
             } else {
                 // operationType만 필터링
