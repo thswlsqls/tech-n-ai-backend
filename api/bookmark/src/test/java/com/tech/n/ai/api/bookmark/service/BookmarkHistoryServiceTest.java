@@ -98,14 +98,13 @@ class BookmarkHistoryServiceTest {
             // Given
             BookmarkEntity bookmark = createBookmark(BOOKMARK_ID, OWNER_ID);
             when(bookmarkReaderRepository.findById(BOOKMARK_ID)).thenReturn(Optional.of(bookmark));
-            lenient().when(bookmarkHistoryReaderRepository.findByHistoryId(HISTORY_ID))
-                .thenReturn(Optional.of(createHistory(HISTORY_ID, BOOKMARK_ID, AFTER_DATA)));
 
             // When & Then
             assertThatThrownBy(() -> bookmarkHistoryService.restoreFromHistory(
                 "2", BOOKMARK_ID.toString(), HISTORY_ID.toString()))
                 .isInstanceOf(UnauthorizedException.class);
             assertOriginalFields(bookmark);
+            verify(bookmarkHistoryReaderRepository, never()).findByHistoryId(any());
             verify(bookmarkWriterRepository, never()).save(any());
         }
 
