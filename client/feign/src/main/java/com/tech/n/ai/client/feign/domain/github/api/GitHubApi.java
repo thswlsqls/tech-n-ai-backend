@@ -51,7 +51,7 @@ public class GitHubApi implements GitHubContract {
     }
 
     private String bearerAuthorization() {
-        return StringUtils.isNotEmpty(token) ? "Bearer " + token : null;
+        return StringUtils.isNotBlank(token) ? "Bearer " + token : null;
     }
 
 }
