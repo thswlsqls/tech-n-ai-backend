@@ -19,6 +19,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -223,6 +224,45 @@ class AnalyticsToolAdapterTest {
             // Then
             assertThat(result.totalDocuments()).isEqualTo(25);
             assertThat(result.topWords()).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("소문자 필터는 대문자로 바꿔 집계 서비스에 넘긴다")
+        void analyzeTextFrequency_소문자필터_대문자변환() {
+            // Given
+            when(analyticsConfig.getStopWords()).thenReturn(List.of());
+            when(aggregationService.aggregateWordFrequency(any(), any(), any(), any(), any(), any(), anyInt()))
+                    .thenReturn(List.of());
+            when(aggregationService.countDocuments(any(), any(), any(), any(), any()))
+                    .thenReturn(0L);
+
+            // When
+            adapter.analyzeTextFrequency("openai", "model_release", "rss", "", "", 20);
+
+            // Then
+            verify(aggregationService).aggregateWordFrequency(
+                    eq("OPENAI"), eq("MODEL_RELEASE"), eq("RSS"), any(), any(), any(), anyInt());
+            verify(aggregationService).countDocuments(
+                    eq("OPENAI"), eq("MODEL_RELEASE"), eq("RSS"), any(), any());
+        }
+
+        @Test
+        @DisplayName("빈 문자열·null 필터는 null로 넘겨 필터를 걸지 않는다")
+        void analyzeTextFrequency_빈필터_null전달() {
+            // Given
+            when(analyticsConfig.getStopWords()).thenReturn(List.of());
+            when(aggregationService.aggregateWordFrequency(any(), any(), any(), any(), any(), any(), anyInt()))
+                    .thenReturn(List.of());
+            when(aggregationService.countDocuments(any(), any(), any(), any(), any()))
+                    .thenReturn(0L);
+
+            // When
+            adapter.analyzeTextFrequency("", null, "  ", "", "", 20);
+
+            // Then
+            verify(aggregationService).aggregateWordFrequency(
+                    isNull(), isNull(), isNull(), any(), any(), any(), anyInt());
+            verify(aggregationService).countDocuments(isNull(), isNull(), isNull(), any(), any());
         }
 
         @Test
