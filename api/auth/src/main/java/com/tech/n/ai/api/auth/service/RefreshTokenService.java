@@ -56,7 +56,6 @@ public class RefreshTokenService {
     
     public boolean validateRefreshToken(String token) {
         return findRefreshToken(token)
-            .filter(entity -> !Boolean.TRUE.equals(entity.getIsDeleted()))
             .filter(entity -> entity.getExpiresAt().isAfter(LocalDateTime.now()))
             .isPresent();
     }
