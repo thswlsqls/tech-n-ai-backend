@@ -31,9 +31,9 @@ public interface EmergingTechInternalContract {
     @GetMapping("/api/v1/emerging-tech/search")
     ApiResponse<Object> searchEmergingTech(
         @RequestHeader("X-Internal-Api-Key") String apiKey,
-        @RequestParam("query") String query,
+        @RequestParam("q") String query,
         @RequestParam(value = "provider", required = false) String provider,
-        @RequestParam(value = "page", defaultValue = "0") int page,
+        @RequestParam(value = "page", defaultValue = "1") int page,
         @RequestParam(value = "size", defaultValue = "20") int size);
 
     /**
