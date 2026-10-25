@@ -457,6 +457,26 @@ class EmergingTechAgentToolsTest {
             assertThat(result.newCount()).isEqualTo(3);
             assertThat(result.failureMessages()).noneMatch(m -> m.startsWith("BLOCKED:"));
         }
+
+        @Test
+        @DisplayName("어댑터가 failure 결과를 돌려준 저장소는 기록되지 않아 다시 수집")
+        void collectGitHubReleases_failure결과저장소재시도() {
+            // Given
+            when(dataCollectionAdapter.collectGitHubReleases("openai", "openai-python"))
+                    .thenReturn(DataCollectionResultDto.failure(
+                            "GITHUB_RELEASES", "OPENAI", 5, "Internal API 호출 실패: timeout"))
+                    .thenReturn(DataCollectionResultDto.success(
+                            "GITHUB_RELEASES", "OPENAI", 5, 5, 3, 2, 0, List.of()));
+            tools.collectGitHubReleases("openai", "openai-python");
+
+            // When
+            DataCollectionResultDto result = tools.collectGitHubReleases("openai", "openai-python");
+
+            // Then
+            verify(dataCollectionAdapter, times(2)).collectGitHubReleases("openai", "openai-python");
+            assertThat(result.newCount()).isEqualTo(3);
+            assertThat(result.failureMessages()).noneMatch(m -> m.startsWith("BLOCKED:"));
+        }
     }
 
     // ========== collectRssFeeds 테스트 ==========

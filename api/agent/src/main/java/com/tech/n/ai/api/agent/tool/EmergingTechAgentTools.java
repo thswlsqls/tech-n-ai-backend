@@ -382,8 +382,13 @@ public class EmergingTechAgentTools {
 
         DataCollectionResultDto result = dataCollectionAdapter.collectGitHubReleases(correctedOwner, correctedRepo);
 
-        // 수집 완료된 저장소 기록
-        metrics().markGitHubRepoCollected(correctedOwner, correctedRepo);
+        // 어댑터가 예외 대신 돌려준 failure 결과(전송 0건, 실패 사유만 있음)는 저장되지 않았으므로 기록하지 않는다
+        boolean failedBeforeSave = result.totalProcessed() == 0 && result.failureCount() == 0
+                && !result.failureMessages().isEmpty();
+        if (!failedBeforeSave) {
+            // 수집 완료된 저장소 기록
+            metrics().markGitHubRepoCollected(correctedOwner, correctedRepo);
+        }
 
         return result;
     }
