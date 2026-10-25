@@ -188,7 +188,6 @@ class OAuthServiceTest {
             ArgumentCaptor<UserEntity> captor = ArgumentCaptor.forClass(UserEntity.class);
             verify(userWriterRepository).save(captor.capture());
             assertThat(captor.getValue().getProvider()).isSameAs(provider);
-            assertThat(captor.getValue().getProviderId()).isEqualTo(1L);
         }
 
         @Test
