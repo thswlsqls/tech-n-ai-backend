@@ -41,7 +41,7 @@ public class EmergingTechToolAdapter {
     public List<EmergingTechDto> search(String query, String provider) {
         try {
             String providerParam = toNullIfBlank(provider);
-            ApiResponse<Object> response = emergingTechContract.searchEmergingTech(apiKey, query, providerParam, 0, 20);
+            ApiResponse<Object> response = emergingTechContract.searchEmergingTech(apiKey, query, providerParam, 1, 20);
 
             InternalApiResponse.PageResponse page = extractPageResponse(response);
             if (page == null || page.items() == null) {

@@ -15,13 +15,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.bind.annotation.RequestParam;
 
+import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -71,6 +74,35 @@ class EmergingTechToolAdapterTest {
             // Then
             assertThat(result).hasSize(2);
             assertThat(result.get(0).provider()).isEqualTo("OPENAI");
+        }
+
+        @Test
+        @DisplayName("검색 요청은 page 1, size 20으로 보낸다 - 서버는 page 1 이상만 받는다")
+        void search_page는1부터() {
+            // Given
+            ApiResponse<Object> response = ApiResponse.success(createPageData(List.of(), 0, 1, 20));
+            when(emergingTechContract.searchEmergingTech(any(), any(), any(), anyInt(), anyInt()))
+                    .thenReturn(response);
+
+            // When
+            adapter.search("GPT", "OPENAI");
+
+            // Then
+            verify(emergingTechContract).searchEmergingTech(any(), eq("GPT"), eq("OPENAI"), eq(1), eq(20));
+        }
+
+        @Test
+        @DisplayName("검색어는 HTTP 쿼리 이름 q로 보낸다 - 서버 검색 API가 q로 받는다")
+        void search_검색어쿼리이름은q() throws NoSuchMethodException {
+            // Given
+            Method method = EmergingTechInternalContract.class.getMethod("searchEmergingTech",
+                    String.class, String.class, String.class, int.class, int.class);
+
+            // When
+            RequestParam queryParam = method.getParameters()[1].getAnnotation(RequestParam.class);
+
+            // Then
+            assertThat(queryParam.value()).isEqualTo("q");
         }
 
         @Test
