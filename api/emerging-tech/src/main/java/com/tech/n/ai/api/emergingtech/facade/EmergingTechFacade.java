@@ -25,6 +25,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -54,6 +56,8 @@ public class EmergingTechFacade {
      */
     public EmergingTechPageResponse getEmergingTechList(EmergingTechListRequest request) {
         validateFilters(request.provider(), request.updateType(), request.status(), request.sourceType());
+        validateDate(request.startDate(), "startDate");
+        validateDate(request.endDate(), "endDate");
 
         Pageable pageable = PageRequest.of(
             request.page() - 1,
@@ -217,6 +221,24 @@ public class EmergingTechFacade {
                 ErrorCodeConstants.BAD_REQUEST,
                 ErrorCodeConstants.MESSAGE_CODE_BAD_REQUEST,
                 String.format("유효하지 않은 %s 값입니다: '%s'. 허용된 값: %s", fieldName, value, validValues)
+            );
+        }
+    }
+
+    /**
+     * 날짜 값 형식(YYYY-MM-DD) 검증
+     */
+    private void validateDate(String value, String fieldName) {
+        if (value == null) {
+            return;
+        }
+        try {
+            LocalDate.parse(value);
+        } catch (DateTimeParseException e) {
+            throw new BusinessException(
+                ErrorCodeConstants.BAD_REQUEST,
+                ErrorCodeConstants.MESSAGE_CODE_BAD_REQUEST,
+                String.format("유효하지 않은 %s 값입니다: '%s'. 올바른 형식: YYYY-MM-DD", fieldName, value)
             );
         }
     }

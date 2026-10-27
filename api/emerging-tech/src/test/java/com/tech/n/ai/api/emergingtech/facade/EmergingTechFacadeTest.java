@@ -2,9 +2,12 @@ package com.tech.n.ai.api.emergingtech.facade;
 
 import com.tech.n.ai.api.emergingtech.dto.request.EmergingTechBatchRequest;
 import com.tech.n.ai.api.emergingtech.dto.request.EmergingTechCreateRequest;
+import com.tech.n.ai.api.emergingtech.dto.request.EmergingTechListRequest;
 import com.tech.n.ai.api.emergingtech.dto.response.EmergingTechBatchResponse;
 import com.tech.n.ai.api.emergingtech.service.EmergingTechCommandService;
 import com.tech.n.ai.api.emergingtech.service.EmergingTechQueryService;
+import com.tech.n.ai.common.core.constants.ErrorCodeConstants;
+import com.tech.n.ai.common.core.exception.BusinessException;
 import com.tech.n.ai.domain.mongodb.document.EmergingTechDocument;
 import org.bson.types.ObjectId;
 import org.junit.jupiter.api.DisplayName;
@@ -14,12 +17,20 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -102,6 +113,61 @@ class EmergingTechFacadeTest {
             assertThat(response.failureMessages()).hasSize(1);
             assertThat(response.failureMessages().getFirst()).contains("count=10", "duplicate key");
         }
+    }
+
+    @Nested
+    @DisplayName("getEmergingTechList - 날짜 형식 검증")
+    class GetEmergingTechListDateValidation {
+
+        @Test
+        @DisplayName("startDate가 YYYY-MM-DD 형식이 아니면 BAD_REQUEST 예외가 나고 QueryService를 호출하지 않는다")
+        void startDate_형식이_틀리면_BAD_REQUEST() {
+            // Given: 구분자가 '/'인 startDate
+            EmergingTechListRequest request = listRequest("2024/01/01", null);
+
+            // When & Then
+            assertThatThrownBy(() -> facade.getEmergingTechList(request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("startDate")
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCodeConstants.BAD_REQUEST);
+            verifyNoInteractions(queryService);
+        }
+
+        @Test
+        @DisplayName("endDate가 없는 날짜(13월)면 BAD_REQUEST 예외가 나고 QueryService를 호출하지 않는다")
+        void endDate_없는_날짜면_BAD_REQUEST() {
+            // Given: 13월인 endDate
+            EmergingTechListRequest request = listRequest(null, "2024-13-01");
+
+            // When & Then
+            assertThatThrownBy(() -> facade.getEmergingTechList(request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("endDate")
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCodeConstants.BAD_REQUEST);
+            verifyNoInteractions(queryService);
+        }
+
+        @Test
+        @DisplayName("올바른 날짜와 null은 같은 값 그대로 QueryService에 넘긴다")
+        void 올바른_날짜와_null은_그대로_넘긴다() {
+            // Given: startDate는 올바른 형식, endDate는 없음
+            EmergingTechListRequest request = listRequest("2024-01-01", null);
+            when(queryService.findEmergingTechs(any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+            // When
+            facade.getEmergingTechList(request);
+
+            // Then
+            verify(queryService).findEmergingTechs(
+                isNull(), isNull(), isNull(), isNull(), eq("2024-01-01"), isNull(), any(Pageable.class));
+        }
+    }
+
+    private EmergingTechListRequest listRequest(String startDate, String endDate) {
+        return new EmergingTechListRequest(1, 20, null, null, null, null, startDate, endDate, null);
     }
 
     private EmergingTechBatchRequest batchRequest(int size) {
