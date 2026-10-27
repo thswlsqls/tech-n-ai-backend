@@ -47,6 +47,7 @@ public class GraphBuildTasklet implements Tasklet {
 
     private static final String INPUT_TEXT_TITLE_SUMMARY = "title-summary";
     private static final String INPUT_TEXT_EMBEDDING = "embedding-text";
+    private static final String SELECT_RECENT = "recent";
     private static final String SELECT_SPREAD = "spread";
     private static final String STATUS_FIELD = "status";
     private static final String PUBLISHED_AT_FIELD = "published_at";
@@ -202,6 +203,10 @@ public class GraphBuildTasklet implements Tasklet {
      * limit이 0이면 전량이라 고를 것이 없고 두 방식이 같다.
      */
     private List<EmergingTechDocument> selectDocuments() {
+        if (!SELECT_RECENT.equals(selectMode) && !SELECT_SPREAD.equals(selectMode)) {
+            throw new IllegalArgumentException("graph.build.select는 %s 또는 %s여야 한다: %s"
+                .formatted(SELECT_RECENT, SELECT_SPREAD, selectMode));
+        }
         List<EmergingTechDocument> found = mongoTemplate.find(selectQuery(), EmergingTechDocument.class);
         if (documentLimit <= 0 || !SELECT_SPREAD.equals(selectMode)) {
             return found;
