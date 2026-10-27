@@ -190,6 +190,7 @@ class BookmarkHistoryServiceTest {
             PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "changedAt"));
         private static final LocalDateTime START = LocalDateTime.of(2026, 1, 1, 0, 0);
         private static final LocalDateTime END = LocalDateTime.of(2026, 1, 31, 23, 59, 59);
+        private static final LocalDateTime END_OF_LAST_DAY = LocalDateTime.of(2026, 1, 31, 23, 59, 59, 999_999_000);
 
         private final Page<BookmarkHistoryEntity> page = new PageImpl<>(List.of(new BookmarkHistoryEntity()));
 
@@ -280,6 +281,68 @@ class BookmarkHistoryServiceTest {
             assertThat(onlyEnd).isSameAs(page);
             verify(bookmarkHistoryReaderRepository, times(2))
                 .findByBookmarkIdAndOperationType(BOOKMARK_ID, "DELETE", PAGEABLE);
+        }
+
+        @Test
+        @DisplayName("endDate를 날짜만 주면 그날 23:59:59.999999까지 포함해 기간으로 조회")
+        void findHistory_기간만_endDate_날짜만() {
+            // Given
+            when(bookmarkHistoryReaderRepository.findByBookmarkIdAndChangedAtBetween(
+                BOOKMARK_ID, START, END_OF_LAST_DAY, PAGEABLE)).thenReturn(page);
+
+            // When
+            Page<BookmarkHistoryEntity> result = findHistory(
+                new BookmarkHistoryListRequest(1, 10, null, "2026-01-01", "2026-01-31"));
+
+            // Then
+            assertThat(result).isSameAs(page);
+            verify(bookmarkHistoryReaderRepository, times(1))
+                .findByBookmarkIdAndChangedAtBetween(BOOKMARK_ID, START, END_OF_LAST_DAY, PAGEABLE);
+        }
+
+        @Test
+        @DisplayName("operationType과 함께 endDate를 날짜만 주면 그날 23:59:59.999999까지 포함해 조회")
+        void findHistory_작업종류와_기간_endDate_날짜만() {
+            // Given
+            when(bookmarkHistoryReaderRepository.findByBookmarkIdAndOperationTypeAndChangedAtBetween(
+                BOOKMARK_ID, "DELETE", START, END_OF_LAST_DAY, PAGEABLE)).thenReturn(page);
+
+            // When
+            Page<BookmarkHistoryEntity> result = findHistory(
+                new BookmarkHistoryListRequest(1, 10, "DELETE", "2026-01-01", "2026-01-31"));
+
+            // Then
+            assertThat(result).isSameAs(page);
+            verify(bookmarkHistoryReaderRepository, times(1))
+                .findByBookmarkIdAndOperationTypeAndChangedAtBetween(
+                    BOOKMARK_ID, "DELETE", START, END_OF_LAST_DAY, PAGEABLE);
+        }
+
+        @Test
+        @DisplayName("endDate에 소문자 t로 시각까지 주면 날짜만 준 것으로 보지 않고 그 시각 그대로 조회")
+        void findHistory_endDate_소문자_t_시각() {
+            // Given
+            when(bookmarkHistoryReaderRepository.findByBookmarkIdAndChangedAtBetween(
+                BOOKMARK_ID, START, END, PAGEABLE)).thenReturn(page);
+
+            // When
+            Page<BookmarkHistoryEntity> result = findHistory(
+                new BookmarkHistoryListRequest(1, 10, null, "2026-01-01", "2026-01-31t23:59:59"));
+
+            // Then
+            assertThat(result).isSameAs(page);
+        }
+
+        @Test
+        @DisplayName("endDate 형식이 틀리면 필드명 endDate를 담은 BookmarkValidationException")
+        void findHistory_endDate_형식_오류() {
+            // When & Then
+            assertThatThrownBy(() -> findHistory(
+                new BookmarkHistoryListRequest(1, 10, null, "2026-01-01", "2026/01/31")))
+                .isInstanceOf(BookmarkValidationException.class)
+                .hasMessageContaining("endDate");
+            verify(bookmarkHistoryReaderRepository, never())
+                .findByBookmarkIdAndChangedAtBetween(any(), any(), any(), any());
         }
 
         private Page<BookmarkHistoryEntity> findHistory(BookmarkHistoryListRequest request) {

@@ -24,7 +24,9 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.List;
@@ -37,6 +39,8 @@ import java.util.Map;
 public class BookmarkHistoryServiceImpl implements BookmarkHistoryService {
     
     private static final DateTimeFormatter ISO_FORMATTER = DateTimeFormatter.ISO_DATE_TIME;
+    // LocalTime.MAX(나노초 999999999)는 MySQL TIMESTAMP(6)에 넣을 때 반올림돼 다음 날 0시가 될 수 있어 마이크로초 단위로 끝낸다
+    private static final LocalTime END_OF_DAY = LocalTime.of(23, 59, 59, 999_999_000);
     
     private final BookmarkHistoryReaderRepository bookmarkHistoryReaderRepository;
     private final BookmarkReaderRepository bookmarkReaderRepository;
@@ -63,7 +67,7 @@ public class BookmarkHistoryServiceImpl implements BookmarkHistoryService {
             if (request.startDate() != null && request.endDate() != null) {
                 // 날짜 범위 필터링
                 LocalDateTime startDate = parseDateTime(request.startDate(), "startDate");
-                LocalDateTime endDate = parseDateTime(request.endDate(), "endDate");
+                LocalDateTime endDate = parseEndDateTime(request.endDate());
                 return bookmarkHistoryReaderRepository.findByBookmarkIdAndOperationTypeAndChangedAtBetween(
                     bookmarkId, request.operationType(), startDate, endDate, pageable
                 );
@@ -76,7 +80,7 @@ public class BookmarkHistoryServiceImpl implements BookmarkHistoryService {
         } else if (request.startDate() != null && request.endDate() != null) {
             // 날짜 범위만 필터링
             LocalDateTime startDate = parseDateTime(request.startDate(), "startDate");
-            LocalDateTime endDate = parseDateTime(request.endDate(), "endDate");
+            LocalDateTime endDate = parseEndDateTime(request.endDate());
             return bookmarkHistoryReaderRepository.findByBookmarkIdAndChangedAtBetween(
                 bookmarkId, startDate, endDate, pageable
             );
@@ -235,15 +239,27 @@ public class BookmarkHistoryServiceImpl implements BookmarkHistoryService {
             return LocalDateTime.parse(dateTimeStr, ISO_FORMATTER);
         } catch (DateTimeParseException e1) {
             // Try ISO_DATE format (e.g., 2024-01-15) and convert to LocalDateTime
-            try {
-                return java.time.LocalDate.parse(dateTimeStr, DateTimeFormatter.ISO_DATE)
-                    .atStartOfDay();
-            } catch (DateTimeParseException e2) {
-                throw new BookmarkValidationException(
-                    String.format("%s 날짜 형식이 유효하지 않습니다: %s (지원 형식: yyyy-MM-dd 또는 yyyy-MM-ddTHH:mm:ss)",
-                        fieldName, dateTimeStr)
-                );
-            }
+            return parseDate(dateTimeStr, fieldName).atStartOfDay();
+        }
+    }
+
+    // endDate 전용: 날짜만 오면 그날 0시가 아니라 마지막 순간까지 포함한다
+    private LocalDateTime parseEndDateTime(String dateTimeStr) {
+        try {
+            return LocalDateTime.parse(dateTimeStr, ISO_FORMATTER);
+        } catch (DateTimeParseException e) {
+            return parseDate(dateTimeStr, "endDate").atTime(END_OF_DAY);
+        }
+    }
+
+    private LocalDate parseDate(String dateStr, String fieldName) {
+        try {
+            return LocalDate.parse(dateStr, DateTimeFormatter.ISO_DATE);
+        } catch (DateTimeParseException e) {
+            throw new BookmarkValidationException(
+                String.format("%s 날짜 형식이 유효하지 않습니다: %s (지원 형식: yyyy-MM-dd 또는 yyyy-MM-ddTHH:mm:ss)",
+                    fieldName, dateStr)
+            );
         }
     }
 }
