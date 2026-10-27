@@ -11,7 +11,6 @@ import io.github.resilience4j.retry.RetryRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientException;
 
 import java.io.StringReader;
 import java.time.LocalDateTime;
@@ -58,37 +57,41 @@ public abstract class AbstractRssParser implements RssParser {
         WebClient webClient = webClientBuilder.baseUrl(config.getFeedUrl()).build();
         Retry retry = retryRegistry.retry("rssRetry");
 
-        return retry.executeSupplier(() -> {
-            try {
+        String feedContent;
+        try {
+            // fetch만 재시도한다. 예외를 바꾸지 않고 그대로 던져야 rssRetry의 retry-exceptions에 걸린다.
+            feedContent = retry.executeSupplier(() -> {
                 log.debug("Fetching {} RSS feed from: {}", sourceName, config.getFeedUrl());
-                String feedContent = webClient.get()
+                return webClient.get()
                     .uri("")
                     .retrieve()
                     .bodyToMono(String.class)
                     .block();
+            });
+        } catch (RuntimeException e) {
+            log.error("Failed to fetch {} RSS feed", sourceName, e);
+            throw new RssParsingException(sourceName + " RSS feed fetch failed", e);
+        }
 
-                if (feedContent == null || feedContent.isEmpty()) {
-                    throw new RssParsingException("Empty RSS feed content received from " + sourceName);
-                }
+        if (feedContent == null || feedContent.isEmpty()) {
+            throw new RssParsingException("Empty RSS feed content received from " + sourceName);
+        }
 
-                feedContent = prepareContent(feedContent);
+        try {
+            feedContent = prepareContent(feedContent);
 
-                SyndFeedInput input = new SyndFeedInput();
-                SyndFeed feed = input.build(new StringReader(feedContent));
+            SyndFeedInput input = new SyndFeedInput();
+            SyndFeed feed = input.build(new StringReader(feedContent));
 
-                log.debug("Successfully parsed {} RSS feed. Found {} entries", sourceName, feed.getEntries().size());
+            log.debug("Successfully parsed {} RSS feed. Found {} entries", sourceName, feed.getEntries().size());
 
-                return feed.getEntries().stream()
-                    .map(this::convertToRssFeedItem)
-                    .collect(Collectors.toList());
-            } catch (WebClientException e) {
-                log.error("Failed to fetch {} RSS feed", sourceName, e);
-                throw new RssParsingException(sourceName + " RSS feed fetch failed", e);
-            } catch (Exception e) {
-                log.error("Failed to parse {} RSS feed", sourceName, e);
-                throw new RssParsingException(sourceName + " RSS parsing failed", e);
-            }
-        });
+            return feed.getEntries().stream()
+                .map(this::convertToRssFeedItem)
+                .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.error("Failed to parse {} RSS feed", sourceName, e);
+            throw new RssParsingException(sourceName + " RSS parsing failed", e);
+        }
     }
 
     /**
