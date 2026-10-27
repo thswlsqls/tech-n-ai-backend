@@ -74,7 +74,7 @@ public class BookmarkQueryServiceImpl implements BookmarkQueryService {
         if ("title".equals(searchField)) {
             spec = spec.and((root, query, cb) ->
                 cb.like(cb.lower(root.get("title")), "%" + searchTerm.toLowerCase() + "%"));
-        } else if ("tag".equals(searchField)) {
+        } else if ("tag".equals(searchField) || "tags".equals(searchField)) {
             spec = spec.and((root, query, cb) ->
                 cb.like(cb.lower(root.get("tag")), "%" + searchTerm.toLowerCase() + "%"));
         } else if ("memo".equals(searchField)) {

@@ -6,11 +6,15 @@ import com.tech.n.ai.api.bookmark.dto.request.BookmarkSearchRequest;
 import com.tech.n.ai.common.exception.exception.UnauthorizedException;
 import com.tech.n.ai.domain.aurora.entity.bookmark.BookmarkEntity;
 import com.tech.n.ai.domain.aurora.repository.reader.bookmark.BookmarkReaderRepository;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Root;
 import org.bson.types.ObjectId;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -25,6 +29,9 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -281,6 +288,95 @@ class BookmarkQueryServiceTest {
 
             // Then
             assertThat(result.getContent()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("searchField가 tags면 tag 컬럼만 검색 조건에 쓴다")
+        void searchBookmarks_tags값은_tag컬럼만검색() {
+            // Given
+            BookmarkSearchRequest request = new BookmarkSearchRequest("ML", 1, 10, "tags");
+
+            // When
+            Root<BookmarkEntity> root = applySearchSpec(request);
+
+            // Then
+            verify(root).get("tag");
+            verify(root, never()).get("title");
+            verify(root, never()).get("memo");
+        }
+
+        @Test
+        @DisplayName("searchField가 tag면 tag 컬럼만 검색 조건에 쓴다")
+        void searchBookmarks_tag값은_tag컬럼만검색() {
+            // Given
+            BookmarkSearchRequest request = new BookmarkSearchRequest("ML", 1, 10, "tag");
+
+            // When
+            Root<BookmarkEntity> root = applySearchSpec(request);
+
+            // Then
+            verify(root).get("tag");
+            verify(root, never()).get("title");
+            verify(root, never()).get("memo");
+        }
+
+        @Test
+        @DisplayName("searchField가 all이면 title·tag·memo를 모두 검색 조건에 쓴다")
+        void searchBookmarks_all값은_세필드검색() {
+            // Given
+            BookmarkSearchRequest request = new BookmarkSearchRequest("ML", 1, 10, "all");
+
+            // When
+            Root<BookmarkEntity> root = applySearchSpec(request);
+
+            // Then
+            verify(root).get("title");
+            verify(root).get("tag");
+            verify(root).get("memo");
+        }
+
+        @Test
+        @DisplayName("searchField가 null이면 기본값 all로 title·tag·memo를 모두 검색 조건에 쓴다")
+        void searchBookmarks_null값은_세필드검색() {
+            // Given
+            BookmarkSearchRequest request = new BookmarkSearchRequest("ML", 1, 10, null);
+
+            // When
+            Root<BookmarkEntity> root = applySearchSpec(request);
+
+            // Then
+            verify(root).get("title");
+            verify(root).get("tag");
+            verify(root).get("memo");
+        }
+
+        @Test
+        @DisplayName("searchField가 알 수 없는 값이면 title·tag·memo를 모두 검색 조건에 쓴다")
+        void searchBookmarks_알수없는값은_세필드검색() {
+            // Given
+            BookmarkSearchRequest request = new BookmarkSearchRequest("ML", 1, 10, "foo");
+
+            // When
+            Root<BookmarkEntity> root = applySearchSpec(request);
+
+            // Then
+            verify(root).get("title");
+            verify(root).get("tag");
+            verify(root).get("memo");
+        }
+
+        @SuppressWarnings("unchecked")
+        private Root<BookmarkEntity> applySearchSpec(BookmarkSearchRequest request) {
+            when(bookmarkReaderRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+            bookmarkQueryService.searchBookmarks(1L, request);
+
+            ArgumentCaptor<Specification<BookmarkEntity>> specCaptor = ArgumentCaptor.forClass(Specification.class);
+            verify(bookmarkReaderRepository).findAll(specCaptor.capture(), any(Pageable.class));
+
+            Root<BookmarkEntity> root = mock(Root.class);
+            specCaptor.getValue().toPredicate(root, mock(CriteriaQuery.class), mock(CriteriaBuilder.class));
+            return root;
         }
     }
 
