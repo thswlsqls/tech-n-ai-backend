@@ -225,6 +225,55 @@ class GraphBuildTaskletTest {
                 .extracting(GraphBuildReport.DocumentRow::externalId)
                 .containsExactly("ext-1", "ext-4", "ext-5");
         }
+
+        @Test
+        @DisplayName("모르는 값이면 문서를 읽기 전에 멈추고 추출·저장·리포트를 하나도 하지 않는다")
+        void unknownSelectFails() {
+            // Given: spread를 spred로 잘못 적었다
+            GraphBuildTasklet typoTasklet = selectTasklet(20, "spred");
+            givenDocuments(document("ext-1", "본문"));
+
+            // When & Then
+            assertThatThrownBy(() -> typoTasklet.execute(null, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("graph.build.select");
+            verify(mongoTemplate, never()).find(any(Query.class), eq(EmergingTechDocument.class));
+            verify(graphExtractor, never()).extract(anyString());
+            verify(graphWriter, never()).upsertNode(anyString(), any(), anyString(), anyString());
+            verify(reportWriter, never()).write(any(), any());
+        }
+
+        @Test
+        @DisplayName("대소문자가 다르면 모르는 값으로 보고 멈춘다")
+        void differentCaseFails() {
+            // Given: input-text처럼 대소문자를 구분한다
+            GraphBuildTasklet upperTasklet = selectTasklet(20, "Spread");
+            givenDocuments(document("ext-1", "본문"));
+
+            // When & Then
+            assertThatThrownBy(() -> upperTasklet.execute(null, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("graph.build.select");
+        }
+
+        @Test
+        @DisplayName("전량(limit 0)으로 돌려도 모르는 값이면 멈춘다")
+        void unknownSelectFailsWithoutLimit() {
+            // Given: limit 0이면 두 방식이 같아도 값 확인은 똑같이 한다
+            GraphBuildTasklet typoTasklet = selectTasklet(0, "spred");
+            givenDocuments(document("ext-1", "본문"));
+
+            // When & Then
+            assertThatThrownBy(() -> typoTasklet.execute(null, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("graph.build.select");
+        }
+
+        private GraphBuildTasklet selectTasklet(int documentLimit, String selectMode) {
+            return new GraphBuildTasklet(
+                mongoTemplate, graphExtractor, graphWriter, tokenUsageRecorder, reportWriter,
+                documentLimit, selectMode, "title-summary", "gpt-4o-mini", 0.15, 0.60);
+        }
     }
 
     @Nested
