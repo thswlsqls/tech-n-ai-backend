@@ -4,6 +4,7 @@ import com.tech.n.ai.client.scraper.config.ScraperProperties;
 import com.tech.n.ai.client.scraper.dto.ScrapedContestItem;
 import com.tech.n.ai.client.scraper.exception.ScrapingException;
 import com.tech.n.ai.client.scraper.util.RobotsTxtChecker;
+import com.tech.n.ai.client.scraper.util.ScraperDomUtils;
 import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.retry.RetryRegistry;
 import lombok.extern.slf4j.Slf4j;
@@ -177,9 +178,10 @@ public class LeetCodeScraper implements WebScraper {
      */
     private ScrapedContestItem extractContestInfo(Element element, String baseUrl) {
         try {
-            String title = element.select("h3, h4, .title, .contest-title").first() != null
-                ? element.select("h3, h4, .title, .contest-title").first().text()
-                : element.text();
+            String title = ScraperDomUtils.extractText(element, "h3, h4, .title, .contest-title");
+            if (title == null) {
+                title = element.text();
+            }
             
             String url = element.attr("href");
             if (url != null && !url.isEmpty() && !url.startsWith("http")) {
@@ -188,9 +190,7 @@ public class LeetCodeScraper implements WebScraper {
                 url = baseUrl + CONTESTS_PAGE;
             }
             
-            String description = element.select(".description, .contest-description").first() != null
-                ? element.select(".description, .contest-description").first().text()
-                : null;
+            String description = ScraperDomUtils.extractText(element, ".description, .contest-description");
             
             // 날짜 파싱 (실제 구조에 따라 조정 필요)
             LocalDateTime startDate = null;
