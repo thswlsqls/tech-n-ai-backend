@@ -10,14 +10,11 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class BatchSourceApplication {
 
 	public static void main(String[] args) {
-//		SpringApplication.run(BatchSourceApplication.class, args);
-
 		System.exit(
 			SpringApplication.exit(
-				SpringApplication.run(BatchSourceApplication.class)
+				SpringApplication.run(BatchSourceApplication.class, args)
 			)
-		)
-		;
+		);
 	}
 
 }
