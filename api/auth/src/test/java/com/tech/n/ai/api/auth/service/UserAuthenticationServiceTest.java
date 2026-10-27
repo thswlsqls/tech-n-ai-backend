@@ -7,8 +7,11 @@ import com.tech.n.ai.common.exception.exception.UnauthorizedException;
 import com.tech.n.ai.common.security.jwt.JwtTokenPayload;
 import com.tech.n.ai.domain.aurora.entity.auth.RefreshTokenEntity;
 import com.tech.n.ai.domain.aurora.entity.auth.UserEntity;
+import com.tech.n.ai.domain.aurora.repository.reader.auth.RefreshTokenReaderRepository;
 import com.tech.n.ai.domain.aurora.repository.reader.auth.UserReaderRepository;
+import com.tech.n.ai.domain.aurora.repository.writer.auth.RefreshTokenWriterRepository;
 import com.tech.n.ai.domain.aurora.repository.writer.auth.UserWriterRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -230,6 +233,63 @@ class UserAuthenticationServiceTest {
 
             assertThatThrownBy(() -> userAuthenticationService.refreshToken(request))
                 .isInstanceOf(UnauthorizedException.class);
+        }
+    }
+
+    // ========== 삭제된 RefreshToken (실제 RefreshTokenService 사용) ==========
+
+    @Nested
+    @DisplayName("삭제된 RefreshToken")
+    class DeletedRefreshToken {
+
+        @Mock
+        private RefreshTokenReaderRepository refreshTokenReaderRepository;
+
+        @Mock
+        private RefreshTokenWriterRepository refreshTokenWriterRepository;
+
+        private UserAuthenticationService service;
+
+        @BeforeEach
+        void setUp() {
+            RefreshTokenService realRefreshTokenService = new RefreshTokenService(
+                refreshTokenWriterRepository, refreshTokenReaderRepository, userReaderRepository, null);
+            service = new UserAuthenticationService(
+                userReaderRepository, userWriterRepository, passwordEncoder, tokenService, realRefreshTokenService);
+        }
+
+        @Test
+        @DisplayName("삭제된 RefreshToken으로 갱신 - UnauthorizedException, 새 토큰 미발급")
+        void refreshToken_삭제된_토큰() {
+            // Given: 이미 로그아웃·갱신에 쓰여 삭제 표시된 토큰
+            RefreshTokenEntity tokenEntity = createRefreshToken(123L);
+            tokenEntity.setIsDeleted(true);
+            when(tokenService.validateToken("deleted-refresh")).thenReturn(true);
+            when(refreshTokenReaderRepository.findByToken("deleted-refresh")).thenReturn(Optional.of(tokenEntity));
+            lenient().when(tokenService.getPayloadFromToken("deleted-refresh"))
+                .thenReturn(new JwtTokenPayload("123", "test@example.com", "USER"));
+
+            // When & Then
+            assertThatThrownBy(() -> service.refreshToken(new RefreshTokenRequest("deleted-refresh")))
+                .isInstanceOf(UnauthorizedException.class)
+                .hasMessage("유효하지 않은 Refresh Token입니다.");
+            verify(tokenService, never()).generateTokens(any(), any(), any());
+            verify(refreshTokenWriterRepository, never()).delete(any());
+        }
+
+        @Test
+        @DisplayName("삭제된 RefreshToken으로 다시 로그아웃 - UnauthorizedException, 삭제 미호출")
+        void logout_삭제된_토큰() {
+            // Given
+            RefreshTokenEntity tokenEntity = createRefreshToken(123L);
+            tokenEntity.setIsDeleted(true);
+            when(refreshTokenReaderRepository.findByToken("deleted-refresh")).thenReturn(Optional.of(tokenEntity));
+
+            // When & Then
+            assertThatThrownBy(() -> service.logout("123", "deleted-refresh"))
+                .isInstanceOf(UnauthorizedException.class)
+                .hasMessage("유효하지 않은 Refresh Token입니다.");
+            verify(refreshTokenWriterRepository, never()).delete(any());
         }
     }
 

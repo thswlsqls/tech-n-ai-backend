@@ -97,6 +97,19 @@ class RefreshTokenServiceTest {
 
             assertThat(refreshTokenService.findRefreshToken("none")).isEmpty();
         }
+
+        @Test
+        @DisplayName("삭제된(isDeleted=true) 토큰 - empty")
+        void findRefreshToken_삭제됨() {
+            // Given: 로그아웃·갱신으로 삭제 표시만 된 토큰이 조회된다
+            RefreshTokenEntity entity = new RefreshTokenEntity();
+            entity.setToken("deleted");
+            entity.setIsDeleted(true);
+            when(refreshTokenReaderRepository.findByToken("deleted")).thenReturn(Optional.of(entity));
+
+            // When & Then
+            assertThat(refreshTokenService.findRefreshToken("deleted")).isEmpty();
+        }
     }
 
     @Nested

@@ -45,7 +45,8 @@ public class RefreshTokenService {
     }
     
     public Optional<RefreshTokenEntity> findRefreshToken(String token) {
-        return refreshTokenReaderRepository.findByToken(token);
+        return refreshTokenReaderRepository.findByToken(token)
+            .filter(entity -> !Boolean.TRUE.equals(entity.getIsDeleted()));
     }
     
     @Transactional
@@ -55,7 +56,6 @@ public class RefreshTokenService {
     
     public boolean validateRefreshToken(String token) {
         return findRefreshToken(token)
-            .filter(entity -> !Boolean.TRUE.equals(entity.getIsDeleted()))
             .filter(entity -> entity.getExpiresAt().isAfter(LocalDateTime.now()))
             .isPresent();
     }
