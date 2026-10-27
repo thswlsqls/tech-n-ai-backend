@@ -109,6 +109,7 @@ public class OAuthService {
             provider.getId(),
             userInfo.providerUserId()
         );
+        user.setProvider(provider);
         return userWriterRepository.save(user);
     }
     
