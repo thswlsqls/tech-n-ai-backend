@@ -142,6 +142,7 @@ public class BookmarkCommandServiceImpl implements BookmarkCommandService {
         Long bookmarkId = parseBookmarkId(bookmarkTsid);
         BookmarkEntity bookmark = findDeletedBookmark(userId, bookmarkId);
         validateRestorePeriod(bookmark);
+        validateDuplicateBookmark(userId, bookmark.getEmergingTechId());
 
         bookmark.restore();
         BookmarkEntity restoredBookmark = bookmarkWriterRepository.save(bookmark);
