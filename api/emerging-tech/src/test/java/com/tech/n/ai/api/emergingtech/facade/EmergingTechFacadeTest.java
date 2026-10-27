@@ -17,8 +17,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -34,7 +37,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
- * EmergingTechFacade 단위 테스트 — 다건 생성 집계
+ * EmergingTechFacade 단위 테스트 — 다건 생성 집계, 목록 조회 필터 전달
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("EmergingTechFacade 단위 테스트")
@@ -116,6 +119,78 @@ class EmergingTechFacadeTest {
     }
 
     @Nested
+    @DisplayName("getEmergingTechList")
+    class GetEmergingTechList {
+
+        @Test
+        @DisplayName("소문자 필터 값은 대문자로 바꿔 조회에 넘긴다")
+        void 소문자_필터는_대문자로_넘긴다() {
+            // Given: 저장된 값은 enum 이름(대문자)인데 필터는 소문자로 들어온다
+            EmergingTechListRequest request = listRequest("openai", "sdk_release", "published", "rss");
+            when(queryService.findEmergingTechs(any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(Page.empty());
+
+            // When
+            facade.getEmergingTechList(request);
+
+            // Then: 검증을 통과한 값과 같은 대문자 값으로 조회한다
+            verify(queryService).findEmergingTechs(
+                eq("OPENAI"), eq("SDK_RELEASE"), eq("PUBLISHED"), eq("RSS"),
+                isNull(), isNull(), any());
+        }
+
+        @Test
+        @DisplayName("대소문자가 섞인 필터 값도 대문자로 바꿔 넘긴다")
+        void 대소문자_섞인_필터는_대문자로_넘긴다() {
+            // Given
+            EmergingTechListRequest request = listRequest("OpenAI", null, null, null);
+            when(queryService.findEmergingTechs(any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(Page.empty());
+
+            // When
+            facade.getEmergingTechList(request);
+
+            // Then
+            verify(queryService).findEmergingTechs(
+                eq("OPENAI"), isNull(), isNull(), isNull(), isNull(), isNull(), any());
+        }
+
+        @Test
+        @DisplayName("대문자 값은 그대로, 빈 필터는 null로, 날짜와 페이지 정보는 지금과 같게 넘긴다")
+        void 대문자와_null과_나머지_인자는_그대로_넘긴다() {
+            // Given: provider만 대문자로 주고 나머지 필터는 비운다
+            EmergingTechListRequest request = new EmergingTechListRequest(
+                2, 10, "OPENAI", null, null, null, "2026-01-01", "2026-01-31", null);
+            when(queryService.findEmergingTechs(any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(Page.empty());
+
+            // When
+            facade.getEmergingTechList(request);
+
+            // Then: 빈 필터는 null 그대로라 조건이 추가되지 않는다
+            verify(queryService).findEmergingTechs(
+                eq("OPENAI"), isNull(), isNull(), isNull(),
+                eq("2026-01-01"), eq("2026-01-31"),
+                eq(PageRequest.of(1, 10, Sort.by(Sort.Direction.DESC, "publishedAt"))));
+        }
+
+        @Test
+        @DisplayName("정의되지 않은 필터 값은 BusinessException으로 거부하고 조회하지 않는다")
+        void 정의되지_않은_값은_거부한다() {
+            // Given
+            EmergingTechListRequest request = listRequest("foo", null, null, null);
+
+            // When & Then
+            assertThatThrownBy(() -> facade.getEmergingTechList(request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("provider")
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCodeConstants.BAD_REQUEST);
+            verifyNoInteractions(queryService);
+        }
+    }
+
+    @Nested
     @DisplayName("getEmergingTechList - 날짜 형식 검증")
     class GetEmergingTechListDateValidation {
 
@@ -164,6 +239,10 @@ class EmergingTechFacadeTest {
             verify(queryService).findEmergingTechs(
                 isNull(), isNull(), isNull(), isNull(), eq("2024-01-01"), isNull(), any(Pageable.class));
         }
+    }
+
+    private EmergingTechListRequest listRequest(String provider, String updateType, String status, String sourceType) {
+        return new EmergingTechListRequest(null, null, provider, updateType, status, null, null, null, sourceType);
     }
 
     private EmergingTechListRequest listRequest(String startDate, String endDate) {

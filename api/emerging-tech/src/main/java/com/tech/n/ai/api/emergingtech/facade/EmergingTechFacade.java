@@ -66,10 +66,10 @@ public class EmergingTechFacade {
         );
 
         Page<EmergingTechDocument> page = queryService.findEmergingTechs(
-            request.provider(),
-            request.updateType(),
-            request.status(),
-            request.sourceType(),
+            toUpperCase(request.provider()),
+            toUpperCase(request.updateType()),
+            toUpperCase(request.status()),
+            toUpperCase(request.sourceType()),
             request.startDate(),
             request.endDate(),
             pageable
@@ -241,6 +241,13 @@ public class EmergingTechFacade {
                 String.format("유효하지 않은 %s 값입니다: '%s'. 올바른 형식: YYYY-MM-DD", fieldName, value)
             );
         }
+    }
+
+    /**
+     * 저장된 enum 이름(대문자)과 맞추기 위해 필터 값을 대문자로 바꾼다. 검증(validateEnumValue)과 같은 방식이다.
+     */
+    private String toUpperCase(String value) {
+        return value != null ? value.toUpperCase() : null;
     }
 
     /**
