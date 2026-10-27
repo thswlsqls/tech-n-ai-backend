@@ -279,7 +279,50 @@ class BookmarkCommandServiceTest {
 
             // Then
             assertThat(result.getIsDeleted()).isFalse();
+            verify(bookmarkReaderRepository)
+                .findByUserIdAndEmergingTechIdAndIsDeletedFalse(userId, bookmark.getEmergingTechId());
             verify(bookmarkWriterRepository).save(bookmark);
+        }
+
+        @Test
+        @DisplayName("같은 항목의 삭제되지 않은 북마크가 있으면 BookmarkDuplicateException - 복구하지 않음")
+        void restoreBookmark_같은항목_북마크_중복() {
+            // Given
+            Long userId = 1L;
+            String bookmarkId = "100";
+            BookmarkEntity deletedBookmark = createDeletedBookmark(100L, userId, LocalDateTime.now().minusDays(5));
+            String emergingTechId = deletedBookmark.getEmergingTechId();
+            BookmarkEntity activeBookmark = createBookmark(200L, userId);
+            activeBookmark.setEmergingTechId(emergingTechId);
+
+            when(bookmarkReaderRepository.findById(100L)).thenReturn(Optional.of(deletedBookmark));
+            when(bookmarkReaderRepository.findByUserIdAndEmergingTechIdAndIsDeletedFalse(userId, emergingTechId))
+                .thenReturn(Optional.of(activeBookmark));
+
+            // When & Then
+            assertThatThrownBy(() -> bookmarkCommandService.restoreBookmark(userId, bookmarkId))
+                .isInstanceOf(BookmarkDuplicateException.class);
+            verify(bookmarkReaderRepository).findByUserIdAndEmergingTechIdAndIsDeletedFalse(userId, emergingTechId);
+            verify(bookmarkWriterRepository, never()).save(any());
+            assertThat(deletedBookmark.getIsDeleted()).isTrue();
+        }
+
+        @Test
+        @DisplayName("다른 사용자 북마크 복구 시 UnauthorizedException - 중복 확인 쿼리 호출 안 함")
+        void restoreBookmark_권한없음() {
+            // Given
+            Long userId = 1L;
+            Long otherUserId = 2L;
+            String bookmarkId = "100";
+            BookmarkEntity bookmark = createDeletedBookmark(100L, otherUserId, LocalDateTime.now().minusDays(5));
+
+            when(bookmarkReaderRepository.findById(100L)).thenReturn(Optional.of(bookmark));
+
+            // When & Then
+            assertThatThrownBy(() -> bookmarkCommandService.restoreBookmark(userId, bookmarkId))
+                .isInstanceOf(UnauthorizedException.class);
+            verify(bookmarkReaderRepository, never()).findByUserIdAndEmergingTechIdAndIsDeletedFalse(anyLong(), anyString());
+            verify(bookmarkWriterRepository, never()).save(any());
         }
 
         @Test
@@ -296,6 +339,7 @@ class BookmarkCommandServiceTest {
             // When & Then
             assertThatThrownBy(() -> bookmarkCommandService.restoreBookmark(userId, bookmarkId))
                 .isInstanceOf(BookmarkValidationException.class);
+            verify(bookmarkReaderRepository, never()).findByUserIdAndEmergingTechIdAndIsDeletedFalse(anyLong(), anyString());
             verify(bookmarkWriterRepository, never()).save(any());
         }
 
@@ -312,6 +356,7 @@ class BookmarkCommandServiceTest {
             // When & Then
             assertThatThrownBy(() -> bookmarkCommandService.restoreBookmark(userId, bookmarkId))
                 .isInstanceOf(BookmarkValidationException.class);
+            verify(bookmarkReaderRepository, never()).findByUserIdAndEmergingTechIdAndIsDeletedFalse(anyLong(), anyString());
         }
     }
 
