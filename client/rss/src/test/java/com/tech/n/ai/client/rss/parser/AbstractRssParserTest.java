@@ -202,7 +202,7 @@ class AbstractRssParserTest {
         @DisplayName("항목의 제목·링크·발행일·카테고리·guid를 변환하고 BOM과 앞뒤 공백을 지운 뒤 파싱한다")
         void parse_convertsItem() {
             // Given
-            respondWith(() -> ok("﻿  \n" + RSS_BODY));
+            respondWith(() -> ok("\uFEFF  \n" + RSS_BODY));
 
             // When
             List<RssFeedItem> items = openAiParser().parse();
