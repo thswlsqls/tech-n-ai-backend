@@ -58,9 +58,10 @@ public class RobotsTxtChecker {
      */
     public CheckResult check(String baseUrl, String path) {
         try {
-            String robotsTxtUrl = baseUrl.endsWith("/")
-                ? baseUrl + "robots.txt"
-                : baseUrl + "/robots.txt";
+            String siteUrl = baseUrl.endsWith("/")
+                ? baseUrl.substring(0, baseUrl.length() - 1)
+                : baseUrl;
+            String robotsTxtUrl = siteUrl + "/robots.txt";
 
             log.debug("Checking robots.txt for {}: {}", baseUrl, robotsTxtUrl);
 
@@ -79,7 +80,8 @@ public class RobotsTxtChecker {
             SimpleRobotRulesParser parser = new SimpleRobotRulesParser();
             BaseRobotRules rules = parser.parseContent(robotsTxtUrl, robotsTxt.getBytes(), "text/plain", "ShrimpTM-Demo/1.0");
 
-            boolean allowed = rules.isAllowed(path);
+            // crawler-commons는 전체 URL을 받는다. 상대 경로를 넘기면 루트("/")로 검사한다.
+            boolean allowed = rules.isAllowed(siteUrl + path);
             log.debug("robots.txt check for {}: path={}, allowed={}", baseUrl, path, allowed);
 
             return allowed ? CheckResult.ALLOWED : CheckResult.BLOCKED_BY_ROBOTS;
