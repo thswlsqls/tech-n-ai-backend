@@ -17,6 +17,7 @@ import org.openqa.selenium.support.ui.WebDriverWait;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientException;
 
 import com.tech.n.ai.client.scraper.util.DateParsingUtils;
 import com.tech.n.ai.client.scraper.util.StructuredDataDateExtractor;
@@ -80,43 +81,50 @@ public class MetaAiBlogScraper implements TechBlogScraper {
 
         Retry retry = retryRegistry.retry("scraperRetry");
 
-        return retry.executeSupplier(() -> {
-            try {
-                String html;
+        try {
+            return retry.executeSupplier(() -> {
+                try {
+                    String html;
 
-                if (config.isRequiresSelenium() && webDriver.isPresent()) {
-                    html = fetchWithSelenium(config.getBaseUrl() + BLOG_PATH);
-                } else {
-                    html = fetchWithWebClient(config.getBaseUrl(), BLOG_PATH);
-                }
-
-                if (html == null || html.isEmpty()) {
-                    throw new ScrapingException("Empty HTML content from Meta AI Blog");
-                }
-
-                Document doc = Jsoup.parse(html);
-                List<ScrapedTechArticle> articles = new ArrayList<>();
-
-                var articleElements = doc.select("a[href*=/blog/]");
-
-                for (Element element : articleElements) {
-                    try {
-                        ScrapedTechArticle article = extractArticle(element, config.getBaseUrl());
-                        if (article != null) {
-                            articles.add(article);
-                        }
-                    } catch (Exception e) {
-                        log.warn("Failed to extract Meta AI article: {}", e.getMessage());
+                    if (config.isRequiresSelenium() && webDriver.isPresent()) {
+                        html = fetchWithSelenium(config.getBaseUrl() + BLOG_PATH);
+                    } else {
+                        html = fetchWithWebClient(config.getBaseUrl(), BLOG_PATH);
                     }
-                }
 
-                log.info("Scraped {} articles from Meta AI Blog", articles.size());
-                return articles;
-            } catch (Exception e) {
-                log.error("Meta AI Blog scraping failed", e);
-                throw new ScrapingException("Meta AI Blog scraping failed", e);
-            }
-        });
+                    if (html == null || html.isEmpty()) {
+                        throw new ScrapingException("Empty HTML content from Meta AI Blog");
+                    }
+
+                    Document doc = Jsoup.parse(html);
+                    List<ScrapedTechArticle> articles = new ArrayList<>();
+
+                    var articleElements = doc.select("a[href*=/blog/]");
+
+                    for (Element element : articleElements) {
+                        try {
+                            ScrapedTechArticle article = extractArticle(element, config.getBaseUrl());
+                            if (article != null) {
+                                articles.add(article);
+                            }
+                        } catch (Exception e) {
+                            log.warn("Failed to extract Meta AI article: {}", e.getMessage());
+                        }
+                    }
+
+                    log.info("Scraped {} articles from Meta AI Blog", articles.size());
+                    return articles;
+                } catch (WebClientException e) {
+                    throw e; // scraperRetry가 보고 다시 시도하도록 그대로 던진다
+                } catch (Exception e) {
+                    log.error("Meta AI Blog scraping failed", e);
+                    throw new ScrapingException("Meta AI Blog scraping failed", e);
+                }
+            });
+        } catch (WebClientException e) {
+            log.error("Meta AI Blog scraping failed", e);
+            throw new ScrapingException("Meta AI Blog scraping failed", e);
+        }
     }
 
     private String fetchWithSelenium(String url) {

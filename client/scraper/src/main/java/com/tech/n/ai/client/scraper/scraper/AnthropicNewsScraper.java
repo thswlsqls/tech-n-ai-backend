@@ -81,51 +81,55 @@ public class AnthropicNewsScraper implements TechBlogScraper {
         WebClient webClient = webClientBuilder.baseUrl(config.getBaseUrl()).build();
         Retry retry = retryRegistry.retry("scraperRetry");
 
-        return retry.executeSupplier(() -> {
-            try {
-                log.debug("Scraping Anthropic News: {}", config.getBaseUrl() + NEWS_PATH);
+        try {
+            return retry.executeSupplier(() -> {
+                try {
+                    log.debug("Scraping Anthropic News: {}", config.getBaseUrl() + NEWS_PATH);
 
-                String html = webClient.get()
-                    .uri(NEWS_PATH)
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block();
+                    String html = webClient.get()
+                        .uri(NEWS_PATH)
+                        .retrieve()
+                        .bodyToMono(String.class)
+                        .block();
 
-                if (html == null || html.isEmpty()) {
-                    throw new ScrapingException("Empty HTML content from Anthropic News");
-                }
-
-                Document doc = Jsoup.parse(html);
-
-                // __next_f 스크립트에서 slug → publishedOn 매핑 추출
-                Map<String, ArticleData> slugDataMap = extractArticleDataFromNextData(doc);
-                log.debug("Extracted {} article data entries from __next_f scripts", slugDataMap.size());
-
-                List<ScrapedTechArticle> articles = new ArrayList<>();
-
-                var articleElements = doc.select("a[href^=/news/]");
-
-                for (Element element : articleElements) {
-                    try {
-                        ScrapedTechArticle article = extractArticle(element, config.getBaseUrl(), slugDataMap);
-                        if (article != null) {
-                            articles.add(article);
-                        }
-                    } catch (Exception e) {
-                        log.warn("Failed to extract Anthropic article: {}", e.getMessage());
+                    if (html == null || html.isEmpty()) {
+                        throw new ScrapingException("Empty HTML content from Anthropic News");
                     }
-                }
 
-                log.info("Scraped {} articles from Anthropic News", articles.size());
-                return articles;
-            } catch (WebClientException e) {
-                log.error("Failed to fetch Anthropic News", e);
-                throw new ScrapingException("Anthropic News scraping failed", e);
-            } catch (Exception e) {
-                log.error("Anthropic News scraping failed", e);
-                throw new ScrapingException("Anthropic News scraping failed", e);
-            }
-        });
+                    Document doc = Jsoup.parse(html);
+
+                    // __next_f 스크립트에서 slug → publishedOn 매핑 추출
+                    Map<String, ArticleData> slugDataMap = extractArticleDataFromNextData(doc);
+                    log.debug("Extracted {} article data entries from __next_f scripts", slugDataMap.size());
+
+                    List<ScrapedTechArticle> articles = new ArrayList<>();
+
+                    var articleElements = doc.select("a[href^=/news/]");
+
+                    for (Element element : articleElements) {
+                        try {
+                            ScrapedTechArticle article = extractArticle(element, config.getBaseUrl(), slugDataMap);
+                            if (article != null) {
+                                articles.add(article);
+                            }
+                        } catch (Exception e) {
+                            log.warn("Failed to extract Anthropic article: {}", e.getMessage());
+                        }
+                    }
+
+                    log.info("Scraped {} articles from Anthropic News", articles.size());
+                    return articles;
+                } catch (WebClientException e) {
+                    throw e; // scraperRetry가 보고 다시 시도하도록 그대로 던진다
+                } catch (Exception e) {
+                    log.error("Anthropic News scraping failed", e);
+                    throw new ScrapingException("Anthropic News scraping failed", e);
+                }
+            });
+        } catch (WebClientException e) {
+            log.error("Failed to fetch Anthropic News", e);
+            throw new ScrapingException("Anthropic News scraping failed", e);
+        }
     }
 
     /**
