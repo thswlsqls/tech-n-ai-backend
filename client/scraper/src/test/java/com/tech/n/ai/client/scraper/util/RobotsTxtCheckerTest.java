@@ -130,7 +130,7 @@ class RobotsTxtCheckerTest {
         }
 
         @Test
-        @DisplayName("Disallow: /이면 지금처럼 BLOCKED_BY_ROBOTS다")
+        @DisplayName("Disallow: /이면 BLOCKED_BY_ROBOTS다")
         void check_disallowAll_blocked() {
             // Given: 전체를 막는 robots.txt
             RobotsTxtChecker checker = checkerReturning("User-agent: *\nDisallow: /\n");
@@ -143,9 +143,9 @@ class RobotsTxtCheckerTest {
         }
 
         @Test
-        @DisplayName("Allow: /이면 지금처럼 /news는 ALLOWED다")
+        @DisplayName("Allow: /이면 /news는 ALLOWED다")
         void check_allowAll_allowed() {
-            // Given: 현재 anthropic.com 형태의 전체 허용 robots.txt
+            // Given: 전체 허용 robots.txt
             RobotsTxtChecker checker = checkerReturning("User-agent: *\nAllow: /\n");
 
             // When
