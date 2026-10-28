@@ -58,12 +58,11 @@ public class SmtpEmailSender implements EmailSender {
         helper.setTo(message.to());
         helper.setSubject(message.subject());
         
-        if (message.htmlContent() != null) {
+        if (message.htmlContent() != null && message.textContent() != null) {
             // multipart/alternative: HTML과 Plain Text 모두 제공
-            helper.setText(
-                message.textContent() != null ? message.textContent() : "",
-                message.htmlContent()
-            );
+            helper.setText(message.textContent(), message.htmlContent());
+        } else if (message.htmlContent() != null) {
+            helper.setText(message.htmlContent(), true);
         } else {
             helper.setText(message.textContent());
         }
