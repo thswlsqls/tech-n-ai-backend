@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.util.HashMap;
 import java.util.List;
@@ -55,8 +56,13 @@ public class SlackWebhookClient implements SlackClient {
                 .block();
             
             log.debug("Slack message sent successfully");
+        } catch (WebClientResponseException e) {
+            // 예외 메시지에는 요청 URL(=webhook 비밀 경로)이 들어 있어 상태 코드와 Slack 응답 본문만 남긴다
+            log.error("Failed to send Slack message: status={}, body={}",
+                e.getStatusCode().value(), e.getResponseBodyAsString());
         } catch (Exception e) {
-            log.error("Failed to send Slack message", e);
+            // 스택트레이스의 checkpoint에도 요청 URL이 붙으므로 예외 객체는 넘기지 않는다
+            log.error("Failed to send Slack message: {}: {}", e.getClass().getSimpleName(), e.getMessage());
             // 알림 실패는 시스템에 치명적이지 않으므로 예외를 다시 던지지 않음
         }
     }
