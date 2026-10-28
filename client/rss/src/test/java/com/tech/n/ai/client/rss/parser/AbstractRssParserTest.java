@@ -157,7 +157,9 @@ class AbstractRssParserTest {
 
             // Then
             assertThat(requestCount).hasValue(1);
-            assertThat(thrown).isInstanceOf(RssParsingException.class);
+            assertThat(thrown)
+                .isInstanceOf(RssParsingException.class)
+                .hasMessageContaining("Empty RSS feed content");
         }
 
         @Test
