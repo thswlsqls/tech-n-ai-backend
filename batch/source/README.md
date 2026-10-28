@@ -121,10 +121,10 @@ feign:
         readTimeout: 30000
 internal-api:
   emerging-tech:
-    api-key: ${INTERNAL_API_EMERGING_TECH_KEY:default-emerging-tech-api-key}
+    api-key: ${EMERGING_TECH_INTERNAL_API_KEY:${INTERNAL_API_EMERGING_TECH_KEY:default-emerging-tech-api-key}}
 ```
 
-**주요 환경 변수**: `INTERNAL_API_EMERGING_TECH_KEY`(내부 API 키), `GITHUB_TOKEN`(GitHub Rate Limit 완화, 선택). Aurora·MongoDB 연결 변수는 각 `datasource-*` 모듈 설정을 따릅니다.
+**주요 환경 변수**: `EMERGING_TECH_INTERNAL_API_KEY`(내부 API 키, api-emerging-tech 서버와 같은 값. 예전 이름 `INTERNAL_API_EMERGING_TECH_KEY`도 읽음), `GITHUB_TOKEN`(GitHub Rate Limit 완화, 선택). Aurora·MongoDB 연결 변수는 각 `datasource-*` 모듈 설정을 따릅니다.
 
 ## 실행
 

@@ -29,4 +29,5 @@ internal-api:
   news:
     api-key: ${INTERNAL_API_NEWS_KEY:default-news-api-key}
   emerging-tech:
-    api-key: ${INTERNAL_API_EMERGING_TECH_KEY:default-emerging-tech-api-key}
+    # 서버(api-emerging-tech)와 같은 변수를 먼저 읽고, 예전 이름도 계속 받는다
+    api-key: ${EMERGING_TECH_INTERNAL_API_KEY:${INTERNAL_API_EMERGING_TECH_KEY:default-emerging-tech-api-key}}
