@@ -16,7 +16,6 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ExecutorService;
@@ -39,10 +38,11 @@ class ScraperConfigTest {
     private HttpServer server;
     private ExecutorService executor;
     private final AtomicReference<String> receivedUserAgent = new AtomicReference<>();
+    private final AtomicReference<String> receivedAcceptEncoding = new AtomicReference<>();
 
     @BeforeEach
     void startServer() throws IOException {
-        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         executor = Executors.newCachedThreadPool();
         server.setExecutor(executor);
 
@@ -58,6 +58,7 @@ class ScraperConfigTest {
         });
         server.createContext("/fast", exchange -> {
             receivedUserAgent.set(exchange.getRequestHeaders().getFirst("User-Agent"));
+            receivedAcceptEncoding.set(exchange.getRequestHeaders().getFirst("Accept-Encoding"));
             respond(exchange, "ok".getBytes(StandardCharsets.UTF_8));
         });
         server.createContext("/large", exchange -> respond(exchange, new byte[MAX_IN_MEMORY_SIZE + 1]));
@@ -112,7 +113,7 @@ class ScraperConfigTest {
         }
 
         @Test
-        @DisplayName("제때 응답하면 본문을 받고 User-Agent 헤더에 설정값이 실린다")
+        @DisplayName("제때 응답하면 본문을 받고 User-Agent 헤더에 설정값이, Accept-Encoding 헤더에 gzip이 실린다")
         void fastResponse_returnsBodyWithUserAgent() {
             // Given
             WebClient client = webClient(1, "test-agent/1.0");
@@ -123,6 +124,7 @@ class ScraperConfigTest {
             // Then
             assertThat(body).isEqualTo("ok");
             assertThat(receivedUserAgent.get()).isEqualTo("test-agent/1.0");
+            assertThat(receivedAcceptEncoding.get()).contains("gzip");
         }
 
         @Test
