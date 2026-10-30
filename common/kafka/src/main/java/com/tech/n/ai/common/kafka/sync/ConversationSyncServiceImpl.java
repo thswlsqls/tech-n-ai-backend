@@ -149,6 +149,9 @@ public class ConversationSyncServiceImpl implements ConversationSyncService {
                     case "lastMessageAt":
                         if (value instanceof Instant instant) {
                             update.set("last_message_at", convertToLocalDateTime(instant));
+                        } else if (value instanceof String text) {
+                            // 발행 측은 LocalDateTime을 넣고, Kafka JSON을 거치면 ISO 문자열로 도착한다
+                            update.set("last_message_at", LocalDateTime.parse(text));
                         }
                         break;
                     case "isActive":
