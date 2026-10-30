@@ -153,7 +153,7 @@ class ExceptionLoggingServiceTest {
         }
 
         @Test
-        @DisplayName("save가 예외를 던지면 로컬 로그로 대체하고 예외를 밖으로 던지지 않는다")
+        @DisplayName("save가 예외를 던져도 밖으로 던지지 않는다")
         void save_실패시_예외를_던지지_않는다() {
             // Given
             when(mongoTemplate.save(any(), eq(COLLECTION))).thenThrow(new RuntimeException("mongo down"));
