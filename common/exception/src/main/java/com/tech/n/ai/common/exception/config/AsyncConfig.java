@@ -15,7 +15,8 @@ import java.util.concurrent.Executor;
 @EnableAsync
 public class AsyncConfig {
 
-    @Bean(name = "exceptionLoggingExecutor")
+    // 이름으로만 쓰는 전용 풀이다. 기본 후보에서 빼서 Spring Boot 기본 applicationTaskExecutor가 그대로 만들어지게 한다.
+    @Bean(name = "exceptionLoggingExecutor", defaultCandidate = false)
     public Executor exceptionLoggingExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(2);
