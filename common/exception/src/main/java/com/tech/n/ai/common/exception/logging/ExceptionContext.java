@@ -1,5 +1,7 @@
 package com.tech.n.ai.common.exception.logging;
 
+import org.springframework.data.mongodb.core.mapping.Field;
+
 import java.time.Instant;
 import java.util.Map;
 
@@ -11,37 +13,37 @@ public record ExceptionContext(
     /**
      * 예외 소스: "READ" 또는 "WRITE"
      */
-    String source,
+    @Field("source") String source,
     
     /**
      * 예외 타입 (예: "DataAccessException", "ValidationException")
      */
-    String exceptionType,
+    @Field("exception_type") String exceptionType,
     
     /**
      * 예외 메시지
      */
-    String exceptionMessage,
+    @Field("exception_message") String exceptionMessage,
     
     /**
      * 스택 트레이스 (전체)
      */
-    String stackTrace,
+    @Field("stack_trace") String stackTrace,
     
     /**
      * 컨텍스트 정보
      */
-    ContextInfo context,
+    @Field("context") ContextInfo context,
     
     /**
      * 발생 일시
      */
-    Instant occurredAt,
+    @Field("occurred_at") Instant occurredAt,
     
     /**
      * 심각도: "LOW", "MEDIUM", "HIGH", "CRITICAL"
      */
-    String severity
+    @Field("severity") String severity
 ) {
     /**
      * 컨텍스트 정보 내부 클래스
@@ -50,32 +52,32 @@ public record ExceptionContext(
         /**
          * 모듈명
          */
-        String module,
+        @Field("module") String module,
         
         /**
          * 메서드명
          */
-        String method,
+        @Field("method") String method,
         
         /**
          * 파라미터 정보
          */
-        Map<String, Object> parameters,
+        @Field("parameters") Map<String, Object> parameters,
         
         /**
          * 요청 URI (nullable)
          */
-        String requestUri,
+        @Field("request_uri") String requestUri,
 
         /**
          * 사용자 ID (nullable)
          */
-        String userId,
+        @Field("user_id") String userId,
 
         /**
          * 요청 ID (nullable)
          */
-        String requestId
+        @Field("request_id") String requestId
     ) {
     }
 }
